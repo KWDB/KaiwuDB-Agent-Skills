@@ -1,9 +1,9 @@
 #!/bin/bash
 #===============================================================================
-# KWDB Common Functions
-# Common function library for all inspection scripts
+# KWDB OS Detection
+# Detect operating system type for cross-platform script execution
 #
-# Usage: source scripts/common_functions.sh
+# Usage: source scripts/detect_os.sh
 #===============================================================================
 
 # Detect operating system type
