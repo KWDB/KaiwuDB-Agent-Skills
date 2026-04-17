@@ -15,7 +15,21 @@
 
 # Source common function library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/common_functions.sh"
+source "${SCRIPT_DIR}/detect_os.sh"
+
+# Dispatch to platform-specific implementation
+case "$OS_TYPE" in
+    linux)
+        source "${SCRIPT_DIR}/check_node_network_connectivity_linux.sh"
+        ;;
+    darwin)
+        source "${SCRIPT_DIR}/check_node_network_connectivity_darwin.sh"
+        ;;
+    *)
+        check_tcp_connectivity() { echo "unreachable"; }
+        check_ping_latency() { echo ""; }
+        ;;
+esac
 
 TARGET_HOSTS="${1:-}"
 PORT="${2:-26257}"
@@ -26,58 +40,6 @@ if [ -z "$TARGET_HOSTS" ]; then
 fi
 
 IFS=',' read -ra HOSTS <<< "$TARGET_HOSTS"
-
-# TCP connectivity check (cross-platform)
-check_tcp_connectivity() {
-    local host="$1"
-    local port="$2"
-    local timeout=3
-
-    if [ "$OS_TYPE" = "linux" ]; then
-        # Linux: Use /dev/tcp (bash built-in)
-        if timeout "$timeout" bash -lc "</dev/tcp/$host/$port" >/dev/null 2>&1; then
-            echo "reachable"
-        else
-            echo "unreachable"
-        fi
-    else
-        # macOS/Others: Use nc (netcat)
-        if command -v nc >/dev/null 2>&1; then
-            if nc -z -w "$timeout" "$host" "$port" 2>/dev/null; then
-                echo "reachable"
-            else
-                echo "unreachable"
-            fi
-        else
-            # Fallback: Use curl (if available)
-            if command -v curl >/dev/null 2>&1; then
-                if curl -s --connect-timeout "$timeout" "telnet://$host:$port" >/dev/null 2>&1; then
-                    echo "reachable"
-                else
-                    echo "unreachable"
-                fi
-            else
-                echo "unreachable"
-            fi
-        fi
-    fi
-}
-
-# Ping latency check (cross-platform)
-check_ping_latency() {
-    local host="$1"
-    local timeout=1
-
-    if [ "$OS_TYPE" = "linux" ]; then
-        # Linux: ping -W specifies timeout in seconds
-        ping -c 1 -W "$timeout" "$host" 2>/dev/null | \
-            sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -n 1
-    else
-        # macOS: ping -t specifies timeout in seconds
-        ping -c 1 -t "$timeout" "$host" 2>/dev/null | \
-            sed -n 's/.*time=\([0-9.]*\).*/\1/p' | head -n 1
-    fi
-}
 
 echo "{"
 echo "  \"port\": $PORT,"
