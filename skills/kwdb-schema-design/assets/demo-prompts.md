@@ -1,3 +1,9 @@
+---
+title: Test Prompts
+description: 32 example prompts for testing kwdb-schema-design skill across all DDL categories
+tags: [testing, prompts, time-series, relational, mixed, index, alter, view, review]
+---
+
 # Demo Prompts
 
 Example prompts for testing kwdb-schema-design skill.

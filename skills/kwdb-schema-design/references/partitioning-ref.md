@@ -1,3 +1,9 @@
+---
+title: Partitioning Reference
+tier: 3
+tags: [ddl, partitioning, list, range, hash, hashpoint, time-series-partition, relational-partition, partition-key]
+---
+
 # Partitioning Reference
 
 Quick reference for KWDB partitioning. Read when designing partitions.

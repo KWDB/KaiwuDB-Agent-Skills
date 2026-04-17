@@ -1,3 +1,9 @@
+---
+title: Index DDL Reference
+tier: 2
+tags: [ddl, create-index, drop-index, composite-index, covering-index, storing, tag-index, time-series-index, fk-index, btree, gin]
+---
+
 # Index DDL Reference
 
 Quick reference for KWDB index operations. Read when adding or modifying indexes.
@@ -121,12 +127,62 @@ EXPLAIN SELECT * FROM table_name WHERE col = 'value';
 
 ## Common Mistakes
 
-| Wrong | Right |
-|-------|-------|
-| Index on low-cardinality column | Don't index boolean/status columns |
-| Random index names | `idx_tablename_column` pattern |
-| Index everything "for performance" | Index based on actual query patterns |
-| Forgetting to index FK columns | FK columns MUST be indexed |
+### Error vs Correct Examples
+
+**Incorrect (index on low-cardinality):**
+```sql
+CREATE INDEX idx_users_active ON users (is_active);  -- Boolean: only 2 values
+CREATE INDEX idx_orders_status ON orders (status);    -- 3-5 statuses: low selectivity
+```
+
+**Correct:**
+```sql
+-- No index on boolean/status columns (low cardinality)
+-- Only index if combined with high-cardinality column:
+CREATE INDEX idx_orders_customer_status ON orders (customer_id, status);
+```
+
+**Incorrect (wrong composite order):**
+```sql
+-- Query: SELECT * FROM orders WHERE customer_id = 'x' AND created_at > '2025-01-01'
+CREATE INDEX idx_orders ON orders (created_at, customer_id);  -- Wrong order
+```
+
+**Correct:**
+```sql
+-- Put equality filter first, range filter second
+CREATE INDEX idx_orders ON orders (customer_id, created_at);
+```
+
+**Incorrect (FK without index):**
+```sql
+CREATE TABLE order_items (
+    order_id UUID NOT NULL REFERENCES orders(id),  -- FK column not indexed
+    product_id UUID NOT NULL REFERENCES products(id) -- FK column not indexed
+);
+```
+
+**Correct:**
+```sql
+CREATE TABLE order_items (
+    order_id UUID NOT NULL REFERENCES orders(id),
+    product_id UUID NOT NULL REFERENCES products(id)
+);
+CREATE INDEX idx_items_order ON order_items (order_id);
+CREATE INDEX idx_items_product ON order_items (product_id);
+```
+
+### Mistake Summary
+
+| Wrong | Right | Impact |
+|-------|-------|--------|
+| Index on boolean/low-cardinality | Skip or combine with selective column | 索引无用，浪费写入 |
+| `INDEX ON ts (k_timestamp)` | Not needed | TS 表 timestamp 自动索引 |
+| `INDEX ON ts (GEOMETRY)` | Not supported | TS 表不支持 |
+| `(created_at, customer_id)` for `WHERE customer_id = ?` | `(customer_id, created_at)` | 复合索引列顺序错误，索引不被使用 |
+| Index every column | Only WHERE/JOIN/ORDER BY columns | 过多索引降低写入性能 |
+| Random index name `idx1` | `idx_tablename_column` | 命名不清难以维护 |
+| Forget FK index | Always index FK columns | JOIN 性能差 |
 
 ## Design Checklist
 

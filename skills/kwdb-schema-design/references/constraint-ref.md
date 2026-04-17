@@ -1,3 +1,9 @@
+---
+title: Constraint Reference
+tier: 2
+tags: [ddl, primary-key, unique, check, foreign-key, cascade, restrict, constraint-naming, fk-index]
+---
+
 # Constraint Reference
 
 Quick reference for KWDB constraints. Read when designing table constraints.
@@ -125,12 +131,67 @@ SHOW CREATE TABLE table_name;
 
 ## Constraint Best Practices
 
+### Error vs Correct Examples
+
+**Incorrect (no constraints):**
+```sql
+CREATE TABLE orders (
+    id INT,
+    customer_id INT,
+    status VARCHAR(20),
+    amount FLOAT,
+    email VARCHAR(254)
+);
+-- No PK, no FK, no CHECK, FLOAT for money, email not unique
+```
+
+**Correct (with constraints):**
+```sql
+CREATE TABLE orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    customer_id UUID NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'shipped', 'delivered', 'cancelled')),
+    amount DECIMAL(12,2) NOT NULL CHECK (amount >= 0),
+    CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+CREATE INDEX idx_orders_customer ON orders (customer_id);
+```
+
+**Incorrect (circular FK):**
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    default_order UUID REFERENCES orders(id)  -- Circular: orders references users
+);
+CREATE TABLE orders (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id)
+);
+```
+
+**Correct (no circular dependency):**
+```sql
+CREATE TABLE users (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY
+);
+CREATE TABLE orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id)
+);
+-- Move default_order to application logic, not FK
+```
+
+### Do vs Don't
+
 | Do | Don't |
 |----|-------|
 | Use CHECK for valid value ranges | CHECK on same column as UNIQUE |
 | Use FK for refer integrity | Circular FK references |
 | Index FK columns | Forget to index FK columns |
 | Name constraints meaningfully | Rely on auto-generated names |
+| `NOT NULL` for required fields | Allow NULL when data is required |
+| `DECIMAL` for money in constraints | `CHECK (amount > 0)` with FLOAT |
 
 ## Common Patterns
 

@@ -1,3 +1,9 @@
+---
+title: Stored Procedure and Function Reference
+tier: 4
+tags: [ddl, procedure, function, plpgsql, stored-procedure, call, select-func, transaction-control]
+---
+
 # Procedure Reference
 
 Quick reference for KWDB stored procedures and functions. **Low-frequency DDL** - only read when user explicitly asks.

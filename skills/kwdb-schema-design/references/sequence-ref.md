@@ -1,3 +1,9 @@
+---
+title: Sequence Reference
+tier: 3
+tags: [ddl, sequence, auto-increment, unique-rowid, uuid, gen_random_uuid, nextval, setval, serial, bigserial]
+---
+
 # Sequence Reference
 
 Quick reference for KWDB sequences. Read when user asks about auto-increment or sequence.

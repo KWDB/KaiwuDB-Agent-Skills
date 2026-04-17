@@ -1,3 +1,9 @@
+---
+title: Data Type Reference
+tier: 2
+tags: [ddl, data-types, numeric, string, timestamp, type-selection, int4, int8, decimal, float4, float8, varchar, jsonb, uuid, bool, geometry]
+---
+
 # Data Type Reference
 
 Quick reference for KWDB data types. Read when choosing column types.
@@ -59,10 +65,66 @@ Quick reference for KWDB data types. Read when choosing column types.
 
 ## Common Mistakes
 
-1. **FLOAT for money** → Use DECIMAL(p,s)
-2. **VARCHAR without length** → Specify reasonable max
-3. **CHAR vs VARCHAR** → VARCHAR unless fixed-length
-4. **Timestamp in TS table** → Must be first column, TIMESTAMPTZ
+### Error vs Correct Examples
+
+**Incorrect:**
+```sql
+CREATE TABLE products (
+    id VARCHAR(50) PRIMARY KEY,       -- VARCHAR as ID: bad index performance
+    price FLOAT,                       -- FLOAT for money: precision loss
+    name CHAR(200),                    -- CHAR wastes space
+    description VARCHAR,               -- No length specified
+    is_active INT,                     -- INT as boolean
+    metadata TEXT                      -- TEXT for JSON
+);
+```
+
+**Correct:**
+```sql
+CREATE TABLE products (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,  -- UUID for ID
+    price DECIMAL(10,2) NOT NULL,                     -- DECIMAL for money
+    name VARCHAR(200) NOT NULL,                       -- VARCHAR for variable text
+    description VARCHAR(2000),                        -- Explicit max length
+    is_active BOOL NOT NULL DEFAULT true,             -- BOOL for boolean
+    metadata JSONB                                    -- JSONB for structured data
+);
+```
+
+**Incorrect (time-series):**
+```sql
+CREATE TABLE sensor (
+    k_timestamp TIMESTAMP NOT NULL,    -- TIMESTAMP without TZ
+    temperature DECIMAL(5,2),          -- DECIMAL not ideal for measurements
+    tags JSONB                         -- JSONB not supported in TS
+) TAGS (
+    sensor_id INT4 NOT NULL
+) PRIMARY TAGS (sensor_id);
+```
+
+**Correct (time-series):**
+```sql
+CREATE TABLE sensor (
+    k_timestamp TIMESTAMPTZ(3) NOT NULL,  -- TIMESTAMPTZ with precision
+    temperature FLOAT4 NOT NULL            -- FLOAT for measurements
+) TAGS (
+    sensor_id INT4 NOT NULL
+) PRIMARY TAGS (sensor_id)
+RETENTIONS 180d;
+```
+
+### Mistake Summary
+
+| Wrong | Right | Impact |
+|-------|-------|--------|
+| `price FLOAT` | `price DECIMAL(10,2)` | 精度丢失导致金额错误 |
+| `VARCHAR` (no length) | `VARCHAR(100)` | 存储规划不明确 |
+| `CHAR(1000)` for variable text | `VARCHAR(1000)` | CHAR 固定长度浪费空间 |
+| `id VARCHAR` | `id INT8` or `UUID` | 索引性能下降 3-5x |
+| `is_active INT` | `is_active BOOL` | 语义不清，浪费空间 |
+| `metadata TEXT` for JSON | `metadata JSONB` | 无法索引和查询 JSON |
+| `TIMESTAMP` in TS table | `TIMESTAMPTZ(3)` | 无时区信息 |
+| `DECIMAL` in TS data column | `FLOAT4`/`FLOAT8` | DECIMAL 不支持于 TS 表 |
 
 ## Time-Series Type Support
 

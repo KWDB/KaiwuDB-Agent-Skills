@@ -1,3 +1,9 @@
+---
+title: Database and Schema Operations Reference
+tier: 4
+tags: [ddl, database, schema, multi-tenant, create-database, drop-database, public-schema, isolation]
+---
+
 # Database Reference
 
 Quick reference for KWDB database and schema operations. **Low-frequency DDL** - only read when user explicitly asks about database-level operations.

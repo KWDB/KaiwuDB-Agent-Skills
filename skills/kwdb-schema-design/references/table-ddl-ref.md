@@ -1,3 +1,9 @@
+---
+title: Table DDL Reference
+tier: 2
+tags: [ddl, create-table, alter-table, drop-table, time-series-table, tags, primary-tags, retention, k_timestamp, relational-table]
+---
+
 # Table DDL Reference
 
 Quick reference for KWDB table DDL. Read when creating, altering, or dropping tables.
@@ -98,14 +104,66 @@ SHOW RETENTIONS ON TABLE t;    -- TS: verify retention
 
 ## Common Mistakes
 
-| Wrong | Right |
-|-------|-------|
-| No PK defined | Define explicit PK or accept auto rowid |
-| VARCHAR without length | VARCHAR(100) or appropriate size |
-| FLOAT for money | DECIMAL(12,2) |
-| VARCHAR for IDs | INT or UUID |
-| TIMESTAMP for TS tables | TIMESTAMPTZ as first column |
-| No retention on IoT data | RETENTIONS 30d-1y |
+### Relational Table Mistakes
+
+| Wrong | Right | Why |
+|-------|-------|-----|
+| `CREATE TABLE t (name VARCHAR)` | `CREATE TABLE t (name VARCHAR(100))` | VARCHAR 必须指定长度 |
+| `price FLOAT` | `price DECIMAL(12,2)` | FLOAT 有精度损失 |
+| `id VARCHAR(36)` | `id UUID DEFAULT gen_random_uuid()` | UUID 类型索引性能更好 |
+| No PK defined | `id INT8 DEFAULT unique_rowid() PRIMARY KEY` | 无 PK 会隐藏 rowid |
+
+### Time-Series Table Mistakes
+
+| Wrong | Right | Why |
+|-------|-------|-----|
+| `CREATE TABLE t (id INT, ts TIMESTAMPTZ, ...)` | First column = timestamp | TS 表第一列必须是 timestamp |
+| `RETENTIONS 30` | `RETENTIONS 30d` | 必须指定时间单位 |
+| `PRIMARY TAGS (location)` where location is FLOAT | Only INT/CHAR/VARCHAR tags | 主标签不支持 FLOAT |
+| `TAGS (ts TIMESTAMPTZ, ...)` | Tags only: INT/FLOAT/CHAR/VARCHAR | Tags 不支持 TIMESTAMPTZ |
+| No RETENTIONS on high-volume table | `RETENTIONS 180d` | 无 retention 数据无限增长 |
+
+### Error vs Correct Examples
+
+**Incorrect (relational):**
+```sql
+CREATE TABLE orders (
+    id VARCHAR(50),
+    amount FLOAT,
+    status INT
+);
+```
+
+**Correct (relational):**
+```sql
+CREATE TABLE orders (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    amount DECIMAL(12,2) NOT NULL CHECK (amount >= 0),
+    status VARCHAR(20) NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending', 'shipped', 'delivered', 'cancelled')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Incorrect (time-series):**
+```sql
+CREATE TABLE sensor (
+    sensor_id INT NOT NULL,
+    ts TIMESTAMPTZ NOT NULL,
+    temperature FLOAT
+);
+```
+
+**Correct (time-series):**
+```sql
+CREATE TABLE sensor (
+    ts TIMESTAMPTZ(3) NOT NULL,
+    temperature FLOAT4 NOT NULL
+) TAGS (
+    sensor_id INT4 NOT NULL
+) PRIMARY TAGS (sensor_id)
+RETENTIONS 180d;
+```
 
 ## Design Checklist
 

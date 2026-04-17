@@ -1,3 +1,9 @@
+---
+title: Output Templates
+description: Response format templates for all schema design operations (CREATE TABLE, ALTER TABLE, INDEX, VIEW, DROP, REVIEW)
+tags: [template, response-format, time-series, relational, alter, index, view, drop, review]
+---
+
 # Output Template
 
 Use this template for schema design responses.

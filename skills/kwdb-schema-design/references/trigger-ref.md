@@ -1,3 +1,9 @@
+---
+title: Trigger Reference
+tier: 4
+tags: [ddl, trigger, plpgsql, audit-logging, before-trigger, after-trigger, row-level, statement-level]
+---
+
 # Trigger Reference
 
 Quick reference for KWDB triggers. **Low-frequency DDL** - only read when user explicitly asks.

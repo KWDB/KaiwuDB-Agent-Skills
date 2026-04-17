@@ -1,3 +1,9 @@
+---
+title: Time-Series Retention Reference
+tier: 3
+tags: [ddl, retention, time-series, data-lifecycle, retentions, auto-delete, storage-management, retention-units]
+---
+
 # Retention Reference
 
 Quick reference for KWDB time-series retention policies. Read when designing time-series tables.

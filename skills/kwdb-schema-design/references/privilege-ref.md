@@ -1,3 +1,9 @@
+---
+title: User, Role, and Privilege Reference
+tier: 4
+tags: [ddl, user, role, privilege, grant, revoke, permissions, admin, sysadmin, security]
+---
+
 # Privilege Reference
 
 Quick reference for KWDB user, role, and privilege management. **Low-frequency DDL** - only read when user explicitly asks about permissions.

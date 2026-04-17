@@ -1,3 +1,9 @@
+---
+title: View Reference
+tier: 3
+tags: [ddl, view, materialized-view, refresh, create-view, drop-view, query-simplification]
+---
+
 # View Reference
 
 Quick reference for KWDB views. Read when user asks about views or materialized views.

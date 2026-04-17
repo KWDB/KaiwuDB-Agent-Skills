@@ -1,14 +1,23 @@
 ---
 name: kwdb-schema-design
-description: Design KWDB schemas and DDL for relational, time-series, and mixed workloads.
-version: 0.3.0
+description: |
+  Design KWDB schemas and generate DDL for relational, time-series, and mixed workloads.
+  Covers: CREATE/ALTER/DROP TABLE, INDEX, VIEW, constraints, partitioning, retention, tags.
+  Trigger keywords: KWDB, schema, table, index, time-series, sensor, IoT, metrics,
+  TAGS, PRIMARY TAGS, RETENTIONS, primary key, foreign key, DDL.
+  NOT for: DML queries, deployment, backup, performance tuning.
+version: 0.4.0
 ---
 
 ## Tiered Reference Architecture
 
-**Tier 1 (Always Read)** - Core rules and disambiguation:
+**Tier 1 (Always Read)** - Core rules, scope, and examples:
 - `references/key-rules.md` - Decision tree and core rules
 - `references/disambiguation.md` - Clarifying questions
+- `references/_scope.md` - Skill boundaries (IN/OUT of scope)
+- `references/_examples.md` - Complete dialogue examples
+- `references/_contributing.md` - How to add new references
+- `references/_sections.md` - Tier definitions and categories
 
 **Tier 2 (High-Frequency DDL)** - Read when designing tables/indexes/constraints:
 - `references/table-ddl-ref.md` - CREATE/ALTER/DROP TABLE
@@ -29,19 +38,37 @@ version: 0.3.0
 
 ## When to Activate
 
-**Should trigger:**
+**Should trigger (explicit KWDB):**
 - "design a KWDB schema"
 - "write KWDB DDL"
 - "create a table/index/view in KWDB"
 - "KWDB schema for ..."
-- "add column to existing table"
-- "create index on ..."
-- "should I use relational or time-series in KWDB"
+- "KWDB CREATE TABLE"
+
+**Should trigger (implicit - schema keywords):**
+- "create table" / "design table" / "table structure"
+- "add column" / "modify column" / "alter table"
+- "create index" / "add index" / "drop index"
+- "primary key" / "foreign key" / "constraints"
+- "schema design" / "database schema"
+
+**Should trigger (time-series keywords):**
+- "sensor data" / "IoT" / "metrics" / "readings"
+- "time-series" / "time series" / "timestamp data"
+- "TAGS" / "PRIMARY TAGS" / "RETENTIONS"
+- "device data" / "monitoring data" / "logs"
+
+**Should trigger (relational keywords):**
+- "users/orders/products" + "schema/table"
+- "entity" + "table"
+- "foreign key relationship"
 
 **Should NOT trigger:**
+- "SELECT ..." / "INSERT ..." / "UPDATE ..." (DML queries)
+- "how to query" / "optimize query" (query optimization)
 - Deployment, troubleshooting, migration questions
-- Pure query questions (not schema design)
 - Backup/restore operations
+- "explain analyze" / "slow query" (performance tuning)
 - User/permission management (unless explicitly requested)
 
 ## Supported DDL Operations

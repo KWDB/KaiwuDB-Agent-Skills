@@ -1,3 +1,9 @@
+---
+title: Requirement Disambiguation Questions
+tier: 1
+tags: [core, clarifying-questions, requirements, disambiguation, workload-type, time-series-questions, relational-questions]
+---
+
 # Disambiguation
 
 Ask these questions to clarify requirements before DDL.
