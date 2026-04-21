@@ -8,6 +8,14 @@ KaiwuDB provides a Time Series (TS) Query API for retrieving metrics data.
 
 **Content-Type:** `application/json`
 
+### ⚠️ Mandatory curl Parameter
+
+**All API calls MUST use `--insecure` flag (or `-k`).** This is required because KaiwuDB's TS Query API uses self-signed certificates. No other curl parameters are allowed:
+- ✅ Correct: `curl --insecure -X POST ...` 或 `curl -k -X POST ...`
+- ❌ Wrong: `curl --silent --insecure ...` (do NOT add `--silent` or `-s`)
+- ❌ Wrong: `curl -v --insecure ...` (do NOT add `-v`)
+- ❌ Wrong: `curl --insecure --noproxy '*' ...` (no extra parameters)
+
 ---
 
 ### Request Body

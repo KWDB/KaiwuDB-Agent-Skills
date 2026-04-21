@@ -12,11 +12,12 @@ Check if KWDB common ports are actually listening at the OS level.
 
 **Usage**:
 ```bash
-bash scripts/check_kwdb_port_listener.sh [PORTS]
+bash scripts/check_kwdb_port_listener.sh [IP] [PORTS]
 ```
 
 **Parameters**:
-- `PORTS`: Optional, comma-separated port list, defaults to `26257,8080`
+- `IP`: Optional, target node IP address (default: `127.0.0.1`). If an invalid IP is provided, returns an error JSON object.
+- `PORTS`: Optional, comma-separated port list (default: `26257,8080`). Non-numeric or out-of-range values are silently ignored.
 
 **Returns**:
 ```json
