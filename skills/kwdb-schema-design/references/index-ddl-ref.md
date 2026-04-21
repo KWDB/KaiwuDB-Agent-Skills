@@ -91,8 +91,10 @@ CREATE INDEX ON ts_table (tag_column);
 
 **TS Tag Index Rules**:
 - Only on tags (max 4 primary tags)
-- Tag types: INT, FLOAT, CHAR, VARCHAR, NCHAR
+- Supported tag types: INT2, INT4, INT8, FLOAT4, FLOAT8, CHAR, NCHAR, BOOL
+- NOT supported: VARCHAR, NVARCHAR (ERROR: "creating index on tag with type varchar/varbytes is not supported in timeseries table")
 - No index on: TIMESTAMP, GEOMETRY, FLOAT primary tags
+- **Always check existing indexes first** (`SHOW INDEX FROM table_name`) — UNIQUE constraints and FK auto-indexes may already cover the column
 
 ## Composite Index Column Order
 
@@ -164,12 +166,14 @@ CREATE TABLE order_items (
 
 **Correct:**
 ```sql
+-- KWDB 会为 FK 列自动创建索引（命名: <table>_auto_index_<fk_name>）
+-- 因此无需手动为 FK 列再建索引，否则会重复
 CREATE TABLE order_items (
     order_id UUID NOT NULL REFERENCES orders(id),
     product_id UUID NOT NULL REFERENCES products(id)
 );
-CREATE INDEX idx_items_order ON order_items (order_id);
-CREATE INDEX idx_items_product ON order_items (product_id);
+-- 用 SHOW INDEX FROM order_items; 确认自动索引已存在
+-- 仅当自动索引不满足查询模式时（如需要复合索引），才手动添加
 ```
 
 ### Mistake Summary
@@ -179,10 +183,13 @@ CREATE INDEX idx_items_product ON order_items (product_id);
 | Index on boolean/low-cardinality | Skip or combine with selective column | 索引无用，浪费写入 |
 | `INDEX ON ts (k_timestamp)` | Not needed | TS 表 timestamp 自动索引 |
 | `INDEX ON ts (GEOMETRY)` | Not supported | TS 表不支持 |
+| `INDEX ON ts (varchar_tag)` | Not supported | VARCHAR/NVARCHAR tag 不支持索引，改用 CHAR 或用 INT 编码 |
 | `(created_at, customer_id)` for `WHERE customer_id = ?` | `(customer_id, created_at)` | 复合索引列顺序错误，索引不被使用 |
 | Index every column | Only WHERE/JOIN/ORDER BY columns | 过多索引降低写入性能 |
 | Random index name `idx1` | `idx_tablename_column` | 命名不清难以维护 |
-| Forget FK index | Always index FK columns | JOIN 性能差 |
+| Forget FK index | Always check `SHOW INDEX` first | KWDB 为 FK 列自动创建 `<table>_auto_index_<fk_name>` |
+| Create index on UNIQUE column | Check `SHOW INDEX` first | UNIQUE 约束已自动创建索引，重复建索引无意义 |
+| Duplicate FK index | Check `SHOW INDEX` before creating | FK 自动索引已存在，手动再建产生冗余索引 |
 
 ## Design Checklist
 

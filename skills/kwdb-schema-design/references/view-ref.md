@@ -17,6 +17,16 @@ Quick reference for KWDB views. Read when user asks about views or materialized 
 | Data freshness | Always current | Stale until refreshed |
 | DML support | Yes (through view) | No (read-only) |
 
+## Time-Series Table Limitation
+
+**TS 表不支持 VIEW 和 MATERIALIZED VIEW**:
+- 不能在 TS 表上创建 VIEW 或 MATERIALIZED VIEW
+- 不能在 TS 数据库中创建任何 VIEW
+- **Error**: `ERROR: create view is not supported in timeseries table` / `ERROR: create view is not supported in timeseries databases`
+- **Workaround**:
+  1. 直接用 SQL 查询（支持跨库 JOIN，如 `FROM hft_ts.public.tick_data t JOIN hft_meta.public.securities s ON ...`）
+  2. 在关系型库中创建聚合结果表，由应用层或定时任务写入预计算结果
+
 ## VIEW
 
 ### CREATE VIEW

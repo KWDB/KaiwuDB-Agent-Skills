@@ -10,12 +10,28 @@ Quick reference for KWDB database and schema operations. **Low-frequency DDL** -
 
 ## DATABASE Operations
 
-### CREATE DATABASE
+### CREATE DATABASE (Relational)
 
 ```sql
 CREATE DATABASE db_name;
 CREATE DATABASE IF NOT EXISTS db_name;
 ```
+
+Creates a **relational** database. Only relational tables can be created in it.
+
+### CREATE TS DATABASE (Time-Series)
+
+```sql
+CREATE TS DATABASE IF NOT EXISTS db_name;
+```
+
+Creates a **time-series** database. **Time-series tables (with TAGS/PRIMARY TAGS) can ONLY be created in a TS database.** Attempting to create a time-series table in a relational database will result in: `ERROR: can not create timeseries table in relational database`.
+
+**Key Rules**:
+- Time-series tables → must use TS database
+- Relational tables → must use relational database
+- A database's type (relational/TS) is determined at creation time and cannot be changed
+- Time-series tables only support `database.table` (always use public schema)
 
 ### DROP DATABASE
 
@@ -66,6 +82,7 @@ SHOW TABLES FROM database_name.schema_name;
 
 - Relational tables support schema prefix: `database.schema.table`
 - Time-series tables only support `database.table` (always use public schema)
+- **CRITICAL**: Time-series tables require a TS database; relational tables require a relational database. Check database type before creating tables with `SHOW DATABASES;`.
 
 ## Validation
 

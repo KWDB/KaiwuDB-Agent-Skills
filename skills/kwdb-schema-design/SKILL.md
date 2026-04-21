@@ -6,8 +6,21 @@ description: |
   Trigger keywords: KWDB, schema, table, index, time-series, sensor, IoT, metrics,
   TAGS, PRIMARY TAGS, RETENTIONS, primary key, foreign key, DDL.
   NOT for: DML queries, deployment, backup, performance tuning.
-version: 0.4.0
+version: 0.4.1
 ---
+
+<EXTREMELY-IMPORTANT>
+**ALWAYS invoke this skill via the Skill tool before designing any KWDB schema.**
+
+This applies even when:
+- Reference file contents appear in conversation context (from previous reads)
+- Session was restored from a compacted conversation
+- You believe you already know the KWDB syntax
+
+**Reading reference files directly ≠ Skill invocation.** The Skill tool triggers the
+complete workflow (classify → gather requirements → design → DDL → validate) and
+ensures guardrails are followed. Skip this step = skip the workflow.
+</EXTREMELY-IMPORTANT>
 
 ## Tiered Reference Architecture
 
@@ -62,6 +75,12 @@ version: 0.4.0
 - "users/orders/products" + "schema/table"
 - "entity" + "table"
 - "foreign key relationship"
+
+**Should trigger (financial/trading keywords):**
+- "高频交易" / "HFT" / "行情" / "tick data"
+- "订单簿" / "order book" / "K线" / "kline"
+- "VWAP" / "成交量" / "价差" / "深度"
+- "stock" / "futures" / "期权" / "证券"
 
 **Should NOT trigger:**
 - "SELECT ..." / "INSERT ..." / "UPDATE ..." (DML queries)

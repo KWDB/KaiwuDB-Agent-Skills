@@ -216,10 +216,9 @@ CREATE TABLE order_items (
     CONSTRAINT fk_items_product FOREIGN KEY (product_id) REFERENCES products(id)
 );
 
--- Indexes for FK columns (auto-created, but explicit for clarity)
-CREATE INDEX idx_orders_customer ON orders (customer_id);
-CREATE INDEX idx_order_items_order ON order_items (order_id);
-CREATE INDEX idx_order_items_product ON order_items (product_id);
+-- KWDB 为 FK 自动创建索引，无需手动再建
+-- 用 SHOW INDEX FROM order_items; 可看到 auto_index 索引
+-- 仅当需要复合索引（如 (order_id, product_id)）时才手动添加
 ```
 
 ## Validation

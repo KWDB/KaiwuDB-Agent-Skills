@@ -26,7 +26,7 @@ Ask these questions to clarify requirements before DDL.
 
 | Question | Why |
 |----------|-----|
-| Timestamp precision? (ms/μs/ns) | Default: millisecond (3) |
+| Timestamp precision? (ms/μs/ns) | Millisecond(3) default. Microsecond(6) for high-frequency data. Nanosecond(9) for scientific instruments. |
 | What's the primary tag? (device_id, sensor_id) | Used for grouping/querying |
 | How long to retain data? | Sets RETENTIONS |
 | Common tag filters? | Candidate for tag indexes |

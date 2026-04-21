@@ -56,13 +56,28 @@ CREATE TABLE table_name (
 ```sql
 DROP TABLE table_name;              -- Error if not exists
 DROP TABLE IF EXISTS table_name;    -- Silent if not exists
-DROP TABLE t1, t2, t3;             -- Multiple tables
+DROP TABLE t1, t2, t3;             -- Multiple tables (relational only)
 DROP TABLE t CASCADE;               -- Drop + dependent objects
 ```
 
+**Time-Series Limitation**: `DROP TABLE t1, t2, t3` is NOT supported for time-series tables. Drop them one at a time: `DROP TABLE t1; DROP TABLE t2;`.
+
 **CASCADE** drops: views referencing this table, foreign key constraints
 
+**FK Dependency Error**:
+```sql
+-- Error: table referenced by foreign key
+DROP TABLE warehouses;
+-- ERROR: "warehouses" is referenced by foreign key from table "inventory"
+
+-- Solution: use CASCADE (drops referencing FK constraints, NOT the referencing table)
+DROP TABLE warehouses CASCADE;
+-- Or drop referencing table first: DROP TABLE inventory; DROP TABLE warehouses;
+```
+
 ## Time-Series Table Syntax
+
+> **Prerequisite**: Time-series tables MUST be created in a TS database (`CREATE TS DATABASE`). Creating a time-series table in a relational database will fail with `ERROR: can not create timeseries table in relational database`. Use `SHOW DATABASES;` to verify the database type before creating tables.
 
 ```sql
 CREATE TABLE sensor_data (
@@ -82,6 +97,27 @@ RETENTIONS 180d;
 - Primary tags via `PRIMARY TAGS (tag1, tag2)` - max 4
 - Retention via `RETENTIONS 180d` (default: 0s = permanent)
 - `DICT ENCODING` for high-repetition string columns
+
+**Tag Types**:
+- Supported: INT2, INT4, INT8, FLOAT4, FLOAT8, CHAR, VARCHAR, BOOL
+- NOT supported: UUID, DATE, TIMESTAMPTZ, DECIMAL, JSONB, ARRAY
+- Workaround: Use VARCHAR for dates (e.g., `'2024-01-15'`), INT for UUIDs
+
+**Data Column Types (TS 表)**:
+- Supported: INT2, INT4, INT8, FLOAT4, FLOAT8, CHAR, VARCHAR, BOOL, TIMESTAMP, TIMESTAMPTZ
+- NOT supported: DECIMAL, NUMERIC, JSONB, UUID, ARRAY, GEOMETRY, BYTES
+- **Why**: TS 存储引擎面向数值型测量值优化，不支持精确小数和复杂类型
+- **Workaround**: 价格等需要精确计算的字段改用 FLOAT8（约 15 位有效数字），或存入关系型表用 DECIMAL
+- **Error**: `ERROR: column xxx: unsupported column type decimal in timeseries table`
+
+**TS 表不支持 CHECK 约束**:
+- **Error**: `ERROR: check constraint is not supported in timeseries table`
+- **Workaround**: 在应用层校验，或仅用 CHAR(1)/BOOL 等类型隐式约束取值范围
+
+**Timestamp Precision** (first column):
+- `TIMESTAMPTZ(3)` — millisecond (default, suitable for most IoT scenarios)
+- `TIMESTAMPTZ(6)` — microsecond (high-frequency trading, industrial control)
+- `TIMESTAMPTZ(9)` — nanosecond (scientific instruments, ultra-low-latency)
 
 ## Validation
 
@@ -122,6 +158,9 @@ SHOW RETENTIONS ON TABLE t;    -- TS: verify retention
 | `PRIMARY TAGS (location)` where location is FLOAT | Only INT/CHAR/VARCHAR tags | 主标签不支持 FLOAT |
 | `TAGS (ts TIMESTAMPTZ, ...)` | Tags only: INT/FLOAT/CHAR/VARCHAR | Tags 不支持 TIMESTAMPTZ |
 | No RETENTIONS on high-volume table | `RETENTIONS 180d` | 无 retention 数据无限增长 |
+| `price DECIMAL(18,4)` in TS table | `price FLOAT8` | TS 表不支持 DECIMAL 数据列 |
+| `CHECK (status IN (...))` in TS table | Remove CHECK, validate in app | TS 表不支持 CHECK 约束 |
+| `id INT4 DEFAULT unique_rowid()` | `id INT8 DEFAULT unique_rowid()` | unique_rowid() 返回 INT8，与 INT4 类型不匹配 |
 
 ### Error vs Correct Examples
 

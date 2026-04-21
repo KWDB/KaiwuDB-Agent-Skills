@@ -10,12 +10,18 @@ Quick reference for KWDB constraints. Read when designing table constraints.
 
 ## Constraint Types
 
-| Type | Purpose | Syntax |
-|------|---------|--------|
-| PRIMARY KEY | Uniquely identify rows | `PRIMARY KEY (col1, col2)` |
-| UNIQUE | No duplicate values (NULL allowed) | `UNIQUE (col)` or column-level |
-| CHECK | Value validation expression | `CHECK (condition)` |
-| FOREIGN KEY | Refer integrity | `FOREIGN KEY (col) REFERENCES other(pk)` |
+| Type | Purpose | Syntax | Relational | TS Table |
+|------|---------|--------|:----------:|:--------:|
+| PRIMARY KEY | Uniquely identify rows | `PRIMARY KEY (col1, col2)` | ✅ | ✅ (timestamp + primary tags) |
+| UNIQUE | No duplicate values | `UNIQUE (col)` or column-level | ✅ | ❌ |
+| CHECK | Value validation expression | `CHECK (condition)` | ✅ | ❌ |
+| FOREIGN KEY | Refer integrity | `FOREIGN KEY (col) REFERENCES other(pk)` | ✅ | ❌ |
+
+**Time-Series 表约束限制**:
+- TS 表仅支持 PRIMARY KEY（timestamp + primary tags 自动构成）
+- TS 表不支持 CHECK、UNIQUE、FOREIGN KEY
+- **Error**: `ERROR: check constraint is not supported in timeseries table`
+- **Workaround**: 在应用层做数据校验，或用 CHAR(1)/BOOL 等类型隐式限制取值范围
 
 ## Primary Key
 
@@ -102,7 +108,7 @@ CREATE TABLE t (
 
 **Rules**:
 1. Referenced column must be PRIMARY KEY or UNIQUE
-2. FK column MUST be indexed (auto-creates if not exists)
+2. FK column MUST be indexed — **KWDB auto-creates an index** (named `<table>_auto_index_<constraint_name>`), so do NOT manually create a duplicate index on FK columns
 3. ON DELETE: CASCADE, SET NULL, RESTRICT, NO ACTION
 4. ON UPDATE: CASCADE, SET NULL, RESTRICT, NO ACTION
 

@@ -204,17 +204,17 @@ The orders table needs proper primary key and foreign key constraints. Design th
 | 6 | Relational | Medium | Users + roles schema |
 | 7 | Relational | Simple | Single entity table |
 | 8 | Relational | Complex | Multi-table with constraints |
-| 9 | Mixed | Medium | 2 tables (entity + TS) with JOIN |
+| 9 | Mixed | Medium | Single TS table with metadata as TAGS (not separate relational table) |
 | 10 | Mixed | Medium | User activity tracking |
 | 11 | Disambiguation | - | Ask clarifying questions |
 | 12 | Disambiguation | - | Ask about time-series vs logs |
 | 13 | Edge case | Minimal | Assumptions stated |
 | 14 | Constraint | Medium | CHECK constraints |
 | 15 | JSON | Simple | JSONB column |
-| 16 | Partitioning | Medium | RANGE partitioned table |
+| 16 | Partitioning | Medium | RANGE partitioned table, partition column MUST be PK prefix |
 | 17 | Index | Simple | ALTER TABLE ADD INDEX |
 | 18 | Index | Medium | Composite index |
-| 19 | Index (TS) | Simple | Tag index on time-series |
+| 19 | Index (TS) | Simple | Tag index on time-series (INT/CHAR/BOOL only, NOT VARCHAR) |
 | 20 | Index | Medium | Covering index |
 | 21 | ALTER | Simple | ADD COLUMN |
 | 22 | ALTER | Simple | ADD COLUMN with DEFAULT |
@@ -222,8 +222,9 @@ The orders table needs proper primary key and foreign key constraints. Design th
 | 24 | ALTER | Simple | RENAME COLUMN |
 | 25 | ALTER | Medium | ADD CHECK constraint |
 | 26 | ALTER (TS) | Simple | SET RETENTIONS |
-| 27 | DROP | Simple | DROP TABLE |
+| 27 | DROP | Simple | DROP TABLE (CASCADE if FK dependency exists) |
 | 28 | DROP | Simple | DROP INDEX |
+| 28.5 | DROP (TS) | Medium | Drop multiple TS tables - must drop one at a time (NOT `DROP TABLE t1, t2`) |
 | 29 | View | Simple | CREATE VIEW |
 | 30 | Materialized View | Medium | CREATE MATERIALIZED VIEW |
 | 31 | Review | Medium | Schema critique |

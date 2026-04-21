@@ -40,7 +40,15 @@ Quick reference for KWDB data types. Read when choosing column types.
 | DATE | Date only (no time) |
 | TIME | Time only (rare) |
 
-**Precision**: (3)=ms default, (6)=μs, (9)=ns
+### Timestamp Precision
+
+| Precision | Syntax | Use When |
+|-----------|--------|----------|
+| Millisecond | `TIMESTAMPTZ(3)` | **Default** — most IoT sensors, general monitoring |
+| Microsecond | `TIMESTAMPTZ(6)` | High-frequency trading, network packet analysis, precision industrial control |
+| Nanosecond | `TIMESTAMPTZ(9)` | Scientific instruments, particle physics, ultra-low-latency systems |
+
+**Note**: Higher precision increases storage. Choose the lowest precision that meets your requirements.
 
 ## Special Types
 
@@ -128,9 +136,22 @@ RETENTIONS 180d;
 
 ## Time-Series Type Support
 
+**Data Columns**:
+
 | Supported | NOT Supported |
 |-----------|---------------|
 | TIMESTAMP/TIMESTAMPTZ | - |
 | INT, BIGINT, FLOAT | DECIMAL |
 | VARCHAR, CHAR, NCHAR | NVARCHAR |
 | BOOL, GEOMETRY | JSONB, ARRAY |
+
+**Tag Columns** (TAGS clause):
+
+| Supported | NOT Supported |
+|-----------|---------------|
+| INT2, INT4, INT8 | UUID |
+| FLOAT4, FLOAT8 | DATE |
+| CHAR, VARCHAR | TIMESTAMPTZ |
+| BOOL | DECIMAL, JSONB, ARRAY |
+
+**Workaround**: Store dates as `VARCHAR(10)` (e.g., `'2024-01-15'`), UUIDs as `INT8` or `VARCHAR(36)`.

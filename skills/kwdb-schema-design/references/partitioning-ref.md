@@ -31,10 +31,30 @@ PARTITION BY LIST (column) (
 ### RANGE (Relational)
 
 ```sql
-PARTITION BY RANGE (column) (
-  PARTITION q1 VALUES FROM ('2025-01-01') TO ('2025-04-01'),
-  PARTITION future VALUES IN (MAXVALUE)
-)
+-- NOTE: partition column (sale_date) MUST be first in primary key
+CREATE TABLE partitioned_sales (
+    id UUID DEFAULT gen_random_uuid(),
+    product_name VARCHAR(200) NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    sale_date DATE NOT NULL,
+    region VARCHAR(50) NOT NULL,
+    PRIMARY KEY (sale_date, id)  -- sale_date first!
+) PARTITION BY RANGE (sale_date) (
+    PARTITION jan2024 VALUES FROM ('2024-01-01') TO ('2024-02-01'),
+    PARTITION feb2024 VALUES FROM ('2024-02-01') TO ('2024-03-01'),
+    PARTITION future VALUES IN (MAXVALUE)
+);
+```
+
+**Wrong:**
+```sql
+-- PK is (id), but partition by sale_date → ERROR
+CREATE TABLE sales (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    sale_date DATE NOT NULL
+) PARTITION BY RANGE (sale_date) (...)
+-- ERROR: declared partition columns (sale_date) do not match
+--         first 1 columns in index being partitioned (id)
 ```
 
 ### HASH (Relational)
@@ -48,11 +68,26 @@ PARTITION BY HASH (column) (
 
 ### HASHPOINT (Time-Series)
 
+> **已验证**: `VALUES IN` 必须使用方括号 `[]`，不能用圆括号 `()`。圆括号 `VALUES IN (...)` 是 `PARTITION BY HASH`（关系型表）的语法，用于 HASHPOINT 会报语法错误。来源：`kwbase/pkg/sql/parser/sql.y:6176`。
+
 ```sql
+-- 正确：方括号 []（HASHPOINT 专属）
 ALTER TABLE t PARTITION BY HASHPOINT (
-  PARTITION p1 VALUES IN (1, 3, 5),
-  PARTITION p2 VALUES IN (2, 4, 6)
-)
+  PARTITION p1 VALUES IN [0],
+  PARTITION p2 VALUES IN [1],
+  PARTITION p3 VALUES IN [2]
+);
+
+-- 也支持范围语法（圆括号，用于 FROM/TO）
+ALTER TABLE t PARTITION BY HASHPOINT (
+  PARTITION p1 VALUES FROM (0) TO (100),
+  PARTITION p2 VALUES FROM (100) TO (200)
+);
+
+-- 错误：圆括号用于 VALUES IN 会报 syntax error
+-- ALTER TABLE t PARTITION BY HASHPOINT (
+--   PARTITION p1 VALUES IN (0),  -- ERROR: at or near "(": syntax error
+-- );
 ```
 
 ## When to Use
@@ -66,7 +101,10 @@ ALTER TABLE t PARTITION BY HASHPOINT (
 
 ## Key Rules
 
-1. **Partition key must be first column(s) of primary key** (Relational)
+1. **Partition key MUST be first column(s) of primary key** (Relational)
+   - If PK is `(id)`, you cannot partition by `sale_date`
+   - Must change PK to `(sale_date, id)` to partition by `sale_date`
+   - Example error: `ERROR: declared partition columns (sale_date) do not match first 1 columns in index being partitioned (id)`
 2. **RANGE boundaries**: lower INCLUSIVE, upper EXCLUSIVE
 3. **Use MAXVALUE** for catch-all partitions
 4. **Number of partitions**: 4-16 typical (not too many)
@@ -75,7 +113,7 @@ ALTER TABLE t PARTITION BY HASHPOINT (
 
 1. **HASH on timestamp** → Use RANGE for time data
 2. **Too many partitions** → 100+ partitions is excessive
-3. **Partition key not in PK** → Error or suboptimal
+3. **Partition key not in PK prefix** → Error: "declared partition columns do not match first N columns in index being partitioned"
 4. **Missing catch-all** → Out-of-range values fail
 
 ## TS vs Relational
