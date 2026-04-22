@@ -31,7 +31,7 @@ The default inspection report must cover these sections unless the user explicit
 | Write QPS (insert + update + delete + rebalancing writes) | API | `sql.insert.count`, `sql.update.count`, `sql.delete.count`, `rebalancing.writespersecond` |
 | Query QPS (select + query + rebalancing queries) | API | `sql.select.count`, `sql.query.count`, `rebalancing.queriespersecond` |
 | Exec latency | API | `sql.exec.latency`, `sql.service.latency`, `sql.distsql.exec.latency` |
-| Slow query information | — | **Not yet supported** — the `/ts/query` API does not expose slow query metrics; alternative APIs (`/api/v2/statements`, `/api/v2/insights`) are removed in open-source edition; TLS mode requires captcha verification |
+| Slow query information | API | `/_status/statements` — use `scripts/get_kwdb_statements.py` to fetch slow query records |
 
 ### 4. Storage
 
