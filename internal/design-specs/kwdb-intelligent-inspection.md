@@ -6,9 +6,9 @@ Perform metrics inspection on the KaiwuDB database and generate a readable repor
 
 ## Hard Constraints
 
-- The skill does not support inspecting KaiwuDB deployed with TLS mode enabled.
 - Metrics data must be fetched exclusively via the `/ts/query` API endpoint (except for slow query information and port listening status, which use other methods).
 - The report must include metrics for all nodes in the database cluster.
+- TLS mode inspection and slow query information retrieval are not yet supported. See [Limitations](#limitations).
 
 ## Report Template (Default)
 
@@ -22,7 +22,7 @@ Perform metrics inspection on the KaiwuDB database and generate a readable repor
 | System Resources | Disk Utilization | Total storage capacity: `capacity`<br>Available storage capacity: `capacity.available`<br>Used storage capacity: `capacity.used` |
 | Database Performance | Write/Query QPS | Number of INSERT statements successfully executed: `sql.insert.count`<br>Number of UPDATE statements successfully executed: `sql.update.count`<br>Number of DELETE statements successfully executed: `sql.delete.count`<br>Keys written per second (Raft-applied, rebalancing average): `rebalancing.writespersecond`<br>Number of SELECT statements successfully executed: `sql.select.count`<br>Number of SQL queries executed: `sql.query.count`<br>KV-level requests received per second (rebalancing average): `rebalancing.queriespersecond` |
 | Database Performance | Exec Latency | Latency of SQL statement execution: `sql.exec.latency`<br>Latency of SQL request execution (service time): `sql.service.latency`<br>Latency of DistSQL statement execution: `sql.distsql.exec.latency` |
-| Database Performance | Slow Query Information | Not yet supported. The `/ts/query` API does not expose slow query metrics. Alternative APIs such as `/api/v2/statements` and `/api/v2/insights` are removed in the open-source edition. In TLS mode, authentication requires the AdminUI login endpoint which needs captcha verification that cannot be solved in non-interactive script mode. |
+| Database Performance | Slow Query Information | Not yet supported. See [Limitations](#limitations). |
 | Storage | Total Data Size | Total bytes of keys and values including non-live data: `totalbytes`<br>Bytes of live data (keys + values): `livebytes`<br>Used storage capacity: `capacity.used` |
 | Cluster | Replica Status | Number of replicas: `replicas`<br>Number of Raft leaders: `replicas.leaders`<br>Number of lease holders: `replicas.leaseholders`<br>Number of quiesced replicas: `replicas.quiescent`<br>Ranges with fewer replicas than quorum requires: `ranges.unavailable`<br>Ranges with fewer replicas than replication target: `ranges.underreplicated`<br>Ranges with more replicas than replication target: `ranges.overreplicated` |
 | Cluster | Replication Sync Status | WAL replication lag latency: `wal.replica.data.latency`<br>Raft log entries followers are behind: `raftlog.behind`<br>Raft replicate consistent latency: `raft.replica.consistent.latency` |
@@ -64,3 +64,5 @@ Before collecting any metrics, present the full menu of available inspection dim
 ## Limitations
 
 - This skill does not support Windows operating systems.
+- **TLS mode inspection is not supported**: The skill does not support inspecting KaiwuDB deployed with TLS mode enabled. In TLS mode, authentication requires the AdminUI login endpoint which needs captcha verification that cannot be solved in non-interactive script mode.
+- **Slow query information is not yet supported**: The `/ts/query` API does not expose slow query metrics. Alternative APIs such as `/api/v2/statements` and `/api/v2/insights` are removed in the open-source edition.
