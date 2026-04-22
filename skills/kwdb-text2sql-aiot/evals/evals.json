@@ -1,0 +1,249 @@
+{
+  "skill_name": "kwdb-text2sql-aiot",
+  "description": "Test cases for KWDB Text-to-SQL conversion with MCP integration support",
+  "evals": [
+    {
+      "id": 1,
+      "name": "downsampling-basic",
+      "prompt": "Show me the hourly average temperature for each device in the last 24 hours. Table: sensor_data, columns: ts (timestamp), device_id (tag), temperature (measurement)",
+      "expected_output": "SQL with time_bucket function, GROUP BY device_id, WHERE clause for last 24 hours",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket(ts, '1h') or time_bucket(ts, '1 hour')", "passed": false},
+        {"text": "Uses avg(temperature) aggregation", "passed": false},
+        {"text": "Uses GROUP BY device_id", "passed": false},
+        {"text": "WHERE clause filters to last 24 hours (NOW() - INTERVAL or similar)", "passed": false}
+      ]
+    },
+    {
+      "id": 2,
+      "name": "downsampling-template",
+      "prompt": "Calculate the daily total of energy consumption for all meters",
+      "expected_output": "SQL template with time_bucket, placeholders for missing table structure",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket with daily interval ('1d' or '1 day')", "passed": false},
+        {"text": "Uses sum() aggregation for total", "passed": false},
+        {"text": "Contains placeholders or template markers for missing table/column names", "passed": false}
+      ]
+    },
+    {
+      "id": 3,
+      "name": "interpolation-linear",
+      "prompt": "Fill missing temperature values using linear interpolation for the past week",
+      "expected_output": "SQL with time_bucket_gapfill and interpolate function with 'linear' mode",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket_gapfill function", "passed": false},
+        {"text": "Uses interpolate with 'linear' mode", "passed": false},
+        {"text": "Filters to past week (NOW() - INTERVAL '7 day' or similar)", "passed": false}
+      ]
+    },
+    {
+      "id": 4,
+      "name": "interpolation-prev",
+      "prompt": "I need to fill gaps in my pressure readings with the previous value for the last month",
+      "expected_output": "SQL with time_bucket_gapfill and interpolate function with PREV mode",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket_gapfill function", "passed": false},
+        {"text": "Uses interpolate with PREV mode (case-insensitive)", "passed": false},
+        {"text": "Filters to last month (NOW() - INTERVAL '1 month' or similar)", "passed": false}
+      ]
+    },
+    {
+      "id": 5,
+      "name": "latest-value-per-device",
+      "prompt": "Get the latest temperature reading for each device in my sensor network",
+      "expected_output": "SQL with last() function and GROUP BY device_id",
+      "files": [],
+      "assertions": [
+        {"text": "Uses last() function for temperature", "passed": false},
+        {"text": "Uses GROUP BY device_id", "passed": false},
+        {"text": "Includes last(ts) or timestamp column for time reference", "passed": false}
+      ]
+    },
+    {
+      "id": 6,
+      "name": "aggregation-complex",
+      "prompt": "Calculate min, max, and average humidity for every 15-minute interval grouped by location",
+      "expected_output": "SQL with time_bucket, multiple aggregate functions, GROUP BY time bucket and location",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket with 15-minute interval ('15m')", "passed": false},
+        {"text": "Uses min(), max(), and avg() aggregate functions on humidity", "passed": false},
+        {"text": "Uses GROUP BY with both time bucket and location", "passed": false}
+      ]
+    },
+    {
+      "id": 7,
+      "name": "cross-model-join",
+      "prompt": "Join the devices table with sensor_data to get device names along with their latest readings",
+      "expected_output": "SQL with JOIN between relational table and time-series subquery, using last() function",
+      "files": [],
+      "assertions": [
+        {"text": "Uses JOIN between devices and sensor_data", "passed": false},
+        {"text": "Uses subquery with last() aggregation for time-series data", "passed": false},
+        {"text": "Selects device_name from relational table", "passed": false},
+        {"text": "Joins on device_id or equivalent key", "passed": false}
+      ]
+    },
+    {
+      "id": 8,
+      "name": "window-function-event",
+      "prompt": "Detect temperature anomaly events where readings exceed 100 degrees, segmenting the data by when the condition starts and ends",
+      "expected_output": "SQL with EVENT_WINDOW function using temperature conditions",
+      "files": [],
+      "assertions": [
+        {"text": "Uses EVENT_WINDOW function", "passed": false},
+        {"text": "Start condition checks temperature > 100 or equivalent", "passed": false},
+        {"text": "End condition reverses the threshold", "passed": false},
+        {"text": "Uses GROUP BY event", "passed": false}
+      ]
+    },
+    {
+      "id": 9,
+      "name": "session-window",
+      "prompt": "Group sensor readings into sessions where data gaps are less than 5 minutes apart",
+      "expected_output": "SQL with SESSION_WINDOW function using 5 minute threshold",
+      "files": [],
+      "assertions": [
+        {"text": "Uses SESSION_WINDOW function", "passed": false},
+        {"text": "Uses 5 minute interval ('5m') as gap threshold", "passed": false},
+        {"text": "Uses GROUP BY session and entity", "passed": false}
+      ]
+    },
+    {
+      "id": 10,
+      "name": "time-weighted-average",
+      "prompt": "Calculate the time-weighted average temperature for each hour",
+      "expected_output": "SQL with TWA function combined with time_bucket",
+      "files": [],
+      "assertions": [
+        {"text": "Uses TWA function", "passed": false},
+        {"text": "Uses time_bucket with hourly interval ('1h')", "passed": false},
+        {"text": "References temperature column in TWA", "passed": false}
+      ]
+    },
+    {
+      "id": 11,
+      "name": "downsampling-chinese",
+      "prompt": "查询最近24小时每小时的平均温度",
+      "expected_output": "应生成使用 time_bucket(ts, '1h') 和 avg(temperature) 的 SQL，带有 WHERE ts >= NOW() - INTERVAL '24 hour' 条件",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket with hourly interval ('1h')", "passed": false},
+        {"text": "Uses avg(temperature) aggregation", "passed": false},
+        {"text": "WHERE clause filters to 24 hours", "passed": false}
+      ]
+    },
+    {
+      "id": 12,
+      "name": "interpolation-chinese",
+      "prompt": "填充缺失的湿度数据，使用线性插值",
+      "expected_output": "应生成使用 time_bucket_gapfill() 和 interpolate(avg(humidity), 'linear') 的 SQL",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket_gapfill function", "passed": false},
+        {"text": "Uses interpolate with 'linear' mode", "passed": false},
+        {"text": "References humidity column", "passed": false}
+      ]
+    },
+    {
+      "id": 13,
+      "name": "latest-value-chinese",
+      "prompt": "获取每个设备最新的一条温度记录",
+      "expected_output": "应生成使用 last(temperature) 或 ORDER BY ts DESC LIMIT 1 的 SQL，带有 GROUP BY device_id",
+      "files": [],
+      "assertions": [
+        {"text": "Uses last() function for temperature (preferred) or ORDER BY ts DESC LIMIT 1", "passed": false},
+        {"text": "Uses GROUP BY device_id", "passed": false}
+      ]
+    },
+    {
+      "id": 14,
+      "name": "aggregation-filter-chinese",
+      "prompt": "查询设备温度大于35度的记录，并按天统计数量",
+      "expected_output": "应生成使用 time_bucket(ts, '1d') 进行分组，WHERE temperature > 35 条件，并使用 count(*) 聚合",
+      "files": [],
+      "assertions": [
+        {"text": "Uses time_bucket with daily interval ('1d')", "passed": false},
+        {"text": "WHERE clause filters temperature > 35", "passed": false},
+        {"text": "Uses count(*) aggregation", "passed": false}
+      ]
+    },
+    {
+      "id": 15,
+      "name": "cross-model-chinese",
+      "prompt": "我有一个 sensors 表，包含 ts 时间戳、temperature 和 humidity 列，还有一个 devices 表包含 device_id 和 device_name，如何查询每个设备的最新温度并显示设备名称？",
+      "expected_output": "应生成跨模查询 SQL，使用 JOIN 连接两个表，查询最新温度数据",
+      "files": [],
+      "assertions": [
+        {"text": "Uses JOIN between sensors and devices tables", "passed": false},
+        {"text": "Uses last() or last_row() for latest temperature", "passed": false},
+        {"text": "Selects device_name from devices table", "passed": false},
+        {"text": "Joins on device_id key", "passed": false}
+      ]
+    },
+    {
+      "id": 16,
+      "name": "mcp-detect-and-discover",
+      "prompt": "Query the average temperature for each device in the last 24 hours. Database: iot_db, MCP is available.",
+      "expected_output": "Skill should detect MCP, read kwdb://db_info/iot_db to discover tables, identify sensor_data table, read kwdb://table/sensor_data for schema, then generate SQL with verified column names",
+      "files": [],
+      "assertions": [
+        {"text": "Mentions detecting MCP availability", "passed": false},
+        {"text": "Mentions reading kwdb://db_info/iot_db", "passed": false},
+        {"text": "Mentions identifying candidate tables", "passed": false},
+        {"text": "Mentions reading kwdb://table/sensor_data", "passed": false},
+        {"text": "Uses verified column names in SQL", "passed": false}
+      ]
+    },
+    {
+      "id": 17,
+      "name": "mcp-multi-table-disambiguation",
+      "prompt": "查询设备数据，数据库中有 device_info、sensor_data、device_log 三个表",
+      "expected_output": "Skill should list candidate tables and ask user to confirm which table to use",
+      "files": [],
+      "assertions": [
+        {"text": "Lists all three candidate tables", "passed": false},
+        {"text": "Asks user to confirm selection", "passed": false}
+      ]
+    },
+    {
+      "id": 18,
+      "name": "mcp-fallback-no-schema",
+      "prompt": "查询最近24小时的平均温度，MCP 不可用",
+      "expected_output": "Skill should ask user to provide schema or use assumed field names",
+      "files": [],
+      "assertions": [
+        {"text": "Mentions MCP is unavailable", "passed": false},
+        {"text": "Asks user to provide schema", "passed": false},
+        {"text": "Or uses assumed field names", "passed": false},
+        {"text": "Marks output as ASSUMED SCHEMA", "passed": false}
+      ]
+    },
+    {
+      "id": 19,
+      "name": "mcp-database-name-missing",
+      "prompt": "帮我查询最近24小时的传感器数据（数据库名未知）",
+      "expected_output": "Skill should ask user for database name",
+      "files": [],
+      "assertions": [
+        {"text": "Asks user for database name", "passed": false},
+        {"text": "Does not attempt to read kwdb://db_info without a database name", "passed": false}
+      ]
+    },
+    {
+      "id": 20,
+      "name": "disambiguation-time-series-vs-relational",
+      "prompt": "查询温度大于30度的记录",
+      "expected_output": "Skill should use disambiguation to determine if this is a time-series or relational query, ask user to clarify if ambiguous",
+      "files": [],
+      "assertions": [
+        {"text": "Mentions ambiguity (time-series vs relational) in output", "passed": false},
+        {"text": "Either asks user to clarify or makes a reasonable assumption based on schema", "passed": false}
+      ]
+    }
+  ]
+}
