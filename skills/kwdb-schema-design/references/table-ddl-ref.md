@@ -96,7 +96,6 @@ RETENTIONS 180d;
 - Tags defined in `TAGS (...)` clause
 - Primary tags via `PRIMARY TAGS (tag1, tag2)` - max 4
 - Retention via `RETENTIONS 180d` (default: 0s = permanent)
-- `DICT ENCODING` for high-repetition string columns
 
 **Tag Types**:
 - Supported: INT2, INT4, INT8, FLOAT4, FLOAT8, CHAR, VARCHAR, BOOL

@@ -100,7 +100,7 @@ ensures guardrails are followed. Skip this step = skip the workflow.
 | Views | CREATE VIEW, DROP VIEW |
 | Materialized Views | CREATE MATERIALIZED VIEW, REFRESH, DROP |
 | Sequences | CREATE SEQUENCE, nextval(), setval() |
-| Time-Series | Tags, Primary Tags, Retention, DICT ENCODING |
+| Time-Series | Tags, Primary Tags, Retention |
 | Partitioning | LIST, RANGE, HASH (relational), HASHPOINT (time-series) |
 
 ## Workflow
