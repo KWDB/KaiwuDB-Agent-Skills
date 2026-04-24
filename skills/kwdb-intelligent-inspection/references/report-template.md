@@ -1,59 +1,47 @@
 ## Required Report Sections
 
-The default inspection report must cover these sections unless the user explicitly narrows scope. Each section identifies its data source as `API` (via `/ts/query`) or `OS` (via shell scripts under `scripts/`).
+The default inspection report must cover these sections unless the user explicitly narrows scope.
 
-### 1. Basic Indicators
+### Data Source Priority
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| Database running state | API | `liveness.livenodes` |
-| Uptime | API | `sys.uptime` |
-| Service port listener state | OS | `scripts/check_kwdb_port_listener.sh` |
+1. **Port listener status**: Use Workflow Step 1 connectivity probe results (no fixed script) in SKILL.md
+2. **Slow queries**: Use `scripts/get_kwdb_statements.py` (`/_status/statements` API)
+3. **All other metrics**: Use `scripts/get_kwdb_ts_metrics.py` (`/ts/query` API)
 
-### 2. System Resources
+### Report Sections
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| CPU user % | API | `sys.cpu.user.percent` |
-| CPU sys % | API | `sys.cpu.sys.percent` |
-| CPU combined % (normalized) | API | `sys.cpu.combined.percent-normalized` |
-| Disk total | API | `capacity` |
-| Disk available | API | `capacity.available` |
-| Disk used | API | `capacity.used` |
-| Memory RSS | API | `sys.rss` |
-| Go alloc bytes | API | `sys.go.allocbytes` |
-| Go total bytes | API | `sys.go.totalbytes` |
+#### 1. Basic Indicators
 
-### 3. Database Performance
+- Database running state (`liveness.livenodes`)
+- Uptime (`sys.uptime`)
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| Write QPS (insert + update + delete + rebalancing writes) | API | `sql.insert.count`, `sql.update.count`, `sql.delete.count`, `rebalancing.writespersecond` |
-| Query QPS (select + query + rebalancing queries) | API | `sql.select.count`, `sql.query.count`, `rebalancing.queriespersecond` |
-| Exec latency | API | `sql.exec.latency`, `sql.service.latency`, `sql.distsql.exec.latency` |
-| Slow query information | API | `/_status/statements` — use `scripts/get_kwdb_statements.py` to fetch slow query records |
+#### 2. System Resources
 
-### 4. Storage
+- CPU user % (`sys.cpu.user.percent`)
+- CPU sys % (`sys.cpu.sys.percent`)
+- CPU combined % normalized (`sys.cpu.combined.percent-normalized`)
+- Disk total/available/used (`capacity`, `capacity.available`, `capacity.used`)
+- Memory RSS (`sys.rss`)
+- Go alloc/total bytes (`sys.go.allocbytes`, `sys.go.totalbytes`)
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| Total data size | API | `totalbytes`, `livebytes`, `capacity.used` |
+#### 3. Database Performance
 
-### 5. Cluster
+- Write QPS: insert + update + delete + rebalancing writes
+- Query QPS: select + query + rebalancing queries
+- Exec latency: sql.exec.latency, sql.service.latency, sql.distsql.exec.latency
+- Slow query information (via `/_status/statements` API)
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| Replicas | API | `replicas` |
-| Raft leaders | API | `replicas.leaders` |
-| Lease holders | API | `replicas.leaseholders` |
-| Unavailable ranges | API | `ranges.unavailable` |
-| Under-replicated ranges | API | `ranges.underreplicated` |
-| Over-replicated ranges | API | `ranges.overreplicated` |
-| Sync lag | API | `wal.replica.data.latency`, `raftlog.behind`, `raft.replica.consistent.latency` |
-| Data distribution balance | API | `ranges.underreplicated`, `ranges.overreplicated`, `rebalancing.writespersecond`, `rebalancing.queriespersecond` |
+#### 4. Storage
 
-### 6. Network
+- Total data size (`totalbytes`, `livebytes`, `capacity.used`)
 
-| Metric | Source | API Name |
-|--------|--------|----------|
-| Node-to-node latency | API | `round-trip-latency`, `clock-offset.meannanos` |
+#### 5. Cluster
+
+- Replicas, Raft leaders, Lease holders (`replicas`, `replicas.leaders`, `replicas.leaseholders`)
+- Unavailable/Under-replicated/Over-replicated ranges
+- Sync lag (`wal.replica.data.latency`, `raftlog.behind`, `raft.replica.consistent.latency`)
+- Data distribution balance
+
+#### 6. Network
+
+- Node-to-node latency (`round-trip-latency`, `clock-offset.meannanos`)

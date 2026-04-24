@@ -1,4 +1,4 @@
-# 测试文档
+# KaiwuDB Inspection Scripts
 
 ## 环境准备
 
@@ -7,6 +7,43 @@ cd skills/kwdb-intelligent-inspection/scripts
 python3 -m venv .venv
 .venv/bin/pip install pytest pytest-cov -q
 ```
+
+## 执行脚本
+
+### get_kwdb_statements.py
+
+获取慢 SQL 语句统计（通过 `/_status/statements` API）。
+
+```bash
+.venv/bin/python get_kwdb_statements.py --host <HOST> --port <PORT> [--limit N] [--min-latency-ms MS] [--json]
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--host` | KaiwuDB admin host | localhost |
+| `--port` | KaiwuDB admin port | 8080 |
+| `--limit N` | 显示 top N 条慢 SQL | 10 |
+| `--min-latency-ms` | 最小服务延迟阈值(ms) | 0 |
+| `--sort-by` | 排序字段: service_lat/run_lat/plan_lat/count | service_lat |
+| `--json` | 输出原始 JSON | false |
+
+### get_kwdb_ts_metrics.py
+
+获取时序指标（通过 `/ts/query` API）。
+
+```bash
+.venv/bin/python get_kwdb_ts_metrics.py --host <HOST> --port <PORT> [--start TIME] [--end TIME] [--sample N] [--metric NAME] [--json]
+```
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--host` | KaiwuDB admin host | localhost |
+| `--port` | KaiwuDB admin port | 8080 |
+| `--start` | 开始时间 (ISO 或 unix ns) | 1小时前 |
+| `--end` | 结束时间 (ISO 或 unix ns) | now |
+| `--sample` | 采样间隔(秒) | 60 |
+| `--metric` | 按指标名过滤 (可重复) | 全部 |
+| `--json` | 输出原始 JSON | false |
 
 ## 执行测试
 
