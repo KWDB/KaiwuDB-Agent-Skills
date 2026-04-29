@@ -12,36 +12,36 @@ The default inspection report must cover these sections unless the user explicit
 
 #### 1. Basic Indicators
 
-- Database running state (`liveness.livenodes`)
-- Uptime (`sys.uptime`)
+- Database running state (`cr.node.liveness.livenodes`)
+- Uptime (`cr.node.sys.uptime`)
 
 #### 2. System Resources
 
-- CPU user % (`sys.cpu.user.percent`)
-- CPU sys % (`sys.cpu.sys.percent`)
-- CPU combined % normalized (`sys.cpu.combined.percent-normalized`)
-- Disk total/available/used (`capacity`, `capacity.available`, `capacity.used`)
-- Memory RSS (`sys.rss`)
-- Go alloc/total bytes (`sys.go.allocbytes`, `sys.go.totalbytes`)
+- CPU user % (`cr.node.sys.cpu.user.percent`)
+- CPU sys % (`cr.node.sys.cpu.sys.percent`)
+- CPU combined % normalized (`cr.node.sys.cpu.combined.percent-normalized`)
+- Disk total/available/used (`cr.store.capacity`, `cr.store.capacity.available`, `cr.store.capacity.used`)
+- Memory RSS (`cr.node.sys.rss`)
+- Go alloc/total bytes (`cr.node.sys.go.allocbytes`, `cr.node.sys.go.totalbytes`)
 
 #### 3. Database Performance
 
 - Write QPS: insert + update + delete + rebalancing writes
 - Query QPS: select + query + rebalancing queries
-- Exec latency: sql.exec.latency, sql.service.latency, sql.distsql.exec.latency
+- Exec latency: `cr.node.exec.latency-p99`, `cr.node.sql.service.latency-p99`, `cr.node.sql.distsql.exec.latency-p99`
 - Slow query information (via `/_status/statements` API)
 
 #### 4. Storage
 
-- Total data size (`totalbytes`, `livebytes`, `capacity.used`)
+- Total data size (`cr.store.totalbytes`, `cr.store.livebytes`, `cr.store.capacity.used`)
 
 #### 5. Cluster
 
-- Replicas, Raft leaders, Lease holders (`replicas`, `replicas.leaders`, `replicas.leaseholders`)
+- Replicas, Raft leaders, Lease holders (`cr.store.replicas`, `cr.store.replicas.leaders`, `cr.store.replicas.leaseholders`)
 - Unavailable/Under-replicated/Over-replicated ranges
-- Sync lag (`wal.replica.data.latency`, `raftlog.behind`, `raft.replica.consistent.latency`)
+- Sync lag (`cr.store.raft.replica.consistent.latency-p99`, `cr.store.raftlog.behind`, `cr.store.raft.replica.consistent.latency-p99`)
 - Data distribution balance
 
 #### 6. Network
 
-- Node-to-node latency (`round-trip-latency`, `clock-offset.meannanos`)
+- Node-to-node latency (`round-trip-latency`, `cr.node.clock-offset.meannanos`)

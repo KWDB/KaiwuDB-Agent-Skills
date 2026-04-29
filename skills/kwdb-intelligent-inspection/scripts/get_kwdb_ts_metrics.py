@@ -25,52 +25,86 @@ import json
 import subprocess
 import sys
 import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 
-# Metrics mapping from report-template.md
-# Format: (api_name, display_name, unit, is_latency)
-METRICS_MAP = {
+@dataclass
+class MetricMeta:
+    """Display metadata for a time series metric."""
+    display_name: str
+    unit: str
+
+
+@dataclass
+class QueryParams:
+    """Query parameters for /ts/query API."""
+    downsampler: int
+    source_aggregator: int
+    derivative: int
+
+
+@dataclass
+class MetricInfo:
+    """Complete metric definition: display metadata + query parameters."""
+    display: MetricMeta
+    query: QueryParams
+
+
+# Metrics mapping: full metric name -> MetricInfo(display + query params)
+#
+# Query Enum Values:
+#   Downsampler/SourceAggregator: 1=AVG, 2=SUM, 3=MAX, 4=MIN, 5=FIRST, 6=LAST, 7=VARIANCE
+#   Derivative: 0=NONE, 1=DERIVATIVE, 2=NON_NEGATIVE_DERIVATIVE
+#
+# Query param conventions:
+#   Gauge/Counter: d:1, sa:2, der:0
+#   Latency:       d:1, sa:1, der:0
+
+# Convenient shortcuts for common query param combinations
+Q_GAUGE = QueryParams(downsampler=1, source_aggregator=2, derivative=0)
+Q_LATENCY = QueryParams(downsampler=1, source_aggregator=1, derivative=0)
+
+METRICS_MAP: dict[str, MetricInfo] = {
     # Basic Indicators
-    "liveness.livenodes": ("Live Nodes", "nodes", False),
-    "sys.uptime": ("Uptime", "seconds", False),
+    "cr.node.liveness.livenodes": MetricInfo(MetricMeta("Live Nodes", "nodes"), Q_GAUGE),
+    "cr.node.sys.uptime": MetricInfo(MetricMeta("Uptime", "seconds"), Q_GAUGE),
     # System Resources
-    "sys.cpu.user.percent": ("CPU User", "%", False),
-    "sys.cpu.sys.percent": ("CPU Sys", "%", False),
-    "sys.cpu.combined.percent-normalized": ("CPU Combined", "%", False),
-    "capacity": ("Disk Total", "bytes", False),
-    "capacity.available": ("Disk Available", "bytes", False),
-    "capacity.used": ("Disk Used", "bytes", False),
-    "sys.rss": ("Memory RSS", "bytes", False),
-    "sys.go.allocbytes": ("Go Alloc", "bytes", False),
-    "sys.go.totalbytes": ("Go Total", "bytes", False),
+    "cr.node.sys.cpu.user.percent": MetricInfo(MetricMeta("CPU User", "%"), Q_GAUGE),
+    "cr.node.sys.cpu.sys.percent": MetricInfo(MetricMeta("CPU Sys", "%"), Q_GAUGE),
+    "cr.node.sys.cpu.combined.percent-normalized": MetricInfo(MetricMeta("CPU Combined", "%"), Q_GAUGE),
+    "cr.store.capacity": MetricInfo(MetricMeta("Disk Total", "bytes"), Q_GAUGE),
+    "cr.store.capacity.available": MetricInfo(MetricMeta("Disk Available", "bytes"), Q_GAUGE),
+    "cr.store.capacity.used": MetricInfo(MetricMeta("Disk Used", "bytes"), Q_GAUGE),
+    "cr.node.sys.rss": MetricInfo(MetricMeta("Memory RSS", "bytes"), Q_GAUGE),
+    "cr.node.sys.go.allocbytes": MetricInfo(MetricMeta("Go Alloc", "bytes"), Q_GAUGE),
+    "cr.node.sys.go.totalbytes": MetricInfo(MetricMeta("Go Total", "bytes"), Q_GAUGE),
     # Database Performance
-    "sql.insert.count": ("SQL Insert Count", "count", False),
-    "sql.update.count": ("SQL Update Count", "count", False),
-    "sql.delete.count": ("SQL Delete Count", "count", False),
-    "sql.select.count": ("SQL Select Count", "count", False),
-    "sql.query.count": ("SQL Query Count", "count", False),
-    "rebalancing.writespersecond": ("Rebalancing Writes/s", "ops/s", False),
-    "rebalancing.queriespersecond": ("Rebalancing Queries/s", "ops/s", False),
-    "sql.exec.latency": ("SQL Exec Latency", "ms", True),
-    "sql.service.latency": ("SQL Service Latency", "ms", True),
-    "sql.distsql.exec.latency": ("DistSQL Exec Latency", "ms", True),
+    "cr.node.sql.insert.count": MetricInfo(MetricMeta("SQL Insert Count", "count"), Q_GAUGE),
+    "cr.node.sql.update.count": MetricInfo(MetricMeta("SQL Update Count", "count"), Q_GAUGE),
+    "cr.node.sql.delete.count": MetricInfo(MetricMeta("SQL Delete Count", "count"), Q_GAUGE),
+    "cr.node.sql.select.count": MetricInfo(MetricMeta("SQL Select Count", "count"), Q_GAUGE),
+    "cr.node.sql.query.count": MetricInfo(MetricMeta("SQL Query Count", "count"), Q_GAUGE),
+    "cr.store.rebalancing.writespersecond": MetricInfo(MetricMeta("Rebalancing Writes/s", "ops/s"), Q_GAUGE),
+    "cr.store.rebalancing.queriespersecond": MetricInfo(MetricMeta("Rebalancing Queries/s", "ops/s"), Q_GAUGE),
+    "cr.node.exec.latency-p99": MetricInfo(MetricMeta("SQL Exec Latency", "ms"), Q_LATENCY),
+    "cr.node.sql.service.latency-p99": MetricInfo(MetricMeta("SQL Service Latency", "ms"), Q_LATENCY),
+    "cr.node.sql.distsql.exec.latency-p99": MetricInfo(MetricMeta("DistSQL Exec Latency", "ms"), Q_LATENCY),
     # Storage
-    "totalbytes": ("Total Bytes", "bytes", False),
-    "livebytes": ("Live Bytes", "bytes", False),
+    "cr.store.totalbytes": MetricInfo(MetricMeta("Total Bytes", "bytes"), Q_GAUGE),
+    "cr.store.livebytes": MetricInfo(MetricMeta("Live Bytes", "bytes"), Q_GAUGE),
     # Cluster
-    "replicas": ("Replicas", "count", False),
-    "replicas.leaders": ("Raft Leaders", "count", False),
-    "replicas.leaseholders": ("Lease Holders", "count", False),
-    "ranges.unavailable": ("Unavailable Ranges", "count", False),
-    "ranges.underreplicated": ("Under-replicated Ranges", "count", False),
-    "ranges.overreplicated": ("Over-replicated Ranges", "count", False),
-    "raftlog.behind": ("Raftlog Behind", "count", False),
-    "wal.replica.data.latency": ("WAL Replica Data Latency", "ms", True),
-    "raft.replica.consistent.latency": ("Raft Consistent Latency", "ms", True),
+    "cr.store.replicas": MetricInfo(MetricMeta("Replicas", "count"), Q_GAUGE),
+    "cr.store.replicas.leaders": MetricInfo(MetricMeta("Raft Leaders", "count"), Q_GAUGE),
+    "cr.store.replicas.leaseholders": MetricInfo(MetricMeta("Lease Holders", "count"), Q_GAUGE),
+    "cr.store.ranges.unavailable": MetricInfo(MetricMeta("Unavailable Ranges", "count"), Q_GAUGE),
+    "cr.store.ranges.underreplicated": MetricInfo(MetricMeta("Under-replicated Ranges", "count"), Q_GAUGE),
+    "cr.store.ranges.overreplicated": MetricInfo(MetricMeta("Over-replicated Ranges", "count"), Q_GAUGE),
+    "cr.store.raftlog.behind": MetricInfo(MetricMeta("Raftlog Behind", "count"), Q_GAUGE),
+    "cr.store.raft.replica.consistent.latency-p99": MetricInfo(MetricMeta("Raft Consistent Latency", "ms"), Q_LATENCY),
     # Network
-    "round-trip-latency": ("Round-trip Latency", "ms", True),
-    "clock-offset.meannanos": ("Clock Offset Mean", "ns", True),
+    "cr.node.clock-offset.meannanos": MetricInfo(MetricMeta("Clock Offset Mean", "ns"), Q_LATENCY),
 }
 
 
@@ -78,32 +112,17 @@ def build_ts_query(host: str, port: int, start_ns: int, end_ns: int, sample_ns: 
                    metric_filter: list[str] | None = None) -> dict:
     """Build and execute /ts/query API request."""
 
-    # Gauge/Counter metrics: d:1, sa:2, der:0
-    # Latency metrics: d:1, sa:1, der:0
-    latency_metrics = {
-        "sql.exec.latency", "sql.service.latency", "sql.distsql.exec.latency",
-        "wal.replica.data.latency", "raft.replica.consistent.latency",
-        "round-trip-latency", "clock-offset.meannanos"
-    }
-
     queries = []
     metrics_to_query = metric_filter if metric_filter else list(METRICS_MAP.keys())
 
     for name in metrics_to_query:
-        if name in latency_metrics:
-            queries.append({
-                "name": f"cr.node.{name}",
-                "downsampler": 1,
-                "source_aggregator": 1,
-                "derivative": 0
-            })
-        else:
-            queries.append({
-                "name": f"cr.node.{name}",
-                "downsampler": 1,
-                "source_aggregator": 2,
-                "derivative": 0
-            })
+        info = METRICS_MAP[name]  # Validated in main() before this call
+        queries.append({
+            "name": name,
+            "downsampler": info.query.downsampler,
+            "source_aggregator": info.query.source_aggregator,
+            "derivative": info.query.derivative,
+        })
 
     payload = {
         "start_nanos": start_ns,
@@ -119,7 +138,11 @@ def build_ts_query(host: str, port: int, start_ns: int, end_ns: int, sample_ns: 
         f"http://{host}:{port}/ts/query"
     ]
 
-    result = subprocess.run(curl_cmd, capture_output=True, text=True)
+    try:
+        result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        print("Error: Connection to KaiwuDB timed out (30s)", file=sys.stderr)
+        sys.exit(1)
     if result.returncode != 0:
         print(f"Error: Failed to fetch metrics: {result.stderr}", file=sys.stderr)
         sys.exit(1)
@@ -136,47 +159,43 @@ def parse_metrics(data: dict) -> list[dict[str, Any]]:
     results = []
 
     for r in data.get("results", []):
-        # Extract metric name (remove cr.node. prefix)
         full_name = r.get("query", {}).get("name", "")
-        if full_name.startswith("cr.node."):
-            name = full_name[8:]  # Remove "cr.node."
-        else:
-            name = full_name
-
         sources = r.get("query", {}).get("sources", [])
         datapoints = r.get("datapoints", [])
+        info = METRICS_MAP.get(full_name, MetricInfo(MetricMeta(full_name, ""), Q_GAUGE))
 
-        # Include metric even if no datapoints (show NULL/NAN)
+        result = {
+            "name": full_name,
+            "display_name": info.display.display_name,
+            "unit": info.display.unit,
+            "sources": sources,
+        }
+
         if datapoints:
             latest = datapoints[-1]
-            timestamp = int(latest.get("timestampNanos", 0)) // 1_000_000  # Convert to ms
-            results.append({
-                "name": name,
-                "display_name": METRICS_MAP.get(name, (name, "", False))[0],
-                "unit": METRICS_MAP.get(name, ("", "", False))[1],
-                "is_latency": METRICS_MAP.get(name, ("", "", False))[2],
-                "latest_value": latest.get("value", 0),
-                "sources": sources,
+            result.update({
+                # TODO: display datapoints_count to show data completeness (e.g., expected 720 pts vs actual 713 pts)
                 "datapoints_count": len(datapoints),
-                "timestamp": timestamp,
+                # TODO: display timestamp to show when latest value was collected
+                "timestamp": int(latest.get("timestampNanos", 0)) // 1_000_000,
+                "latest_value": latest.get("value", 0),
                 "min": min(dp.get("value", 0) for dp in datapoints),
                 "max": max(dp.get("value", 0) for dp in datapoints),
                 "avg": sum(dp.get("value", 0) for dp in datapoints) / len(datapoints),
             })
         else:
-            results.append({
-                "name": name,
-                "display_name": METRICS_MAP.get(name, (name, "", False))[0],
-                "unit": METRICS_MAP.get(name, ("", "", False))[1],
-                "is_latency": METRICS_MAP.get(name, ("", "", False))[2],
-                "latest_value": None,
-                "sources": sources,
+            result.update({
+                # TODO: display datapoints_count to show data completeness
                 "datapoints_count": 0,
+                # TODO: display timestamp to show when latest value was collected
                 "timestamp": None,
+                "latest_value": None,
                 "min": None,
                 "max": None,
                 "avg": None,
             })
+
+        results.append(result)
 
     return results
 
@@ -186,12 +205,38 @@ def format_metrics_table(metrics: list[dict]) -> str:
     if not metrics:
         return "No metrics data available."
 
+    # Unit formatters: unit_name -> (formatter_fn, suffix_or_none)
+    # suffix_or_none: if not None, append to formatted value (e.g., "ms", "%")
+    UNIT_FORMATTERS = {
+        "bytes": (format_bytes, None),
+        "%": (lambda v: f"{v:.4f}", "%"),
+        "ms": (lambda v: f"{v:.3f}", "ms"),
+        "ns": (lambda v: f"{v:.0f}", "ns"),
+        "seconds": (format_duration, None),
+        "count": (lambda v: str(int(v)), None),
+        "nodes": (lambda v: str(int(v)), None),
+        "ops/s": (lambda v: f"{v:.2f}", "/s"),
+    }
+
+    def format_value(value, unit, col_width=18):
+        if value is None:
+            return "NAN"
+        if unit not in UNIT_FORMATTERS:
+            s = str(value)
+        else:
+            formatter, suffix = UNIT_FORMATTERS[unit]
+            s = f"{formatter(value)}{suffix}" if suffix else formatter(value)
+        # Truncate only if exceeds column width
+        if len(s) > col_width:
+            return s[:col_width-3] + "..."
+        return s
+
     # Determine column widths
     name_width = max(len(m["display_name"]) for m in metrics) + 2
     val_width = 18
-    min_width = 12
-    max_width = 12
-    avg_width = 12
+    min_width = 15
+    max_width = 15
+    avg_width = 15
 
     lines = []
     header = (f"{'Metric':<{name_width}}"
@@ -204,41 +249,17 @@ def format_metrics_table(metrics: list[dict]) -> str:
     lines.append("-" * len(header))
 
     for m in sorted(metrics, key=lambda x: x["display_name"]):
-        value = m["latest_value"]
-        unit = m["unit"]
-
-        # Format value with unit (handle None)
-        if value is None:
-            value_str = "NAN"
-        elif unit == "bytes":
-            value_str = format_bytes(value)
-        elif unit == "%":
-            value_str = f"{value:.4f}%"
-        elif unit == "ms":
-            value_str = f"{value:.3f}ms"
-        elif unit == "ns":
-            value_str = f"{value:.0f}ns"
-        elif unit == "seconds":
-            value_str = format_duration(value)
-        elif unit == "count" or unit == "nodes":
-            value_str = f"{int(value)}"
-        elif unit == "ops/s":
-            value_str = f"{value:.2f}/s"
-        else:
-            value_str = f"{value}"
-
-        # Format min/max/avg (handle None)
-        def fmt(v):
-            if v is None:
-                return "NAN"
-            return f"{v:.3f}"
+        value_str = format_value(m["latest_value"], m["unit"], val_width)
+        min_str = format_value(m["min"], m["unit"], min_width)
+        max_str = format_value(m["max"], m["unit"], max_width)
+        avg_str = format_value(m["avg"], m["unit"], avg_width)
 
         lines.append(
             f"{m['display_name']:<{name_width}}"
             f"{value_str:>{val_width}}"
-            f"{fmt(m['min']):>{min_width}}"
-            f"{fmt(m['max']):>{max_width}}"
-            f"{fmt(m['avg']):>{avg_width}}"
+            f"{min_str:>{min_width}}"
+            f"{max_str:>{max_width}}"
+            f"{avg_str:>{avg_width}}"
             f"  {','.join(m['sources']) if m['sources'] else 'N/A'}"
         )
 
@@ -252,6 +273,14 @@ def format_bytes(num: float) -> str:
             return f"{num:.2f}{unit}"
         num /= 1024.0
     return f"{num:.2f}PB"
+
+
+def _parse_iso_to_ns(iso_str: str) -> float:
+    """Parse ISO 8601 datetime string to unix timestamp in nanoseconds."""
+    dt = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.timestamp() * 1_000_000_000
 
 
 def format_duration(seconds: float) -> str:
@@ -272,13 +301,20 @@ def main():
     )
     parser.add_argument("--host", default="localhost", help="KaiwuDB admin host")
     parser.add_argument("--port", type=int, default=8080, help="KaiwuDB admin port")
-    parser.add_argument("--start", help="Start time (ISO format or unix timestamp in ns)")
-    parser.add_argument("--end", help="End time (ISO format or unix timestamp in ns)")
+    parser.add_argument("--start", help="Start time (ISO 8601 format or unix timestamp in ns). Examples: '2026-04-28T10:00:00', '2026-04-28T10:00:00Z', '1745846400000000000'")
+    parser.add_argument("--end", help="End time (ISO 8601 format or unix timestamp in ns). Examples: '2026-04-28T11:00:00', '2026-04-28T11:00:00Z', '1745850000000000000'")
     parser.add_argument("--sample", type=int, default=60, help="Sample interval in seconds")
     parser.add_argument("--metric", action="append", help="Filter by metric name (can repeat)")
     parser.add_argument("--json", action="store_true", help="Output raw JSON")
 
     args = parser.parse_args()
+
+    # Validate metric filter
+    if args.metric:
+        for m in args.metric:
+            if m not in METRICS_MAP:
+                print(f"Error: Unknown metric: {m}", file=sys.stderr)
+                sys.exit(1)
 
     # Calculate time range
     now_ns = int(time.time_ns())  # Use time_ns() for integer precision
@@ -288,8 +324,11 @@ def main():
         try:
             start_ns = int(args.start)
         except ValueError:
-            # Assume ISO format, use as-is (would need dateutil for proper parsing)
-            start_ns = now_ns - hour_ns
+            try:
+                start_ns = int(_parse_iso_to_ns(args.start))
+            except ValueError as e:
+                print(f"Error: Invalid --start format: {args.start}. Use ISO 8601 (e.g., '2026-04-28T10:00:00') or unix timestamp in ns", file=sys.stderr)
+                sys.exit(1)
     else:
         start_ns = now_ns - hour_ns
 
@@ -297,7 +336,11 @@ def main():
         try:
             end_ns = int(args.end)
         except ValueError:
-            end_ns = now_ns
+            try:
+                end_ns = int(_parse_iso_to_ns(args.end))
+            except ValueError as e:
+                print(f"Error: Invalid --end format: {args.end}. Use ISO 8601 (e.g., '2026-04-28T10:00:00') or unix timestamp in ns", file=sys.stderr)
+                sys.exit(1)
     else:
         end_ns = now_ns
 
