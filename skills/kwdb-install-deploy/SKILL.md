@@ -1,47 +1,47 @@
 ---
 name: kwdb-install-deploy
-description: 当用户提问要安装、部署开务数据库 (kwdb,kaiwudb) 时触发，用来帮助用户完成 KaiwuDB 集群的脚本部署。包括配置文件修改、安装命令执行、集群初始化和状态检查等步骤。
+description: Triggered when the user wants to install or deploy KaiwuDB (kwdb, kaiwudb). Helps users complete script-based deployment of KaiwuDB clusters, including configuration file modification, installation command execution, cluster initialization, and status checks.
 ---
 
-# KWDB Install (开务数据库安装部署)
+# KWDB Install
 
 ## Overview
 
-该技能提供 KaiwuDB 数据库的脚本部署功能，适用于 Linux 环境下的裸机或容器部署。支持单副本和多副本集群部署，并提供完整的部署流程指导。
+This skill provides script-based deployment for KaiwuDB, suitable for bare-metal or container deployment in Linux environments. Supports single-replica and multi-replica cluster deployments with complete deployment workflow guidance.
 
-## Mandatory Rules (强制要求)
+## Mandatory Rules
 
-**必须严格遵守以下三条规则：**
+**The following three rules must be strictly followed:**
 
-### 1. 禁止猜测安装参数
+### 1. Prohibit Guessing Installation Parameters
 
-**除非用户明确指定，否则不得自行猜测或假设任何安装参数并执行安装。**
+**Do not guess or assume any installation parameters and proceed with installation unless explicitly specified by the user.**
 
-- 所有配置参数（端口、IP、数据目录、安全模式等）必须向用户逐一确认
-- 即使用户说"使用默认值"，也需要明确列出默认值并等待用户确认
-- 安装包路径必须由用户明确提供，不得自行推测
+- All configuration parameters (ports, IPs, data directories, security modes, etc.) must be confirmed with the user one by one
+- Even if the user says "use defaults", the default values must be explicitly listed and confirmed with the user
+- The installation package path must be explicitly provided by the user and must not be guessed
 
-### 2. 安装失败时必须读取日志
+### 2. Must Read Logs on Installation Failure
 
-**当安装命令执行失败后，必须读取安装脚本同路径下 `log/` 目录中的日志文件，获取详细失败信息。**
+**When the installation command fails, you must read the log files in the `log/` directory under the same path as the installation script to obtain detailed failure information.**
 
-日志文件路径：`/opt/kaiwudb/<安装包名>/log/` 或 `kaiwudb_install/log/`
+Log file path: `/opt/kaiwudb/<package-name>/log/` or `kaiwudb_install/log/`
 
 ```bash
-# 安装失败后，首先读取日志
+# After installation failure, first read the logs
 ls -la log/
-cat log/install.log  # 或最新生成的日志文件
+cat log/install.log  # or the latest generated log file
 ```
 
-### 3. 失败汇报后退出，禁止随意重试
+### 3. Exit After Reporting Failure, Prohibit Arbitrary Retries
 
-**安装失败后，必须：**
-1. 向用户清晰展示从日志中获取的错误信息
-2. 说明可能的原因
-3. 退出安装流程，**不得自行重试**
-4. 等待用户指示后再决定下一步操作
+**After installation failure, you must:**
+1. Clearly display the error information obtained from the logs to the user
+2. Explain possible causes
+3. Exit the installation process, **do not retry on your own**
+4. Wait for user instructions before deciding on the next step
 
-**例外**：只有当用户明确要求"重试"时，才可以再次执行安装命令。
+**Exception**: Only when the user explicitly requests "retry", you may execute the installation command again.
 
 ## Prerequisites
 
@@ -64,132 +64,132 @@ cat log/install.log  # 或最新生成的日志文件
 
 ## Deployment Steps
 
-### Step 1: 确认部署模式
+### Step 1: Confirm Deployment Mode
 
-首先，我需要确认您需要部署的模式：
+First, I need to confirm the deployment mode you need:
 
-**询问内容**：
-"请选择部署模式：单机部署 (single) 或 集群部署 (cluster)？"
+**Ask**:
+"Please select the deployment mode: single-node deployment (single) or cluster deployment (cluster)?"
 
-### Step 1.1: 确认集群副本数 - 仅集群模式需要
+### Step 1.1: Confirm Cluster Replica Count - Cluster Mode Only
 
-如果选择集群部署，我需要进一步确认副本数：
+If cluster deployment is selected, I need to further confirm the number of replicas:
 
-**询问内容**：
-"请选择集群部署类型：单副本集群 (single-replica) 或 多副本集群 (multi-replica)？"
+**Ask**:
+"Please select the cluster deployment type: single-replica cluster (single-replica) or multi-replica cluster (multi-replica)?"
 
-### Step 2: 确认安装包位置
+### Step 2: Confirm Installation Package Location
 
-接下来，我需要向您确认 KaiwuDB 安装包的位置。安装包应该是一个以 `KaiwuDB` 为前缀的 `.tar.gz` 文件，例如：`KaiwuDB-1.0.0.tar.gz`。
+Next, I need to confirm the location of the KaiwuDB installation package with you. The installation package should be a `.tar.gz` file with `KaiwuDB` as the prefix, for example: `KaiwuDB-1.0.0.tar.gz`.
 
-**询问内容**：
-"请提供 KaiwuDB 安装包的完整路径（包含文件名）。安装包应该是一个以 KaiwuDB 为前缀的 tar.gz 文件，例如 /path/to/KaiwuDB-1.0.0.tar.gz。"
+**Ask**:
+"Please provide the full path (including filename) of the KaiwuDB installation package. The installation package should be a tar.gz file with KaiwuDB as the prefix, for example /path/to/KaiwuDB-1.0.0.tar.gz."
 
-**注意**：必须等待用户提供确切路径，不得自行猜测。
+**Note**: You must wait for the user to provide the exact path and must not guess on your own.
 
-### Step 3: 验证安装包
+### Step 3: Verify Installation Package
 
-确认安装包位置后，需要验证文件是否存在且格式正确：
+After confirming the installation package location, verify that the file exists and has the correct format:
 
 ```bash
-# 检查安装包是否存在
+# Check if the installation package exists
 if [ ! -f "$INSTALL_PACKAGE_PATH" ]; then
-    echo "错误：安装包不存在，请检查路径是否正确"
+    echo "Error: Installation package does not exist, please check if the path is correct"
     exit 1
 fi
 
-# 检查文件名格式
+# Check filename format
 if [[ "$(basename $INSTALL_PACKAGE_PATH)" != KaiwuDB*.tar.gz ]]; then
-    echo "错误：安装包文件名不正确。应该以 KaiwuDB 为前缀的 tar.gz 文件"
+    echo "Error: Installation package filename is incorrect. It should be a tar.gz file with KaiwuDB as the prefix"
     exit 1
 fi
 ```
 
-### Step 4: 解压安装包并配置
+### Step 4: Extract Installation Package and Configure
 
 ```bash
-# 创建安装目录
+# Create installation directory
 sudo mkdir -p /opt/kaiwudb
 
-# 解压安装包
+# Extract installation package
 tar -xzf "$INSTALL_PACKAGE_PATH" -C /opt/kaiwudb
 
-# 进入安装目录
+# Enter installation directory
 cd /opt/kaiwudb/kaiwudb_install
 ```
 
-### Step 5: 配置 deploy.cfg 文件
+### Step 5: Configure deploy.cfg File
 
-我将根据您选择的部署模式，向您逐步询问每一项配置内容，然后根据您的回答来修改 `deploy.cfg` 配置文件。
+I will ask you about each configuration item step by step according to the deployment mode you selected, and then modify the `deploy.cfg` configuration file based on your answers.
 
-**强制要求**：除非用户主动说"全部默认"或明确指定了参数值，否则必须逐项确认。即使用户选择默认值，也需要展示默认值并等待确认。
+**Mandatory**: Unless the user voluntarily says "all defaults" or explicitly specifies parameter values, each item must be confirmed one by one. Even if the user selects default values, the defaults must be displayed and confirmed.
 
-#### 全局配置 (global) - 所有模式通用
+#### Global Configuration (global) - Common to All Modes
 
-1. **安全模式 (secure_mode)**:
-   - 询问内容："请选择安全模式：insecure（非安全模式）、tls（TLS 安全模式，默认）、tlcp（TLCP 安全模式）"
+1. **Security Mode (secure_mode)**:
+   - Ask: "Please select the security mode: insecure (non-secure mode), tls (TLS secure mode, default), tlcp (TLCP secure mode)"
 
-2. **管理用户 (management_user)**:
-   - 询问内容："请输入 KaiwuDB 管理用户名（默认：kaiwudb）"
+2. **Management User (management_user)**:
+   - Ask: "Please enter the KaiwuDB management username (default: kaiwudb)"
 
-3. **RESTful 端口 (rest_port)**:
-   - 询问内容："请输入 KaiwuDB Web 服务端口（默认：8080）"
+3. **RESTful Port (rest_port)**:
+   - Ask: "Please enter the KaiwuDB Web service port (default: 8080)"
 
-4. **KaiwuDB 服务端口 (kaiwudb_port)**:
-   - 询问内容："请输入 KaiwuDB 服务端口（默认：26257）"
+4. **KaiwuDB Service Port (kaiwudb_port)**:
+   - Ask: "Please enter the KaiwuDB service port (default: 26257)"
 
-5. **BRPC 端口 (brpc_port)**:
-   - 询问内容："请输入 KaiwuDB 时序引擎通信端口（默认：27257）"
+5. **BRPC Port (brpc_port)**:
+   - Ask: "Please enter the KaiwuDB time-series engine communication port (default: 27257)"
 
-6. **数据目录 (data_root)**:
-   - 询问内容："请输入 KaiwuDB 数据存储目录（默认：/var/lib/kaiwudb）"
+6. **Data Directory (data_root)**:
+   - Ask: "Please enter the KaiwuDB data storage directory (default: /var/lib/kaiwudb)"
 
-7. **CPU 资源占用 (cpu)**:
-   - 询问内容："请输入 KaiwuDB 服务占用 CPU 资源的比例（0-1，默认无限制）"
+7. **CPU Resource Usage (cpu)**:
+   - Ask: "Please enter the proportion of CPU resources occupied by KaiwuDB service (0-1, default: unlimited)"
 
-#### 本地节点配置 (local) - 所有模式通用
+#### Local Node Configuration (local) - Common to All Modes
 
-8. **本地节点 IP 地址 (local_node_ip)**:
-   - 询问内容："请输入本地节点的 IP 地址（用于对外提供服务）"
-   - **注意**：此参数无默认值，必须由用户提供
+8. **Local Node IP Address (local_node_ip)**:
+   - Ask: "Please enter the IP address of the local node (used for external services)"
+   - **Note**: This parameter has no default value and must be provided by the user
 
-#### 集群配置 (cluster) - 仅集群模式需要
+#### Cluster Configuration (cluster) - Cluster Mode Only
 
-9. **集群其他节点 IP 地址 (cluster_node_ips)**:
-   - 询问内容："请输入集群其他节点的 IP 地址（多个地址用逗号分隔）"
+9. **Other Cluster Node IP Addresses (cluster_node_ips)**:
+   - Ask: "Please enter the IP addresses of other cluster nodes (multiple addresses separated by commas)"
 
-10. **SSH 端口 (ssh_port)**:
-    - 询问内容："请输入远程节点的 SSH 服务端口（默认：22）"
+10. **SSH Port (ssh_port)**:
+    - Ask: "Please enter the SSH service port of the remote node (default: 22)"
 
-11. **SSH 用户名 (ssh_user)**:
-    - 询问内容："请输入远程节点的 SSH 登录用户名"
+11. **SSH Username (ssh_user)**:
+    - Ask: "Please enter the SSH login username for the remote node"
 
-根据您的回答，我会自动生成对应的 `deploy.cfg` 配置文件。单机部署时会自动省略集群配置部分。
+Based on your answers, I will automatically generate the corresponding `deploy.cfg` configuration file. The cluster configuration section will be automatically omitted for single-node deployment.
 
-### Step 6: 执行安装命令
+### Step 6: Execute Installation Command
 
-根据您的选择，执行相应的安装命令：
+Execute the corresponding installation command based on your selection:
 
-**单机部署**：
+**Single-node deployment**:
 ```bash
 ./deploy.sh install --single
 ```
 
-**单副本集群部署**：
+**Single-replica cluster deployment**:
 ```bash
 ./deploy.sh install --single-replica
 ```
 
-**多副本集群部署**：
+**Multi-replica cluster deployment**:
 ```bash
 ./deploy.sh install --multi-replica
 ```
 
-**重要**：执行前必须向用户展示所有配置参数，等待用户确认后方可执行。
+**Important**: Before execution, all configuration parameters must be displayed to the user and confirmed before proceeding.
 
-### Step 7: 确认安装信息
+### Step 7: Confirm Installation Information
 
-检查配置无误后输入 `Y` 或 `y`，如需返回修改配置文件，输入 `N` 或 `n`。
+After checking that the configuration is correct, enter `Y` or `y`. If you need to return to modify the configuration file, enter `N` or `n`.
 
 ```shell
 ================= KaiwuDB Basic Info =================
@@ -207,70 +207,70 @@ Local Node Address: 192.168.122.221
 Please confirm the installation information above(Y/n):
 ```
 
-### Step 8: 处理安装失败
+### Step 8: Handle Installation Failure
 
-**如果安装命令执行失败（返回非零退出码），必须执行以下操作：**
+**If the installation command execution fails (returns a non-zero exit code), the following operations must be performed:**
 
 ```bash
-# 1. 进入日志目录
+# 1. Enter the log directory
 cd log/
 
-# 2. 列出日志文件
+# 2. List log files
 ls -la
 
-# 3. 读取最新的日志文件（通常是 install.log 或带时间戳的文件）
+# 3. Read the latest log file (usually install.log or a file with a timestamp)
 cat install.log
-# 或者
-tail -100 <最新日志文件>
+# or
+tail -100 <latest log file>
 ```
 
-**向用户汇报失败信息：**
+**Report failure information to the user:**
 
-1. 清晰展示从日志中提取的错误信息
-2. 说明可能的原因（参考 references/troubleshooting.md）
-3. **退出安装流程，不得自行重试**
-4. 等待用户进一步指示
+1. Clearly display the error information extracted from the logs
+2. Explain possible causes (refer to references/troubleshooting.md)
+3. **Exit the installation process, do not retry on your own**
+4. Wait for further user instructions
 
-示例汇报格式：
+Example report format:
 ```
-安装失败！
+Installation failed!
 
-错误信息（来自日志）：
-[从 log/install.log 中提取的具体错误内容]
+Error information (from logs):
+[Specific error content extracted from log/install.log]
 
-可能原因：
-- [根据错误信息分析的可能原因]
+Possible causes:
+- [Possible causes analyzed based on the error information]
 
-请检查上述问题后，告诉我是否需要重试或有其他指示。
+Please check the above issues and let me know if you need to retry or have other instructions.
 ```
 
-### Step 9: 初始化并启动集群 - 仅集群模式需要
+### Step 9: Initialize and Start Cluster - Cluster Mode Only
 
-安装成功后，执行：
+After successful installation, execute:
 
 ```bash
 ./deploy.sh cluster -i
-# 或者
+# or
 ./deploy.sh cluster --init
 ```
 
-### Step 10: 查看状态
+### Step 10: Check Status
 
-**查看服务状态**：
+**Check service status**:
 ```bash
 systemctl status kaiwudb
 ```
 
-**查看集群状态（仅集群模式）**：
+**Check cluster status (cluster mode only)**:
 ```bash
 ./deploy.sh cluster -s
-# 或者
+# or
 ./deploy.sh cluster --status
-# 或者使用便捷脚本
+# or use the convenience script
 kw-status
 ```
 
-### Step 11: 配置开机自启动（可选）
+### Step 11: Configure Auto-start on Boot (Optional)
 
 ```bash
 systemctl enable kaiwudb
@@ -279,12 +279,12 @@ systemctl enable kaiwudb
 ## Resources
 
 ### references/
-包含 KaiwuDB 相关文档：
+Contains KaiwuDB related documents:
 
-- `installation_guide.md` - 详细的安装指南
-- `troubleshooting.md` - 常见问题和解决方案
+- `installation_guide.md` - Detailed installation guide
+- `troubleshooting.md` - Common issues and solutions
 
 ### assets/
-包含 KaiwuDB 配置文件模板和资源：
+Contains KaiwuDB configuration file templates and resources:
 
-- `deploy.cfg` - 部署配置文件模板
+- `deploy.cfg` - Deployment configuration file template

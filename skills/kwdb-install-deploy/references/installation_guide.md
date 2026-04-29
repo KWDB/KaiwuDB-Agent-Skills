@@ -1,127 +1,127 @@
-# KaiwuDB 脚本部署指南
+# KaiwuDB Script Deployment Guide
 
-## 前提条件
+## Prerequisites
 
-### 系统要求
+### System Requirements
 
-- 所有待部署节点的硬件、操作系统和软件依赖满足安装部署要求。
-- **网络设置**:
-  - 各节点间网络联通。
-  - 节点所在机器位于同一机房内。
-  - 物理机器间网络延迟不高于 50 ms。
-  - 各节点时钟相差不大于 500 ms。
-  - 各节点已预留 KaiwuDB 服务所需端口。
-- 已获取对应系统版本的 KaiwuDB 裸机或容器安装包。
+- Hardware, operating system, and software dependencies of all nodes to be deployed must meet the installation and deployment requirements.
+- **Network Settings**:
+  - Network connectivity between all nodes.
+  - Nodes are located within the same data center.
+  - Network latency between physical machines is no higher than 50 ms.
+  - Clock difference between nodes is no greater than 500 ms.
+  - Required ports for KaiwuDB service have been reserved on each node.
+- KaiwuDB bare-metal or container installation package for the corresponding system version has been obtained.
 
-### 用户权限要求
+### User Permissions
 
-- 已配置当前节点与集群内其他节点的 SSH 免密登录。
-- 安装用户为 `root` 用户或者拥有 `sudo` 权限的普通用户。
-- 使用容器安装包部署时，如果安装用户为非 `root` 用户，需要通过 `sudo usermod -aG docker $USER` 命令将用户添加到 `docker` 组。
+- SSH passwordless login is configured between the current node and other nodes in the cluster.
+- The installation user is the `root` user or a regular user with `sudo` privileges.
+- When deploying with the container installation package, if the installation user is a non-`root` user, add the user to the `docker` group by running `sudo usermod -aG docker $USER`.
 
-## 部署步骤
+## Deployment Steps
 
-### Step 1: 确认部署模式
+### Step 1: Confirm Deployment Mode
 
-首先，确认需要部署的模式：
+First, confirm the deployment mode:
 
-**询问内容**：
-"请选择部署模式：单机部署(single) 或 集群部署(cluster)？"
+**Ask**:
+"Please select the deployment mode: single-node deployment (single) or cluster deployment (cluster)?"
 
-### Step 1.1: 确认集群副本数 - 仅集群模式需要
+### Step 1.1: Confirm Cluster Replica Count - Cluster Mode Only
 
-如果选择集群部署，我需要进一步确认副本数：
+If cluster deployment is selected, further confirm the number of replicas:
 
-**询问内容**：
-"请选择集群部署类型：单副本集群(single-replica) 或 多副本集群(multi-replica)？"
+**Ask**:
+"Please select the cluster deployment type: single-replica cluster (single-replica) or multi-replica cluster (multi-replica)?"
 
-### Step 2: 确认安装包位置
+### Step 2: Confirm Installation Package Location
 
-提供安装包的完整路径，包括文件名，例如：
+Provide the full path of the installation package, including the filename, for example:
 ```
 /path/to/KaiwuDB-1.0.0.tar.gz
 ```
 
-### Step 3: 解压安装包
+### Step 3: Extract Installation Package
 
 ```bash
-# 创建安装目录
+# Create installation directory
 sudo mkdir -p /opt/kaiwudb
 
-# 解压安装包
+# Extract installation package
 tar -xzf "$INSTALL_PACKAGE_PATH" -C /opt/kaiwudb
 
-# 进入安装目录
+# Enter installation directory
 cd /opt/kaiwudb/$(basename "$INSTALL_PACKAGE_PATH" .tar.gz)
 ```
 
-### Step 4: 配置 deploy.cfg 文件
+### Step 4: Configure deploy.cfg File
 
-我将根据您选择的部署模式，向您逐步询问每一项配置内容，然后根据您的回答来修改 `deploy.cfg` 配置文件。
+I will ask you about each configuration item step by step according to the deployment mode you selected, and then modify the `deploy.cfg` configuration file based on your answers.
 
-#### 全局配置 (global) - 所有模式通用
+#### Global Configuration (global) - Common to All Modes
 
-1. **安全模式 (secure_mode)**:
-   - 选择安全模式：insecure（非安全模式）、tls（TLS安全模式，默认）、tlcp（TLCP安全模式）
+1. **Security Mode (secure_mode)**:
+   - Select the security mode: insecure (non-secure mode), tls (TLS secure mode, default), tlcp (TLCP secure mode)
 
-2. **管理用户 (management_user)**:
-   - 输入KaiwuDB管理用户名（默认：kaiwudb）
+2. **Management User (management_user)**:
+   - Enter the KaiwuDB management username (default: kaiwudb)
 
-3. **RESTful端口 (rest_port)**:
-   - 输入KaiwuDB Web服务端口（默认：8080）
+3. **RESTful Port (rest_port)**:
+   - Enter the KaiwuDB Web service port (default: 8080)
 
-4. **KaiwuDB服务端口 (kaiwudb_port)**:
-   - 输入KaiwuDB服务端口（默认：26257）
+4. **KaiwuDB Service Port (kaiwudb_port)**:
+   - Enter the KaiwuDB service port (default: 26257)
 
-5. **BRPC端口 (brpc_port)**:
-   - 输入KaiwuDB时序引擎通信端口（默认：27257）
+5. **BRPC Port (brpc_port)**:
+   - Enter the KaiwuDB time-series engine communication port (default: 27257)
 
-6. **数据目录 (data_root)**:
-   - 输入KaiwuDB数据存储目录（默认：/var/lib/kaiwudb）
+6. **Data Directory (data_root)**:
+   - Enter the KaiwuDB data storage directory (default: /var/lib/kaiwudb)
 
-7. **CPU资源占用 (cpu)**:
-   - 输入KaiwuDB服务占用CPU资源的比例（0-1，默认无限制）
+7. **CPU Resource Usage (cpu)**:
+   - Enter the proportion of CPU resources occupied by KaiwuDB service (0-1, default: unlimited)
 
-#### 本地节点配置 (local) - 所有模式通用
+#### Local Node Configuration (local) - Common to All Modes
 
-8. **本地节点IP地址 (local_node_ip)**:
-   - 输入本地节点的IP地址（用于对外提供服务）
+8. **Local Node IP Address (local_node_ip)**:
+   - Enter the IP address of the local node (used for external services)
 
-#### 集群配置 (cluster) - 仅集群模式需要
+#### Cluster Configuration (cluster) - Cluster Mode Only
 
-9. **集群其他节点IP地址 (cluster_node_ips)**:
-   - 输入集群其他节点的IP地址（多个地址用逗号分隔）
+9. **Other Cluster Node IP Addresses (cluster_node_ips)**:
+   - Enter the IP addresses of other cluster nodes (multiple addresses separated by commas)
 
-10. **SSH端口 (ssh_port)**:
-    - 输入远程节点的SSH服务端口（默认：22）
+10. **SSH Port (ssh_port)**:
+    - Enter the SSH service port of the remote node (default: 22)
 
-11. **SSH用户名 (ssh_user)**:
-    - 输入远程节点的SSH登录用户名
+11. **SSH Username (ssh_user)**:
+    - Enter the SSH login username for the remote node
 
-根据您的回答，我会自动生成对应的 `deploy.cfg` 配置文件。单机部署时会自动省略集群配置部分。
+Based on your answers, I will automatically generate the corresponding `deploy.cfg` configuration file. The cluster configuration section will be automatically omitted for single-node deployment.
 
-### Step 5: 执行安装命令
+### Step 5: Execute Installation Command
 
-根据您的选择，执行相应的安装命令：
+Execute the corresponding installation command based on your selection:
 
-**单机部署**：
+**Single-node deployment**:
 ```bash
 ./deploy.sh install --single
 ```
 
-**单副本集群部署**：
+**Single-replica cluster deployment**:
 ```bash
 ./deploy.sh install --single-replica
 ```
 
-**多副本集群部署**：
+**Multi-replica cluster deployment**:
 ```bash
 ./deploy.sh install --multi-replica
 ```
 
-### Step 6: 确认安装信息
+### Step 6: Confirm Installation Information
 
-检查配置无误后输入 `Y` 或 `y`，如需返回修改配置文件，输入 `N` 或 `n`。
+After checking that the configuration is correct, enter `Y` or `y`. If you need to return to modify the configuration file, enter `N` or `n`.
 
 ```shell
 ================= KaiwuDB Basic Info =================
@@ -139,56 +139,56 @@ Local Node Address: 192.168.122.221
 Please confirm the installation information above(Y/n):
 ```
 
-### Step 7: 初始化并启动集群 - 仅集群模式需要
+### Step 7: Initialize and Start Cluster - Cluster Mode Only
 
 ```bash
 ./deploy.sh cluster -i
-# 或者
+# or
 ./deploy.sh cluster --init
 ```
 
-### Step 8: 查看状态
+### Step 8: Check Status
 
-**查看服务状态**：
+**Check service status**:
 ```bash
 systemctl status kaiwudb
 ```
 
-**查看集群状态（仅集群模式）**：
+**Check cluster status (cluster mode only)**:
 ```bash
 ./deploy.sh cluster -s
-# 或者
+# or
 ./deploy.sh cluster --status
-# 或者使用便捷脚本
+# or use the convenience script
 kw-status
 ```
 
-### Step 9: 配置开机自启动（可选）
+### Step 9: Configure Auto-start on Boot (Optional)
 
 ```bash
 systemctl enable kaiwudb
 ```
 
-## 状态检查说明
+## Status Check Description
 
-`kw-status` 命令返回的字段说明：
+Field descriptions returned by the `kw-status` command:
 
-| 字段         | 描述 |
-|--------------|------|
-| `id`         | 节点 ID |
-| `address`    | 节点地址 |
-| `sql_address`| SQL 地址 |
-| `build`      | KaiwuDB 版本 |
-| `started_at` | 启动时间 |
-| `updated_at` | 更新时间 |
-| `is_available`/`is_live` | 节点状态，均为 `true` 表示正常 |
+| Field | Description |
+|-------|-------------|
+| `id` | Node ID |
+| `address` | Node address |
+| `sql_address` | SQL address |
+| `build` | KaiwuDB version |
+| `started_at` | Start time |
+| `updated_at` | Update time |
+| `is_available`/`is_live` | Node status, both `true` indicates normal |
 
-## 部署模式
+## Deployment Modes
 
-### 裸机部署
+### Bare-metal Deployment
 
-使用 `KaiwuDB-baremetal-*.tar.gz` 安装包进行部署。
+Use the `KaiwuDB-baremetal-*.tar.gz` installation package for deployment.
 
-### 容器部署
+### Container Deployment
 
-使用 `KaiwuDB-container-*.tar.gz` 安装包进行部署，需确保 Docker 已安装并配置好。
+Use the `KaiwuDB-container-*.tar.gz` installation package for deployment. Ensure Docker is installed and configured.

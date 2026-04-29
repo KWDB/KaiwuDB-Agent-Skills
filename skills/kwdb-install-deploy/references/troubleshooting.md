@@ -1,104 +1,104 @@
-# KaiwuDB 常见问题与解决方案
+# KaiwuDB Common Issues and Solutions
 
-## 安装问题
+## Installation Issues
 
-### 1. 环境检查失败
+### 1. Environment Check Failure
 
-**问题**：脚本提示环境检查失败
+**Problem**: Script prompts environment check failure
 
-**解决方案**：
-- 检查系统要求是否满足（内存、磁盘空间）
-- 确保运行脚本的用户有足够权限
-- 检查网络连接是否正常
+**Solution**:
+- Check if system requirements are met (memory, disk space)
+- Ensure the user running the script has sufficient permissions
+- Check if network connection is normal
 
-### 2. 依赖安装失败
+### 2. Dependency Installation Failure
 
-**问题**：依赖安装过程中出现错误
+**Problem**: Error occurs during dependency installation
 
-**解决方案**：
-- 检查系统包管理器是否正常（yum/apt）
-- 尝试手动更新包管理器：
+**Solution**:
+- Check if system package manager is working normally (yum/apt)
+- Try manually updating package manager:
   - CentOS: `sudo yum update -y`
   - Ubuntu: `sudo apt-get update -y`
-- 如果网络慢，考虑使用国内镜像源
+- If network is slow, consider using domestic mirror sources
 
-### 3. 下载安装包失败
+### 3. Installation Package Download Failure
 
-**问题**：无法下载 KaiwuDB 安装包
+**Problem**: Unable to download KaiwuDB installation package
 
-**解决方案**：
-- 检查网络连接
-- 尝试手动下载安装包并放在 scripts/ 目录下
-- 联系技术支持获取下载链接
+**Solution**:
+- Check network connection
+- Try manually downloading the installation package and placing it in the scripts/ directory
+- Contact technical support to obtain download link
 
-## 运行问题
+## Runtime Issues
 
-### 1. 数据库无法启动
+### 1. Database Cannot Start
 
-**问题**：执行启动命令后没有响应
+**Problem**: No response after executing start command
 
-**解决方案**：
-- 检查数据目录权限：`ls -ld /var/lib/kwdb`
-- 查看日志文件：`cat /var/log/kwdb/kwdb.log`
-- 检查配置文件是否正确
+**Solution**:
+- Check data directory permissions: `ls -ld /var/lib/kwdb`
+- Check log files: `cat /var/log/kwdb/kwdb.log`
+- Check if configuration file is correct
 
-### 2. 无法连接数据库
+### 2. Unable to Connect to Database
 
-**问题**：使用 psql 命令无法连接到数据库
+**Problem**: Cannot connect to database using psql command
 
-**解决方案**：
-- 检查 kwdb 进程是否正在运行：`ps aux | grep kwdb`
-- 检查防火墙是否允许端口 5432 访问
-- 检查 listen_addresses 配置是否为 '*'
-- 检查 pg_hba.conf 文件是否允许连接
+**Solution**:
+- Check if kwdb process is running: `ps aux | grep kwdb`
+- Check if firewall allows port 5432 access
+- Check if listen_addresses configuration is set to '*'
+- Check if pg_hba.conf file allows connections
 
-### 3. 数据库运行缓慢
+### 3. Database Running Slowly
 
-**问题**：查询响应时间长
+**Problem**: Long query response time
 
-**解决方案**：
-- 检查系统资源使用情况：`top`
-- 查看慢查询日志：`/var/log/kwdb/slow_query.log`
-- 优化查询语句
-- 调整配置文件参数
+**Solution**:
+- Check system resource usage: `top`
+- Check slow query log: `/var/log/kwdb/slow_query.log`
+- Optimize query statements
+- Adjust configuration file parameters
 
-## 性能问题
+## Performance Issues
 
-### 1. 内存使用过高
+### 1. High Memory Usage
 
-**问题**：数据库进程占用过多内存
+**Problem**: Database process occupies too much memory
 
-**解决方案**：
-- 调整 shared_buffers 参数
-- 检查是否有内存泄漏
-- 增加系统内存
+**Solution**:
+- Adjust shared_buffers parameter
+- Check for memory leaks
+- Increase system memory
 
-### 2. 磁盘I/O过高
+### 2. High Disk I/O
 
-**问题**：磁盘写入速度慢
+**Problem**: Slow disk write speed
 
-**解决方案**：
-- 检查磁盘空间是否充足
-- 考虑使用 SSD 磁盘
-- 调整 checkpoint 相关参数
-- 优化查询减少磁盘I/O
+**Solution**:
+- Check if disk space is sufficient
+- Consider using SSD disk
+- Adjust checkpoint-related parameters
+- Optimize queries to reduce disk I/O
 
-## 备份和恢复
+## Backup and Recovery
 
-### 1. 备份数据库
+### 1. Backup Database
 
 ```bash
 /opt/kwdb/current/bin/pg_dump -h localhost -p 5432 -U $USER -d kwdb_db > backup.sql
 ```
 
-### 2. 恢复数据库
+### 2. Restore Database
 
 ```bash
 /opt/kwdb/current/bin/psql -h localhost -p 5432 -U $USER -d kwdb_db < backup.sql
 ```
 
-## 联系支持
+## Contact Support
 
-如果您遇到无法解决的问题，请联系技术支持：
-- 邮箱：support@kaiwudb.com
-- 电话：400-xxx-xxxx
+If you encounter issues that cannot be resolved, please contact technical support:
+- Email: support@kaiwudb.com
+- Phone: 400-xxx-xxxx
