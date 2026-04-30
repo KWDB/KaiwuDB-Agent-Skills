@@ -113,6 +113,93 @@ When MCP is unavailable:
 3. **Mark assumptions** if schema was assumed
 4. **Add verification checklist**
 
+### Phase 4: KWDB Execute
+
+**Prerequisite:** SQL has been generated in Phase 2 and formatted in Phase 3.
+
+#### Step 1: Detect MCP Availability
+
+Check if `kwdb-mcp-server` is available:
+- Try reading `kwdb://product_info`
+- If successful → MCP is available, proceed to Step 2
+- If failed → MCP is unavailable, **skip this phase entirely** and end workflow
+
+#### Step 2: Ask User for Execution Confirmation
+
+Prompt user:
+```
+生成的 SQL 已准备就绪。是否需要通过 kwdb-mcp-server 执行该 SQL？
+- 输入 "是" 或 "执行" → 继续执行
+- 输入 "否" 或 "跳过" → 结束，不再执行
+```
+
+If user declines → **end workflow**.
+
+#### Step 3: Determine Query Type
+
+Analyze the generated SQL:
+- **Read query**: SELECT, SHOW, EXPLAIN → use `read-query`
+- **Write query**: INSERT, UPDATE, DELETE, CREATE, DROP, ALTER → use `write-query`
+
+#### Step 4: Execute Query
+
+Call the appropriate MCP tool:
+
+**For read queries (`read-query`):**
+```json
+{
+  "sql": "<generated SQL>"
+}
+```
+
+**For write queries (`write-query`):**
+```json
+{
+  "sql": "<generated SQL>"
+}
+```
+
+#### Step 5: Handle Execution Result
+
+**On Success:**
+Report to user:
+```
+## Execution Result
+- Status: success
+- Query Type: read / write
+- Row Count: N
+- Auto-Limited: true/false
+
+### Results
+[formatted table if applicable]
+```
+
+**On Failure:**
+1. Parse the error message to identify error type (see Error Type table below)
+2. If error indicates **SQL generation issue** (wrong table name, wrong column, syntax error):
+   - Explain to user: "SQL 执行失败，正在分析错误原因..."
+   - Report the error and analysis:
+     ```
+     ## Execution Result
+     - Status: failed
+     - Error: [error message]
+     - Analysis: [cause analysis]
+     ```
+   - Return to **Phase 1** with error context to regenerate SQL
+3. If error indicates **user data issue** (constraint violation, permission issue, etc.):
+   - Report the error and suggest fixes, but do not auto-regenerate
+
+**Error Type Table:**
+
+| Error Type | Likely Cause | Action |
+|-----------|-------------|--------|
+| `relation "xxx" does not exist` | Wrong table name | Regenerate SQL with correct table |
+| `column "xxx" not found` | Wrong column name | Regenerate SQL with correct column |
+| `syntax error` | SQL syntax issue | Regenerate with corrected syntax |
+| `invalid interval` | Wrong interval format | Regenerate with correct format |
+| `ambiguous column reference` | Column exists in multiple tables | Regenerate with qualified names |
+| `permission denied` | No write permission | Report to user, do not regenerate |
+
 ## Reference Files
 
 - `references/scenarios.md` - Query routing entry point (decision tree)
