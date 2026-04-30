@@ -117,9 +117,11 @@ When MCP is unavailable:
 
 **Prerequisite:** SQL has been generated in Phase 2 and formatted in Phase 3.
 
-#### Step 1: Detect MCP Availability
+#### Step 1: Check MCP Availability
 
-Check if `kwdb-mcp-server` is available:
+**Note:** If MCP was successfully used in Phase 0 and schema was discovered, MCP is available. If Phase 0 indicated MCP was unavailable, skip this phase entirely.
+
+If MCP availability is unknown (e.g., Phase 0 was skipped), verify now:
 - Try reading `kwdb://product_info`
 - If successful → MCP is available, proceed to Step 2
 - If failed → MCP is unavailable, **skip this phase entirely** and end workflow
@@ -175,7 +177,7 @@ Report to user:
 ```
 
 **On Failure:**
-1. Parse the error message to identify error type (see Error Type table below)
+1. Parse the error message to identify error type (see Error Type table in Error Handling section below)
 2. If error indicates **SQL generation issue** (wrong table name, wrong column, syntax error):
    - Explain to user: "SQL 执行失败，正在分析错误原因..."
    - Report the error and analysis:
@@ -188,17 +190,6 @@ Report to user:
    - Return to **Phase 1** with error context to regenerate SQL
 3. If error indicates **user data issue** (constraint violation, permission issue, etc.):
    - Report the error and suggest fixes, but do not auto-regenerate
-
-**Error Type Table:**
-
-| Error Type | Likely Cause | Action |
-|-----------|-------------|--------|
-| `relation "xxx" does not exist` | Wrong table name | Regenerate SQL with correct table |
-| `column "xxx" not found` | Wrong column name | Regenerate SQL with correct column |
-| `syntax error` | SQL syntax issue | Regenerate with corrected syntax |
-| `invalid interval` | Wrong interval format | Regenerate with correct format |
-| `ambiguous column reference` | Column exists in multiple tables | Regenerate with qualified names |
-| `permission denied` | No write permission | Report to user, do not regenerate |
 
 ## Reference Files
 
@@ -223,7 +214,11 @@ Report to user:
 5. **Mark assumed schema** when MCP is unavailable
 6. **Handle ambiguous NL** by asking clarifying questions
 
-## Error Handling
+## Error Handling (Authoritative Reference)
+
+This Error Type table is used by:
+- **Phase 4 Step 5** when SQL execution fails
+- **When user reports** that generated SQL failed
 
 When a user reports that generated SQL failed, diagnose and regenerate:
 
@@ -235,6 +230,8 @@ When a user reports that generated SQL failed, diagnose and regenerate:
 | `invalid interval` | Wrong interval format | Use format like `'1h'`, `'1d'`, `'5m'` — not复合格式 like `'1d1h'` |
 | Overflow / out of range | Aggregation result too large | Add filters to reduce result set size |
 | `ambiguous column reference` | Column name exists in both joined tables | Use fully-qualified column names (`table.column`) |
+| `permission denied` | No write permission | Report to user, do not regenerate |
+| `duplicate key` | Constraint violation | Report to user, do not regenerate |
 
 When SQL fails:
 1. Read the error message to identify the error type
