@@ -2,54 +2,6 @@
 
 This guide describes how to use kwdb-mcp-server to automatically discover database schema and generate accurate SQL from natural language.
 
-## MCP Resources
-
-### kwdb://product_info
-
-Returns general KWDB product information including version and capabilities.
-
-**Response fields:**
-- `version` - KWDB version string
-- `capabilities` - List of supported features
-
-### kwdb://db_info/{database_name}
-
-Returns information about a specific database.
-
-**Response fields:**
-- `database_name` - Name of the database
-- `engine_type` - Storage engine type (tsdb/rdb)
-- `comment` - Database description
-- `tables` - Array of table names in the database
-
-**Usage:**
-```
-Read resource: kwdb://db_info/{database_name}
-```
-If MCP is available but database_name is unknown, first query `kwdb://product_info` or ask the user.
-
-### kwdb://table/{table_name}
-
-Returns detailed schema for a specific table.
-
-**Response fields:**
-- `table_name` - Name of the table
-- `columns` - Array of column definitions
-  - Each column has: `name`, `type`, `nullable`, `primary_key`, `default_value`
-- `table_type` - Table type (TIME SERIES or relational)
-- `comment` - Table description
-- `storage_engine` - Storage engine used
-- `primary_key` - Primary key columns
-- `indexes` - List of indexes on the table
-- `partition_info` - Partition configuration
-- `read_example_queries` - Example SELECT queries for reference
-- `write_example_queries` - Example INSERT/UPDATE queries
-
-**Usage:**
-```
-Read resource: kwdb://table/{table_name}
-```
-
 ## MCP Tools
 
 ### read-query
@@ -79,19 +31,31 @@ Executes read-only SQL queries (SELECT, SHOW, EXPLAIN).
 
 **Note:** SELECT queries without LIMIT automatically get `LIMIT 20` added to prevent large result sets. Check `metadata.auto_limited` to detect this.
 
+## Schema Discovery via SHOW Commands
+
+Use `read-query` tool to execute SHOW commands for schema discovery:
+
+| SQL Command | Purpose |
+|-------------|---------|
+| `SHOW DATABASES` | List all databases |
+| `SHOW TABLES FROM {database_name}` | List all tables in a database |
+| `SHOW CREATE TABLE {database_name}.{table_name}` | Get complete table structure |
+
+
+
 ## Workflow: Schema-Aware SQL Generation
 
 ### Step 1: Detect MCP Availability
 
-When the skill activates, check if kwdb-mcp-server is available by attempting to read a resource.
+Call `read-query` with `SELECT 1` to verify MCP is available.
 
 ### Step 2: Get Database Name (if not provided)
 
-Ask the user which database to query, or get list from `kwdb://db_info/*` pattern.
+Ask user which database to query, or execute `SHOW DATABASES` to list all databases.
 
 ### Step 3: Discover Tables
 
-Read `kwdb://db_info/{database_name}` to get all tables in the database.
+Execute `SHOW TABLES FROM {database_name}` to get all tables in the database.
 
 ### Step 4: Match Candidate Tables
 
@@ -104,7 +68,7 @@ If multiple tables match, ask the user to confirm.
 
 ### Step 5: Get Table Schema
 
-For each candidate table, read `kwdb://table/{table_name}` to get column definitions.
+For each candidate table, execute `SHOW CREATE TABLE {database_name}.{table_name}` to get column definitions.
 
 ### Step 6: Map NL to Schema
 
@@ -125,40 +89,36 @@ Use the schema information to construct accurate SQL.
 
 1. Ask user for database name → "iot_db"
 
-2. Read `kwdb://db_info/iot_db` → returns tables: ["devices", "sensor_data", "alarms"]
+2. Execute `SHOW DATABASES` to verify database exists
 
-3. Identify candidate tables: "sensor_data" likely contains temperature readings
+3. Execute `SHOW TABLES FROM iot_db` → returns: ["devices", "sensor_data", "alarms"]
 
-4. Read `kwdb://table/sensor_data`:
-```json
-{
-  "table_name": "sensor_data",
-  "table_type": "TIME SERIES",
-  "columns": [
-    {"name": "ts", "type": "TIMESTAMP", "nullable": false},
-    {"name": "temperature", "type": "DOUBLE"},
-    {"name": "humidity", "type": "DOUBLE"}
-  ],
-  "primary_key": ["ts"],
-  "tags": ["device_id"]
-}
+4. Identify candidate tables: "sensor_data" likely contains temperature readings
+
+5. Execute `SHOW CREATE TABLE iot_db.sensor_data`:
+```sql
+CREATE TABLE iot_db.sensor_data (
+    ts TIMESTAMPTZ NOT NULL,
+    temperature DOUBLE,
+    humidity DOUBLE,
+    device_id INT4
+) TAGS (
+    device_id INT4 NOT NULL,
+    location VARCHAR(100)
+) PRIMARY TAGS (device_id)
 ```
 
-5. Read `kwdb://table/devices`:
-```json
-{
-  "table_name": "devices",
-  "table_type": "relational",
-  "columns": [
-    {"name": "device_id", "type": "INT", "nullable": false},
-    {"name": "device_name", "type": "VARCHAR"},
-    {"name": "location", "type": "VARCHAR"}
-  ],
-  "primary_key": ["device_id"]
-}
+6. Execute `SHOW CREATE TABLE iot_db.devices`:
+```sql
+CREATE TABLE iot_db.devices (
+    device_id INT4 NOT NULL,
+    device_name VARCHAR(100),
+    location VARCHAR(100),
+    PRIMARY KEY (device_id)
+)
 ```
 
-6. Generate SQL:
+7. Generate SQL:
 ```sql
 SELECT d.device_name,
        d.location,
@@ -185,10 +145,10 @@ When kwdb-mcp-server is not available:
 
 ## MCP Detection Pattern
 
-To check if MCP is available, attempt to read `kwdb://product_info`:
+To check if MCP is available, execute:
 
-```
-Read resource: kwdb://product_info
+```sql
+SELECT 1
 ```
 
 If this fails or returns an error, MCP is unavailable.

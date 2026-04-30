@@ -55,23 +55,25 @@ Based on the user's query, read the appropriate reference file:
 
 ### Phase 0: MCP Detection & Schema Discovery (Recommended)
 
-1. **Detect MCP availability**: Try reading `kwdb://product_info`
+1. **Detect MCP availability**: Call `read-query` with `SELECT 1`
    - If successful → MCP is available
    - If failed → MCP is unavailable, proceed to fallback
 
 2. **Get database name** (if not provided by user):
    - Ask user: "请提供要查询的数据库名称"
-   - Read `kwdb://db_info/{database_name}` to list all tables
+   - Or execute `SHOW DATABASES` to list all databases
 
-3. **Identify candidate tables**:
+3. **Discover tables in database**: Execute `SHOW TABLES FROM {database_name}`
+
+4. **Identify candidate tables**:
    - Match NL keywords to table names (e.g., "传感器" → sensor_data)
    - If multiple candidates → ask user: "请确认表名: [A, B, C]?"
 
-4. **Get table schema**: For each target table, read `kwdb://table/{table_name}`
-   - Note column names, types, primary key, tags
+5. **Get table schema**: Execute `SHOW CREATE TABLE {database_name}.{table_name}`, do not use `DESCRIBE`
+   - Note column names, types, primary key, tags, comments
    - Map NL field names to actual column names
 
-5. **Proceed to Phase 1** with verified schema
+6. **Proceed to Phase 1** with verified schema
 
 ### Phase 0 Fallback: No MCP Available
 
@@ -122,7 +124,7 @@ When MCP is unavailable:
 **Note:** If MCP was successfully used in Phase 0 and schema was discovered, MCP is available. If Phase 0 indicated MCP was unavailable, skip this phase entirely.
 
 If MCP availability is unknown (e.g., Phase 0 was skipped), verify now:
-- Try reading `kwdb://product_info`
+- Call `read-query` with `SELECT 1`
 - If successful → MCP is available, proceed to Step 2
 - If failed → MCP is unavailable, **skip this phase entirely** and end workflow
 
@@ -240,10 +242,12 @@ When SQL fails:
 4. If data issue → ask user for clarification
 5. Regenerate corrected SQL with explanation
 
-## MCP Resources Reference
+## Schema Discovery via MCP
 
-| Resource | Purpose |
-|----------|---------|
-| `kwdb://product_info` | KWDB version and capabilities |
-| `kwdb://db_info/{db}` | List tables in database |
-| `kwdb://table/{table}` | Column schema, types, example queries |
+Use `read-query` tool to execute SHOW commands:
+
+| SQL Command | Purpose |
+|-------------|---------|
+| `SHOW DATABASES` | List all databases |
+| `SHOW TABLES FROM {database_name}` | List all tables in a database |
+| `SHOW CREATE TABLE {database_name}.{table_name}` | Get table structure (columns, types, tags, comments) |

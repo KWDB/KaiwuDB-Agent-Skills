@@ -38,7 +38,18 @@ Used with `time_bucket` and `time_bucket_gapfill`:
 | `count` | `count(*)` or `count(col)` | Count |
 | `min` | `min(col)` | Minimum |
 | `max` | `max(col)` | Maximum |
-| `stddev` | `stddev(col)` | Standard deviation |
+| `stddev` | `stddev(col)` | Population standard deviation (uses N as denominator) |
+| `stddev_samp` | `stddev_samp(col)` | Sample standard deviation (uses N-1 as denominator) |
+| `variance` | `variance(col)` | Population variance (stddev squared) |
+
+Supported input types: `INT2`, `INT4`, `INT8`, `FLOAT4`, `FLOAT8`, `DECIMAL`
+
+### stddev vs stddev_samp
+
+- `stddev`: 总体标准差，分母为 N（全部数据点）
+- `stddev_samp`: 样本标准差，分母为 N-1（用于估算总体标准差）
+
+对于大量数据，两者结果接近；对于小数据集差异明显。
 
 ## First/Last Functions
 
