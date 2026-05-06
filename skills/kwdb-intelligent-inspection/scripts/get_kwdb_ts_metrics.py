@@ -59,52 +59,53 @@ class MetricInfo:
 #   Derivative: 0=NONE, 1=DERIVATIVE, 2=NON_NEGATIVE_DERIVATIVE
 #
 # Query param conventions:
-#   Gauge/Counter: d:1, sa:2, der:0
-#   Latency:       d:1, sa:1, der:0
+#   SUM metrics (cluster totals):     d:1, sa:2, der:0
+#   AVG metrics (per-node average):   d:1, sa:1, der:0
+#   MAX metrics (worst-case):         d:1, sa:3, der:0
 
-# Convenient shortcuts for common query param combinations
-Q_GAUGE = QueryParams(downsampler=1, source_aggregator=2, derivative=0)
-Q_LATENCY = QueryParams(downsampler=1, source_aggregator=1, derivative=0)
+Q_SUM = QueryParams(downsampler=1, source_aggregator=2, derivative=0)
+Q_AVG = QueryParams(downsampler=1, source_aggregator=1, derivative=0)
+Q_MAX = QueryParams(downsampler=1, source_aggregator=3, derivative=0)
 
 METRICS_MAP: dict[str, MetricInfo] = {
     # Basic Indicators
-    "cr.node.liveness.livenodes": MetricInfo(MetricMeta("Live Nodes", "nodes"), Q_GAUGE),
-    "cr.node.sys.uptime": MetricInfo(MetricMeta("Uptime", "seconds"), Q_GAUGE),
+    "cr.node.liveness.livenodes": MetricInfo(MetricMeta("Live Nodes", "nodes"), Q_AVG),
+    "cr.node.sys.uptime": MetricInfo(MetricMeta("Uptime", "seconds"), Q_AVG),
     # System Resources
-    "cr.node.sys.cpu.user.percent": MetricInfo(MetricMeta("CPU User", "%"), Q_GAUGE),
-    "cr.node.sys.cpu.sys.percent": MetricInfo(MetricMeta("CPU Sys", "%"), Q_GAUGE),
-    "cr.node.sys.cpu.combined.percent-normalized": MetricInfo(MetricMeta("CPU Combined", "%"), Q_GAUGE),
-    "cr.store.capacity": MetricInfo(MetricMeta("Disk Total", "bytes"), Q_GAUGE),
-    "cr.store.capacity.available": MetricInfo(MetricMeta("Disk Available", "bytes"), Q_GAUGE),
-    "cr.store.capacity.used": MetricInfo(MetricMeta("Disk Used", "bytes"), Q_GAUGE),
-    "cr.node.sys.rss": MetricInfo(MetricMeta("Memory RSS", "bytes"), Q_GAUGE),
-    "cr.node.sys.go.allocbytes": MetricInfo(MetricMeta("Go Alloc", "bytes"), Q_GAUGE),
-    "cr.node.sys.go.totalbytes": MetricInfo(MetricMeta("Go Total", "bytes"), Q_GAUGE),
+    "cr.node.sys.cpu.user.percent": MetricInfo(MetricMeta("CPU User", "%"), Q_SUM),
+    "cr.node.sys.cpu.sys.percent": MetricInfo(MetricMeta("CPU Sys", "%"), Q_SUM),
+    "cr.node.sys.cpu.combined.percent-normalized": MetricInfo(MetricMeta("CPU Combined", "%"), Q_SUM),
+    "cr.store.capacity": MetricInfo(MetricMeta("Disk Total", "bytes"), Q_SUM),
+    "cr.store.capacity.available": MetricInfo(MetricMeta("Disk Available", "bytes"), Q_SUM),
+    "cr.store.capacity.used": MetricInfo(MetricMeta("Disk Used", "bytes"), Q_SUM),
+    "cr.node.sys.rss": MetricInfo(MetricMeta("Memory RSS", "bytes"), Q_SUM),
+    "cr.node.sys.go.allocbytes": MetricInfo(MetricMeta("Go Alloc", "bytes"), Q_SUM),
+    "cr.node.sys.go.totalbytes": MetricInfo(MetricMeta("Go Total", "bytes"), Q_SUM),
     # Database Performance
-    "cr.node.sql.insert.count": MetricInfo(MetricMeta("SQL Insert Count", "count"), Q_GAUGE),
-    "cr.node.sql.update.count": MetricInfo(MetricMeta("SQL Update Count", "count"), Q_GAUGE),
-    "cr.node.sql.delete.count": MetricInfo(MetricMeta("SQL Delete Count", "count"), Q_GAUGE),
-    "cr.node.sql.select.count": MetricInfo(MetricMeta("SQL Select Count", "count"), Q_GAUGE),
-    "cr.node.sql.query.count": MetricInfo(MetricMeta("SQL Query Count", "count"), Q_GAUGE),
-    "cr.store.rebalancing.writespersecond": MetricInfo(MetricMeta("Rebalancing Writes/s", "ops/s"), Q_GAUGE),
-    "cr.store.rebalancing.queriespersecond": MetricInfo(MetricMeta("Rebalancing Queries/s", "ops/s"), Q_GAUGE),
-    "cr.node.exec.latency-p99": MetricInfo(MetricMeta("SQL Exec Latency", "ms"), Q_LATENCY),
-    "cr.node.sql.service.latency-p99": MetricInfo(MetricMeta("SQL Service Latency", "ms"), Q_LATENCY),
-    "cr.node.sql.distsql.exec.latency-p99": MetricInfo(MetricMeta("DistSQL Exec Latency", "ms"), Q_LATENCY),
+    "cr.node.sql.insert.count": MetricInfo(MetricMeta("SQL Insert Count", "count"), Q_SUM),
+    "cr.node.sql.update.count": MetricInfo(MetricMeta("SQL Update Count", "count"), Q_SUM),
+    "cr.node.sql.delete.count": MetricInfo(MetricMeta("SQL Delete Count", "count"), Q_SUM),
+    "cr.node.sql.select.count": MetricInfo(MetricMeta("SQL Select Count", "count"), Q_SUM),
+    "cr.node.sql.query.count": MetricInfo(MetricMeta("SQL Query Count", "count"), Q_SUM),
+    "cr.store.rebalancing.writespersecond": MetricInfo(MetricMeta("Rebalancing Writes/s", "ops/s"), Q_SUM),
+    "cr.store.rebalancing.queriespersecond": MetricInfo(MetricMeta("Rebalancing Queries/s", "ops/s"), Q_SUM),
+    "cr.node.exec.latency-p99": MetricInfo(MetricMeta("SQL Exec Latency", "ns"), Q_AVG),
+    "cr.node.sql.service.latency-p99": MetricInfo(MetricMeta("SQL Service Latency", "ns"), Q_AVG),
+    "cr.node.sql.distsql.exec.latency-p99": MetricInfo(MetricMeta("DistSQL Exec Latency", "ns"), Q_AVG),
     # Storage
-    "cr.store.totalbytes": MetricInfo(MetricMeta("Total Bytes", "bytes"), Q_GAUGE),
-    "cr.store.livebytes": MetricInfo(MetricMeta("Live Bytes", "bytes"), Q_GAUGE),
+    "cr.store.totalbytes": MetricInfo(MetricMeta("Total Bytes", "bytes"), Q_SUM),
+    "cr.store.livebytes": MetricInfo(MetricMeta("Live Bytes", "bytes"), Q_SUM),
     # Cluster
-    "cr.store.replicas": MetricInfo(MetricMeta("Replicas", "count"), Q_GAUGE),
-    "cr.store.replicas.leaders": MetricInfo(MetricMeta("Raft Leaders", "count"), Q_GAUGE),
-    "cr.store.replicas.leaseholders": MetricInfo(MetricMeta("Lease Holders", "count"), Q_GAUGE),
-    "cr.store.ranges.unavailable": MetricInfo(MetricMeta("Unavailable Ranges", "count"), Q_GAUGE),
-    "cr.store.ranges.underreplicated": MetricInfo(MetricMeta("Under-replicated Ranges", "count"), Q_GAUGE),
-    "cr.store.ranges.overreplicated": MetricInfo(MetricMeta("Over-replicated Ranges", "count"), Q_GAUGE),
-    "cr.store.raftlog.behind": MetricInfo(MetricMeta("Raftlog Behind", "count"), Q_GAUGE),
-    "cr.store.raft.replica.consistent.latency-p99": MetricInfo(MetricMeta("Raft Consistent Latency", "ms"), Q_LATENCY),
+    "cr.store.replicas": MetricInfo(MetricMeta("Replicas", "count"), Q_SUM),
+    "cr.store.replicas.leaders": MetricInfo(MetricMeta("Raft Leaders", "count"), Q_SUM),
+    "cr.store.replicas.leaseholders": MetricInfo(MetricMeta("Lease Holders", "count"), Q_SUM),
+    "cr.store.ranges.unavailable": MetricInfo(MetricMeta("Unavailable Ranges", "count"), Q_MAX),
+    "cr.store.ranges.underreplicated": MetricInfo(MetricMeta("Under-replicated Ranges", "count"), Q_MAX),
+    "cr.store.ranges.overreplicated": MetricInfo(MetricMeta("Over-replicated Ranges", "count"), Q_MAX),
+    "cr.store.raftlog.behind": MetricInfo(MetricMeta("Raftlog Behind", "count"), Q_MAX),
+    "cr.store.raft.replica.consistent.latency-p99": MetricInfo(MetricMeta("Raft Consistent Latency", "ns"), Q_AVG),
     # Network
-    "cr.node.clock-offset.meannanos": MetricInfo(MetricMeta("Clock Offset Mean", "ns"), Q_LATENCY),
+    "cr.node.clock-offset.meannanos": MetricInfo(MetricMeta("Clock Offset Mean", "ns"), Q_MAX),
 }
 
 
@@ -162,7 +163,7 @@ def parse_metrics(data: dict) -> list[dict[str, Any]]:
         full_name = r.get("query", {}).get("name", "")
         sources = r.get("query", {}).get("sources", [])
         datapoints = r.get("datapoints", [])
-        info = METRICS_MAP.get(full_name, MetricInfo(MetricMeta(full_name, ""), Q_GAUGE))
+        info = METRICS_MAP.get(full_name, MetricInfo(MetricMeta(full_name, ""), Q_SUM))
 
         result = {
             "name": full_name,
@@ -211,7 +212,7 @@ def format_metrics_table(metrics: list[dict]) -> str:
         "bytes": (format_bytes, None),
         "%": (lambda v: f"{v:.4f}", "%"),
         "ms": (lambda v: f"{v:.3f}", "ms"),
-        "ns": (lambda v: f"{v:.0f}", "ns"),
+        "ns": (lambda v: f"{v/1_000_000:.3f}", "ms"),  # nanoseconds -> milliseconds
         "seconds": (format_duration, None),
         "count": (lambda v: str(int(v)), None),
         "nodes": (lambda v: str(int(v)), None),

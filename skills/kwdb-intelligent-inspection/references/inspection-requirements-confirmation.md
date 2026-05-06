@@ -27,11 +27,13 @@ After confirming target info with user, verify reachability using appropriate to
 ### Step 3: TLS Mode Detection
 
 Only after connectivity is confirmed, check TLS status:
+
+**Must strictly use this exact command format, only replace `<host>` and `<admin-port>` with actual values:**
 ```
-curl -k https://<host>:8080/health
+curl -k https://<host>:<admin-port>/health
 ```
-- If output contains `SSL` or `error:0A00010B` → TLS enabled, **inspection not supported** (stop here)
-- If returns JSON health data → TLS not enforced, proceed
+- If output contains `error:0A00010B` or `wrong version number` → TLS not enforced, proceed
+- If returns JSON health data with no error → TLS enabled, **inspection not supported** (stop here)
 
 **Do NOT proceed to Step 4 until TLS mode is determined.**
 

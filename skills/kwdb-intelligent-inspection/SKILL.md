@@ -15,7 +15,7 @@ description: Run KaiwuDB inspection and health-check tasks. Use this skill for d
 
 **Before collecting any metrics**, follow `references/inspection-requirements-confirmation.md` EXACTLY in order:
 1. Parse user intent → confirm target (host, ports)
-2. Probe connectivity → verify ports reachable
+2. Probe connectivity → verify ports reachable (see `references/inspection-port-listening-reference.md`)
 3. TLS mode detection → determine if inspection supported
 4. Present scope menu → user confirms before proceeding
 
