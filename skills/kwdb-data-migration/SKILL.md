@@ -1,259 +1,566 @@
 ---
 name: kwdb-data-migration
 description: |
-  Assist with full-lifecycle KaiwuDB data migration tasks, including source configuration,
-  data type mapping, migration policy setup, parameter validation, Headless command generation,
-  connection checks, time-series slicing, and troubleshooting.
-  Trigger keywords: migration, KDTS, KaiwuDB, data migration, type mapping,
-  time-series, relational, Headless, split interval, where filter, DDL, DML.
-  NOT for: installation, deployment, cluster management, SQL tuning, backup, restore.
+  Interactive guidance skill for KWDB data migration. Assist users to complete migration step by step.
+  For KWDB to KWDB migration, use built-in EXPORT / IMPORT tools.
+  For heterogeneous data migration, use KDTS migration tool (GUI mode recommended, Headless mode for non-interface
+  environments).
+  It provides detailed operation guidance, configuration collection, and validation suggestions to ensure smooth
+  migration.
+metadata:
+pattern: pipeline
+secondary_patterns: [ interactive, guide, assistant ]
 version: 1.0.0
 ---
 
-<!-- 
-辅助完成KaiwuDB全生命周期数据迁移任务，包括数据源配置、数据类型映射、迁移策略设定、参数校验、Headless命令生成、连通性检查、时序分片及故障排查。  
-触发关键词：迁移、KDTS、KaiwuDB、数据迁移、类型映射、时序、关系、Headless、切分间隔、where过滤、DDL、DML。  
-不适用场景：安装、部署、集群管理、SQL调优、备份、恢复。  
--->
+# KWDB Data Migration
 
-## EXTREMELY IMPORTANT
+## Overview
 
-ALWAYS invoke this skill via the Skill tool before performing any KaiwuDB migration.
+This skill provides standardized interactive step-by-step guidance for KWDB full lifecycle data migration.
 
-1. This applies even when:
-    - Reference file contents appear in conversation context
-    - Session was restored from a compacted conversation
-    - You believe you already know the KaiwuDB migration rules
-2. Reading reference files directly is not equivalent to Skill invocation.
-3. The Skill tool triggers the complete standard workflow and ensures guardrails are followed.
-4. Skip this step equals skipping the standard migration workflow and validation.
+For **KWDB to KWDB migration**, it is recommended to use KWDB built-in EXPORT / IMPORT command tool officially.
+For **heterogeneous database migration to KWDB**, use KDTS heterogeneous migration tool:
 
-<!-- 
-极度重要说明：执行任何KaiwuDB迁移操作前，必须通过Skill工具调用本技能  
-1. 即使出现以下情况，也必须触发本技能：  
-    - 参考文件内容已出现在对话上下文中  
-    - 会话从压缩对话中恢复  
-    - 你认为自己已经掌握了KaiwuDB迁移规则  
-2. 分层参考架构：明确不同层级的参考文件和配置重点  
-3. Skill工具会触发完整的标准工作流，并确保遵循所有防护规则  
-4. 跳过此步骤等同于跳过标准迁移流程和校验
--->
+- GUI graphical interface operation is recommended for daily use;
+- Non-interface server environment adopts KDTS Headless command-line mode.
 
-## Tiered Reference Architecture
+KDTS only supports **automatic data migration** for partial heterogeneous data sources. For data sources without
+official type mapping rules, the tool does not automatically map table structures and field types; users need to
+manually create tables and manually correspond field types first, then perform data migration only.
 
-**Tier 1 (Always Read)** - Core rules and workflow
+This skill covers migration scenario selection, configuration collection, pre-migration check, step-by-step operation
+guidance, data type mapping reference, migration verification and common constraint specifications.
 
-- `references/key-rules.md` - Core migration constraints and business rules
-- `references/path-discovery.md` - Standard migration process and step definition
-- `references/triage-playbook.md` - Migration fault diagnosis and handling manual
-- `references/data-type-mapping.md` - Standard data type mapping rules
+## Mandatory Rules
 
-<!-- 
-第一层（必须阅读）- 核心规则和工作流  
-- 迁移核心约束和业务规则  
-- 标准迁移流程和步骤定义  
-- 迁移故障诊断和处理手册  
-- 标准数据类型映射规则  
--->
+The following rules must be strictly followed during all migration processes:
 
-**Tier 2 (Mandatory Parameters)** - High-frequency configuration items
+### 1. Prohibit Guessing Migration Parameters
 
-- Time-series: time_column, start_time, end_time
-- Relational: split key, where filter
-- Write modes: INSERT / UPSERT
+Do not guess or assume any configuration. All parameters must be provided or confirmed by the user.
 
-<!-- 
-第二层（必填参数）- 高频配置项  
-- 时序迁移必填参数：时间列、开始时间、结束时间  
-- 关系迁移相关：切分主键、where过滤条件  
-- 写入模式：插入（默认）、更新插入
--->
+- Source/target database connection information (IP, port, username, password, database/table)
+- Export path, migration mode, data object range
+- Tool selection (EXPORT/IMPORT or KDTS)
+- Operation mode (GUI or Headless)
 
-**Tier 3 (Execution & Tuning)** - Execution and optimization items
+### 2. Do Not Execute Migration Without Backup
 
-- Headless command generation
-- Channel count & flow control
-- JVM tuning & batch size
+Data backup of source database must be completed before starting any export, import or KDTS migration task.
+Do not proceed migration without user confirmation of backup completion.
 
-<!-- 
-第三层（执行与调优）- 执行和优化相关项  
-- Headless命令生成  
-- 并发通道数和流量控制  
-- JVM调优和批次大小设置
--->
+### 3. Unmapped Data Sources Require Manual Table Structure Matching
 
-## When to Activate
+For heterogeneous data sources **without official field type mapping rules**:
+KDTS only migrates business data automatically, does not create tables or map field types.
+User must manually create target table and complete field type correspondence first.
 
-### Should trigger
+### 4. Must Check Logs and Failed Rows
 
-- Migrate business data to KaiwuDB
-- Use KaiwuDB official migration tool
-- Configure migration task parameters and policy
-- Generate Headless running command for migration
-- Diagnose and resolve migration task errors (including type mismatch)
-- Verify migration task configuration validity
-- Slice migration tasks by time interval
-- Check data type mapping between source and KaiwuDB
+If any step fails:
 
-<!-- 
-- 将业务数据迁移到KaiwuDB  
-- 使用KaiwuDB官方迁移工具  
-- 配置迁移任务参数和策略  
-- 生成迁移用的Headless运行命令  
-- 诊断并解决迁移任务报错（含类型不匹配）  
-- 校验迁移任务配置的合法性  
-- 按时间间隔对迁移任务进行分片  
-- 核查数据源与KaiwuDB之间的数据类型映射
--->
+- For EXPORT/IMPORT: Check `reject.txt` and KWDB job logs
+- For KDTS: Check task logs and error records in the tool
+- Clearly display error information before proceeding
 
-### Should NOT trigger
+### 5. Must Verify Data Consistency After Migration
 
-- KaiwuDB installation, deployment and cluster initialization
-- Cluster node management and status query
-- Conventional SQL query writing and performance tuning
-- Database backup, restore and permission management
-- Daily DDL operation without migration background
+After any migration task is completed, row count comparison and sampling verification must be completed;
+failed rows and abnormal data must be processed in time.
 
-<!--
-- KaiwuDB的安装、部署和集群初始化  
-- 集群节点管理和状态查询  
-- 常规SQL编写和性能调优  
-- 数据库备份、恢复和权限管理  
-- 无迁移背景的日常DDL操作  
--->
+### 6. Prohibit Migration During Business Peak Window
 
-## Supported Migration Scope
+Avoid executing EXPORT/IMPORT and KDTS tasks during business peak hours to prevent performance impact on source and
+target databases.
 
-| Category           | Supported Content                                                                                  |
-|--------------------|----------------------------------------------------------------------------------------------------|
-| Data Sources       | MySQL, PostgreSQL, Oracle, TDengine, InfluxDB, OpenTSDB, FTP, HDFS, MongoDB, SQLServer, ClickHouse |
-| Target Engines     | Relational Engine, Time-Series Engine                                                              |
-| Migration Modes    | Schema-only, Data-only, Schema & Data full migration                                               |
-| Migration Policies | WHERE filter condition, time range filter, split key, split interval, custom SQL                   |
-| Write Modes        | INSERT, UPSERT                                                                                     |
-| Execution Modes    | Graphical GUI mode, Headless command line mode                                                     |
+## Prerequisites
 
-## Workflow
+### Supported Environments
 
-### Step 1: Distinguish Engine Type
+1. KWDB-to-KWDB Migration
+    - Source: KWDB 2.x.x / 3.x.x
+    - Target: KWDB 2.x.x / 3.x.x
+    - Network connectivity between source and target
+    - Read/write permissions for EXPORT/IMPORT
 
-Classify the target into Relational Engine / Time-Series Engine / Mixed scenario.
-If unclear, actively ask user, do not assume arbitrarily.
+2. Heterogeneous Migration (KDTS Tool)
+    - Target: KWDB 2.x.x / 3.x.x
+    - Supported sources:
+        - Relational: MySQL, Oracle, PostgreSQL, ClickHouse, SQL Server
+        - Time-Series: KWDB, TDengine, InfluxDB, OpenTSDB
+        - NoSQL/Files: MongoDB, FTP, HDFS
+    - GUI or Headless environment for KDTS
 
-<!-- 
-步骤1：区分引擎类型  
-将目标引擎归类为关系引擎、时序引擎或混合场景；信息不明确时主动询问，禁止自行臆断  
--->
+### Supported Data Sources With Official Type Mapping
 
-### Step 2: Confirm Migration Basic Information
+#### Relational Engine Auto Mapping Supported
 
-Confirm data source type, migration mode, target business scenario.
+MySQL、Oracle、PostgreSQL、KWDB
 
-<!-- 
-步骤2：确认迁移基础信息  
-确认数据源类型、迁移模式、目标业务场景  
--->
+#### Time-Series Engine Auto Mapping Supported
 
-### Step 3: Verify Mandatory Parameters & Data Type Mapping
+TDengine、InfluxDB、KWDB
 
-- Time-series migration: Check time_column, start_time, end_time + data type mapping compliance.
-- Relational migration: Check split key, custom SQL mutual exclusion rules + data type mapping compliance.
+#### No Automatic Table Mapping (Only Data Migration)
 
-<!-- 
-步骤3：校验必填参数及数据类型映射  
-时序迁移需校验时间列、开始时间、结束时间及数据类型映射合规性；关系迁移需校验切分主键、自定义SQL互斥规则及数据类型映射合规性  
--->
+ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
+> Rule: The above three types have no official field type mapping rules.
+> KDTS only migrates data; users need to manually create KWDB table structure and match field types by themselves.
 
-### Step 4: Configure Migration Policy
+### Permissions Required
 
-Set filter conditions, split interval, batch size and concurrency channel.
+- Source database: read permission of migration objects
+- Target KWDB: table creation and write permission
+- File path: read/write permission for export/import
+- Network: accessible between source, target, and KDTS server
+- KDTS tool installed and available for GUI or Headless startup
 
-<!-- 
-步骤4：配置迁移策略  
-设置过滤条件、切分间隔、批次大小和并发通道  
--->
+## Heterogeneous Data Source → KWDB Type Mapping Reference
 
-### Step 5: Generate Executable Configuration and Command
+### MySQL → KWDB
 
-Output standard Headless command and task configuration template.
+| MySQL Data Type    | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
+|--------------------|----------------------------------|-----------------------------------|
+| BOOLEAN            | BOOL                             | BOOL                              |
+| TINYINT(1)         | BOOL                             | BOOL                              |
+| TINYINT            | INT2                             | INT2                              |
+| SMALLINT           | INT2                             | INT2                              |
+| INT                | INT4                             | INT4                              |
+| MEDIUMINT          | INT4                             | INT4                              |
+| TINYINT UNSIGNED   | INT2                             | INT2                              |
+| SMALLINT UNSIGNED  | INT4                             | INT4                              |
+| MEDIUMINT UNSIGNED | INT4                             | INT4                              |
+| INT UNSIGNED       | INT8                             | INT8                              |
+| BIGINT UNSIGNED    | NUMERIC(20)                      | INT8                              |
+| BIGINT             | INT8                             | INT8                              |
+| DECIMAL            | DECIMAL                          | FLOAT8                            |
+| DOUBLE             | FLOAT8                           | FLOAT8                            |
+| FLOAT              | FLOAT4                           | FLOAT4                            |
+| DATE               | TIMESTAMP                        | TIMESTAMP                         |
+| DATETIME           | TIMESTAMP                        | TIMESTAMP                         |
+| TIMESTAMP          | TIMESTAMP                        | TIMESTAMP                         |
+| TIME               | TIME                             | TIMESTAMP                         |
+| CHAR               | CHAR                             | CHAR                              |
+| VARCHAR            | VARCHAR                          | VARCHAR                           |
+| BINARY             | BYTEA                            | VARBYTES                          |
+| VARBINARY          | VARBYTES                         | VARBYTES                          |
+| LONG VARBINARY     | VARBYTES                         | VARBYTES                          |
+| BLOB               | BYTES                            | VARBYTES                          |
+| MEDIUMBLOB         | BYTES                            | VARBYTES                          |
+| LONGTEXT           | TEXT                             | NVARCHAR                          |
+| JSON               | JSON                             | NVARCHAR                          |
 
-<!-- 
-步骤5：生成可执行配置与命令  
-输出标准Headless命令和任务配置模板  
--->
+### PostgreSQL → KWDB
 
-### Step 6: Verify and Troubleshoot
+| PostgreSQL Data Type | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
+|----------------------|----------------------------------|-----------------------------------|
+| BIT                  | BIT                              | BOOL                              |
+| BOOL                 | BOOL                             | BOOL                              |
+| INT2                 | INT2                             | INT2                              |
+| INT4                 | INT4                             | INT4                              |
+| INT8                 | INT8                             | INT8                              |
+| DECIMAL              | DECIMAL                          | FLOAT8                            |
+| NUMERIC              | NUMERIC                          | FLOAT8                            |
+| MONEY                | DECIMAL                          | FLOAT8                            |
+| FLOAT8               | FLOAT8                           | FLOAT8                            |
+| FLOAT4               | FLOAT4                           | FLOAT4                            |
+| DATE                 | DATE                             | TIMESTAMP                         |
+| TIMESTAMP            | TIMESTAMP                        | TIMESTAMP                         |
+| TIMESTAMPTZ          | TIMESTAMPTZ                      | TIMESTAMPTZ                       |
+| TIME                 | TIME                             | TIMESTAMP                         |
+| TIMETZ               | TIMETZ                           | TIMESTAMPTZ                       |
+| BPCHAR, CHAR         | CHAR                             | CHAR                              |
+| VARCHAR              | VARCHAR                          | VARCHAR                           |
+| BYTEA                | BYTES                            | VARBYTES                          |
+| BLOB                 | BYTES                            | VARBYTES                          |
+| VARBIT               | VARBIT                           | VARCHAR                           |
+| TEXT                 | TEXT                             | NVARCHAR                          |
+| JSON                 | JSON                             | NVARCHAR                          |
+| JSONB                | JSONB                            | NVARCHAR                          |
+| UUID                 | UUID                             | VARCHAR                           |
+| UNKNOWN              | UNKNOWN                          | VARCHAR                           |
 
-Check running logs, count data rows; locate fault (including type mismatch) according to playbook when abnormal.
+### Oracle → KWDB
 
-<!-- 
-步骤6：校验与故障排查  
-查看运行日志、统计数据行数；异常时（含类型不匹配）依据排查手册定位问题  
--->
+| Oracle Data Type | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
+|------------------|----------------------------------|-----------------------------------|
+| ROWID            | INT4                             | INT4                              |
+| BOOLEAN          | BOOL                             | BOOL                              |
+| NUMBER(5,0)      | INT2                             | INT2                              |
+| NUMBER(5)        | INT2                             | INT2                              |
+| NUMBER(10,0)     | INT4                             | INT4                              |
+| NUMBER(10)       | INT4                             | INT4                              |
+| NUMBER(19,0)     | INT8                             | INT8                              |
+| NUMBER(19)       | INT8                             | INT8                              |
+| NUMBER           | FLOAT4                           | FLOAT4                            |
+| FLOAT            | FLOAT4                           | FLOAT4                            |
+| BINARY_FLOAT     | FLOAT4                           | FLOAT4                            |
+| BINARY_DOUBLE    | FLOAT8                           | FLOAT8                            |
+| CHAR             | CHAR                             | CHAR                              |
+| VARCHAR2         | VARCHAR                          | VARCHAR                           |
+| NCHAR            | TEXT                             | NCHAR                             |
+| NVARCHAR2        | TEXT                             | NVARCHAR                          |
+| BLOB             | BYTES                            | VARBYTES                          |
+| CLOB             | TEXT                             | NVARCHAR                          |
+| RAW              | BYTES                            | VARBYTES                          |
+| DATE             | TIMESTAMP                        | TIMESTAMP                         |
+| TIMESTAMP        | TIMESTAMP                        | TIMESTAMP                         |
+| TIMESTAMP(3)     | TIMESTAMP                        | TIMESTAMP                         |
+| TIMESTAMP(6)     | TIMESTAMP                        | TIMESTAMP                         |
 
-## Output Format
+### TDengine → KWDB
 
-```markdown
-## Intent
+| TDengine Data Type | KWDB Time-Series Engine Data Type |
+|--------------------|-----------------------------------|
+| BOOL               | BOOL                              |
+| TINYINT            | INT2                              |
+| SMALLINT           | INT2                              |
+| INT                | INT4                              |
+| BIGINT             | INT8                              |
+| DOUBLE             | FLOAT8                            |
+| FLOAT              | FLOAT4                            |
+| NCHAR              | NCHAR                             |
+| VARCHAR            | VARCHAR                           |
+| BINARY             | VARBYTES                          |
+| VARBINARY          | VARBYTES                          |
+| TIMESTAMP          | TIMESTAMP                         |
+| JSON               | NVARCHAR                          |
+| TINYINT UNSIGNED   | INT2                              |
+| SMALLINT UNSIGNED  | INT4                              |
+| INT UNSIGNED       | INT8                              |
+| BIGINT UNSIGNED    | INT8                              |
 
-[Brief description of this migration task scenario]
+### InfluxDB → KWDB
 
-## Source & Target
+| InfluxDB Data Type | KWDB Time-Series Engine Data Type |
+|--------------------|-----------------------------------|
+| BOOLEAN            | BOOL                              |
+| INTEGER            | INT4                              |
+| LONG               | INT8                              |
+| DOUBLE             | FLOAT8                            |
+| FLOAT              | FLOAT8                            |
+| STRING             | VARCHAR                           |
+| TIMESTAMP          | TIMESTAMP                         |
 
-- Data Source:
-- Target Engine:
-- Migration Mode:
+### KWDB → KWDB Cross Version
 
-## Mandatory Configuration Parameters
+Direct compatible mapping, keep original field type without manual adjustment.
 
-## Data Type Mapping Verification
+### Unmapped Source Special Rule
 
-(Refer to references/data-type-mapping.md)
+ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS：
 
-## Migration Policy & Filter Rules
+- No official automatic field type mapping and table creation capability;
+- KDTS only supports multiple table data migration;
+- User must manually create target table and complete field type matching before migration task execution.
 
-## Recommended Headless Execution Command
+## Migration Guidance Steps
 
-{{headless_command}}
+### Step 1: Confirm Migration Type
 
-## Post-Migration Verification & Matters Needing Attention
+ASK: Please select your migration type (enter the corresponding number):
 
-```
+1) KWDB → KWDB (same database type migration)
+2) Heterogeneous Database → KWDB (different database type migration)
 
-## Guardrails
+#### Step 1.1: Branch According to Migration Type
 
-1. Must distinguish relational engine and time-series engine first before any configuration.
-2. Must verify mandatory parameters for time-series migration completely.
-3. Must follow parameter mutual exclusion rules: custom SQL cannot be used with WHERE and time filter.
-4. Must verify data type mapping compliance before configuration submission.
-5. Do not generate execution command before configuration validation passed.
-6. Production environment prefer Headless command line mode to run migration tasks.
-7. Must remind user to verify data row count consistency after migration completed.
+If user selects 1 (KWDB → KWDB):
 
-<!--
-1. 任何配置前，必须先区分关系引擎与时序引擎  
-2. 必须完整校验时序迁移的所有必填参数  
-3. 严格遵循参数互斥规则：自定义SQL不可与WHERE、时间过滤同时使用  
-4. 配置提交前，必须校验数据类型映射合规性  
-5. 配置校验不通过，禁止生成执行命令  
-6. 生产环境优先使用Headless命令行运行迁移任务  
-7. 迁移完成后，必须提醒用户校验数据行数一致性  
--->
+- Suggestion: Use KWDB built-in EXPORT / IMPORT tool (official recommended).
+- Jump to Step 2 (KWDB → KWDB Migration with EXPORT/IMPORT).
 
-## Error Handling
+If user selects 2 (Heterogeneous → KWDB):
 
-- Incomplete parameters: put forward clear supplementary requirements to user.
-- Connection abnormal: check network, port, account password and IP whitelist.
-- Time format error: unify standard format as yyyy-MM-dd HH:mm:ss.
-- Task timeout and OOM: suggest adjusting split interval and JVM memory parameters.
-- Data loss and inconsistency: check filter conditions and switch to UPSERT write mode.
-- Type mismatch error: check data type mapping (refer to references/data-type-mapping.md) and adjust field types.
+- Suggestion: Use KDTS migration tool. It supports multiple data sources, full migration/multiple table migration.
+  - For GUI environment, use graphical interface (recommended); 
+  - For non-GUI environment, use Headless mode.
+- Jump to Step 3 (Heterogeneous Migration with KDTS Tool).
 
-<!--
-- 参数缺失：向用户明确提出补充要求  
-- 连接异常：检查网络、端口、账号密码及IP白名单  
-- 时间格式错误：统一为标准格式yyyy-MM-dd HH:mm:ss  
-- 任务超时/内存溢出：建议调整分片间隔及JVM内存参数  
-- 数据丢失/不一致：核查过滤条件，切换为UPSERT写入模式  
-- 类型不匹配报错：核查数据类型映射（参考官方文件），调整字段类型
--->
+### Step 2: KWDB → KWDB Migration (EXPORT / IMPORT)
+
+#### Step 2.1: Collect Source Database Configuration
+
+ASK: Please provide the following source KWDB information in the specified format (do not omit any items, separate with
+commas):
+Format: host:port, username, password, database, table (fill in "all" if full database migration)
+Example: 127.0.0.1:26257, test, kwdb@123, test_db, all
+Example (single table): 127.0.0.1:26257, test, kwdb@123, test_db, user_table
+
+#### Step 2.2: Collect Target Database Configuration
+
+ASK: Please provide the following target KWDB information in the specified format (do not omit any items, separate with
+commas):
+Format: host:port, username, password, database
+Example: 127.0.1.1:26257, test, kwdb@123, test_db
+
+#### Step 2.3: Collect Export Path Configuration
+
+ASK: Please provide the export path (supports nodelocal:// path or local absolute path) in the specified format:
+Format: path_type:path
+Example 1 (nodelocal path): nodelocal:/kwdb/export/data
+Example 2 (local absolute path): local:/opt/kwdb/export
+
+#### Step 2.4: Pre-Migration Check & Operation Suggestion
+
+Suggestion: Please complete the following pre-migration checks before executing the export/import operation:
+
+1. Back up the source database data to prevent data loss due to abnormal operation.
+2. Confirm that the export path has read and write permissions.
+3. Confirm that the disk space of the export path is sufficient (at least 1.2 times the size of the source data).
+4. Confirm network connectivity between the source and target servers (ping test and port connectivity test).
+5. Confirm that the source user has EXPORT permission and the target user has IMPORT permission.
+6. Avoid performing migration during peak business hours to reduce impact on business.
+
+ASK: Have you completed all the above pre-migration checks? (enter yes/no)
+
+- If yes: Proceed to Step 2.5 (Execute EXPORT).
+- If no: Please complete the pre-migration checks first, then enter yes to continue.
+
+#### Step 2.5: Execute EXPORT
+
+ASK: Confirm to start the EXPORT on the source database? (enter yes/no)
+
+- If no: Return to Step 2.4 to recheck.
+- If yes: Execute the following operations:
+
+1. Log in to the source KWDB server using the source user.
+2. Execute the EXPORT command:
+    - Full database export: EXPORT INTO 'export_path' FROM source_database.*;
+    - Single table export: EXPORT INTO 'export_path' FROM source_database.source_table;
+3. After the export is completed, check the export log to confirm that the export is successful (no error information).
+4. Copy all exported files from the export path to the target server's corresponding path.
+
+Reminder: Do not modify the exported file name and format, otherwise the import operation will fail.
+
+ASK: Has the EXPORT been completed successfully and the exported files have been copied to the target
+server? (enter yes/no)
+
+- If no: Check the export log, troubleshoot the problem, and re-execute the export operation.
+- If yes: Proceed to Step 2.6 (Execute IMPORT).
+
+#### Step 2.6: Execute IMPORT
+
+ASK: Confirm to start the IMPORT on the target database? (enter yes/no)
+
+- If no: Check the exported files and target server path, then reconfirm.
+- If yes: Execute the following operations:
+
+1. Log in to the target KWDB server using the target user.
+2. Confirm that the imported files have been copied to the target path.
+3. Execute the IMPORT command:
+   IMPORT INTO target_database.* FROM 'export_path';
+4. During the import process, view the import log in real time to monitor the import progress.
+
+Reminder: If the import fails, the failed rows will be stored in the reject.txt file under the export path. After the
+import is completed, check the reject.txt file and process the failed rows.
+
+ASK: Has the IMPORT been completed? (enter yes/no)
+
+- If no: Check the import log, troubleshoot the problem, and re-execute the import operation.
+- If yes: Proceed to Step 2.7 (Migration Validation).
+
+#### Step 2.7: Migration Validation
+
+Suggestion: Please perform the following 4 verification steps to confirm the migration is successful:
+
+1. Row count consistency check: Compare the total number of rows of the source and target databases/tables.
+2. Task status check: Execute "SHOW JOBS;" on the target KWDB to check the import task status, which should be "
+   SUCCEEDED".
+3. Failed rows check: Check the reject.txt file under the export path. If there are failed rows, analyze the reason and
+   reprocess them.
+4. Sampling check: Randomly sample 10-20 rows from 3-5 key tables, compare the field values of the source and target
+   tables, and ensure they are consistent.
+
+ASK: Have all the above verification steps been completed and the results are normal? (enter yes/no)
+
+- If no: Troubleshoot according to the verification results and re-verify after processing.
+- If yes: Proceed to Step 2.8 (Migration Completed).
+
+#### Step 2.8: Migration Completed
+
+Output: KWDB → KWDB data migration has been completed successfully!
+Reminder:
+
+1. Keep the exported files and backup data for 7-15 days to prevent subsequent problems.
+2. Confirm the availability of the target database business (test application read/write operations).
+3. If you need to perform incremental migration later, you can re-execute the EXPORT/IMPORT operation (only
+   export/import the newly added data).
+
+### Step 3: Heterogeneous Database Migration (KDTS Tool)
+
+#### Step 3.1: KDTS Tool Introduction & Operation Mode Suggestion
+
+Suggestion:
+
+1. Tool Introduction: KDTS is a professional heterogeneous database migration tool specially designed for KWDB, which
+   supports full migration, multiple table migration, and can automatically handle data type mapping and schema
+   conversion.
+2. Operation Mode:
+    - GUI Mode (Recommended): Suitable for environments with graphical interface, easy to operate, with real-time
+      progress monitoring and visual configuration.
+    - Headless Mode: Suitable for non-GUI environments (such as server command line), using JSON configuration files and
+      command lines to complete migration.
+
+ASK: Please select the KDTS operation mode (enter the corresponding number):
+
+1) GUI Mode (graphical interface, recommended for desktop/server with GUI)
+2) Headless Mode (command line, for non-GUI server environment)
+
+#### Step 3.2: Confirm Supported Source
+
+Output: KDTS supports the following data sources to migrate to KWDB. Please confirm that your source database is in the
+supported list:
+
+1. Relational: MySQL, Oracle, PostgreSQL, ClickHouse, SQL Server
+2. Time-Series: KWDB, TDengine, InfluxDB, OpenTSDB
+3. NoSQL/Files: MongoDB, FTP, HDFS
+
+ASK: Is your source in the supported list? (enter yes/no)
+
+- If no: The current source is not supported by KDTS. Please use other migration tools.
+- If yes: Proceed to Step 3.3 (Collect Configuration).
+
+#### Step 3.3: Collect Source & Target Configuration
+
+##### Step 3.3.1: Collect Source Configuration
+
+ASK: Please select your source database type (enter the corresponding number):
+
+1) MySQL
+2) Oracle
+3) PostgreSQL
+4) ClickHouse
+5) SQL Server
+6) TDengine
+7) InfluxDB
+8) MongoDB
+9) FTP
+10) HDFS
+
+ASK: Please provide source configuration in the specified format (do not omit any items, separate with commas):
+Format: host:port, username, password, database, table (fill in "all" if full database migration)
+Example (MySQL): 127.0.0.1:3306, test, mysql@123, test_db, all
+Example (InfluxDB): 127.0.0.1:8086, test, pwd@123, test_db, all
+
+##### Step 3.3.2: Collect Target KWDB Configuration
+
+ASK: Please provide target KWDB 3.x configuration in the specified format (do not omit any items, separate with commas):
+Format: host:port, username, password, database
+Example: 127.0.0.1:26257, test, kwdb@123, test_db
+
+##### Step 3.3.3: Collect Migration Mode Configuration
+
+ASK: Please select the migration mode (enter the corresponding number):
+
+1) Full Migration (migrate all existing data once)
+2) multiple table migration (migrate specified table existing data once)
+
+#### Step 3.4: Pre-Migration Check & Suggestion
+
+Suggestion: Please complete the following pre-migration checks before starting the KDTS migration task:
+
+1. Back up the source database data and the target KWDB data (if the target database already has data).
+2. Confirm network connectivity between the KDTS server, source database server, and target KWDB server.
+3. Confirm that the source user has read permission and the target user has write permission.
+4. Confirm that the KDTS tool has been installed and started.
+5. For FTP/HDFS, confirm that the KDTS tool can access the FTP/HDFS server and has read permission for the target files.
+6. Avoid performing migration during peak business hours.
+
+ASK: Have you completed all the pre-migration checks? (enter yes/no)
+
+- If no: Please complete the pre-migration checks first, then enter yes to continue.
+- If yes: Proceed to Step 3.5 (GUI Mode Operation Guidance) or Step 3.6 (Headless Mode Operation Guidance) according to
+  the selected operation mode.
+
+#### Step 3.5: GUI Mode Operation Guidance
+
+Step-by-step detailed operation guidance (follow the steps in order):
+
+1. Open the KDTS graphical tool (double-click the desktop shortcut or run the startup command).
+2. Create a new migration task: Click "New Task" in the upper left corner, enter the task name and select the task type.
+3. Configure source data source:
+    - Select the source type (consistent with the type you selected in Step 3.3.1).
+    - Fill in the source configuration (host:port, username, password, database, table) collected in Step 3.3.1.
+    - Click "Test Connection" to confirm that the KDTS tool can connect to the source successfully.
+4. Configure target data source:
+    - Select the target type as "KWDB".
+    - Fill in the target KWDB configuration collected in Step 3.3.2.
+    - Click "Test Connection" to confirm that the KDTS tool can connect to the target KWDB successfully.
+5. Configure migration mode: Select the migration mode (full/multiple table) you selected in Step 3.3.3.
+    - For multiple table migration: Configure the multiple table trigger condition.
+6. Select migration objects: Check the databases/tables/files to be migrated.
+7. Configure data mapping rules:
+    - KDTS will automatically generate data type mapping rules.
+    - Preview the mapping rules, and modify them manually if there is a mismatch.
+8. Configure task parameters (optional):
+    - Set the number of concurrent threads (adjust according to server performance, 5 threads recommended for medium
+      data volume).
+    - Set the batch size (number of rows per batch, 1000-2000 rows recommended).
+9. Preview task configuration: Check all configuration information (source, target, migration mode, mapping rules) to
+   ensure no errors.
+10. Start the migration task: Click "Start Task" to start the migration.
+11. During the migration:
+    - Monitor the task status, and view the real-time progress on the task interface.
+    - If there is an error, through log to troubleshoot, and pause/resume the task if necessary.
+
+ASK: Has the KDTS GUI mode migration task been started and completed? (enter yes/no)
+
+- If no: Check the task log, troubleshoot the problem, and restart the task.
+- If yes: Proceed to Step 3.7 (Migration Validation).
+
+#### Step 3.6: Headless Mode Operation Guidance
+
+Step-by-step detailed operation guidance (follow the steps in order):
+
+1. Prepare the KDTS Headless configuration file (JSON format), and fill in the configuration collected in Step 3.3:
+    - Configuration file template (save as migration_task.json): // TODO add headless config json template
+2. Upload the configuration file to the KDTS Headless server (such as /opt/kdts/config/).
+3. Log in to the KDTS Headless server using the command line.
+4. Start the migration task with the following command: // TODO
+5. Monitor the migration progress: view the task log.
+6. After the task is completed, check the task status.
+
+ASK: Has the KDTS Headless mode migration task been started and completed? (enter yes/no)
+
+- If no: Check the task log, troubleshoot the problem, modify the configuration file if necessary, and restart the task.
+- If yes: Proceed to Step 3.7 (Migration Validation).
+
+#### Step 3.7: Migration Validation
+
+Suggestion: Please perform the following 5 verification steps to confirm the migration is successful:
+
+1. Row count consistency check: Compare the total number of rows of the source and target databases/tables. The number
+   of rows should be consistent (excluding failed rows recorded in the KDTS log).
+2. Field-level sampling check: Randomly sample 10-20 rows from 3-5 key tables, compare the field values of the source
+   and target tables, and ensure they are consistent (including data type, length, and value).
+3. Migration task status check: Check the KDTS task report, and confirm the task status is "SUCCEEDED".
+4. Business availability check: Test the read/write operation of the target KWDB through the application to confirm
+   that the business is available.
+
+ASK: Have all the above verification steps been completed and the results are normal? (enter yes/no)
+
+- If no: Troubleshoot according to the verification results and re-verify after processing.
+- If yes: Proceed to Step 3.8 (Migration Completed).
+
+#### Step 3.8: Migration Completed
+
+Output: Heterogeneous migration to KWDB completed successfully!
+Reminder:
+
+1. Keep the KDTS task configuration file and log file for 7-15 days for subsequent problem troubleshooting.
+2. Keep the source database backup data until the target database runs stably for 1-2 weeks.
+3. Confirm the long-term stability of the target KWDB business.
+
+## General Notes
+
+1. Data backup is mandatory before migration. Do not migration without backup.
+2. Time-series data import (whether EXPORT/IMPORT or KDTS) does not trigger full rollback. Successfully written data
+   will be retained, and failed rows will be recorded separately.
+3. For KWDB IMPORT operation, failed rows are stored in reject.txt under the export path; for KDTS migration, failed
+   rows are recorded in the task log.
+4. Do not modify the exported data file format (EXPORT/IMPORT) or KDTS configuration file during migration.
+5. After migration, it is necessary to perform data consistency verification and business availability test.
+6. For KWDB version upgrade migration, do not downgrade directly after upgrade; downgrade requires reinstalling the old
+   version and restoring from backup.
