@@ -3,13 +3,8 @@ name: kwdb-data-migration
 description: |
   Interactive guidance skill for KWDB data migration. Assist users to complete migration step by step.
   For KWDB to KWDB migration, use built-in EXPORT / IMPORT tools.
-  For heterogeneous data migration, use KDTS migration tool (GUI mode recommended, Headless mode for non-interface
-  environments).
-  It provides detailed operation guidance, configuration collection, and validation suggestions to ensure smooth
-  migration.
-metadata:
-pattern: pipeline
-secondary_patterns: [ interactive, guide, assistant ]
+  For heterogeneous data migration, use KDTS migration tool (GUI mode recommended, Headless mode for non-interface environments).
+  It provides detailed operation guidance, configuration collection, and validation suggestions to ensure smooth migration.
 version: 1.0.0
 ---
 
@@ -19,8 +14,8 @@ version: 1.0.0
 
 This skill provides standardized interactive step-by-step guidance for KWDB full lifecycle data migration.
 
-For **KWDB to KWDB migration**, it is recommended to use KWDB built-in EXPORT / IMPORT command tool officially.
-For **heterogeneous database migration to KWDB**, use KDTS heterogeneous migration tool:
+For **KWDB to KWDB migration**, recommended to use KWDB built-in EXPORT / IMPORT command tool officially.  
+For **Heterogeneous database migration to KWDB**, use KDTS heterogeneous migration tool:
 
 - GUI graphical interface operation is recommended for daily use;
 - Non-interface server environment adopts KDTS Headless command-line mode.
@@ -76,39 +71,41 @@ target databases.
 
 ## Prerequisites
 
-### Supported Environments
+### 1. Supported Environments
 
-1. KWDB-to-KWDB Migration
-    - Source: KWDB 2.x.x / 3.x.x
-    - Target: KWDB 2.x.x / 3.x.x
-    - Network connectivity between source and target
-    - Read/write permissions for EXPORT/IMPORT
+#### 1.1 KWDB-to-KWDB Migration
 
-2. Heterogeneous Migration (KDTS Tool)
-    - Target: KWDB 2.x.x / 3.x.x
-    - Supported sources:
-        - Relational: MySQL, Oracle, PostgreSQL, ClickHouse, SQL Server
-        - Time-Series: KWDB, TDengine, InfluxDB, OpenTSDB
-        - NoSQL/Files: MongoDB, FTP, HDFS
+- Source: KWDB 2.x.x / 3.x.x
+- Target: KWDB 2.x.x / 3.x.x
+- Network connectivity between source and target
+- Read/write permissions for EXPORT/IMPORT
+
+#### 1.2 Heterogeneous Migration (KDTS Tool)
+
+- Target: KWDB 2.x.x / 3.x.x
+- Supported sources:
+    - Relational: MySQL, Oracle, PostgreSQL, ClickHouse, SQL Server
+    - Time-Series: KWDB, TDengine, InfluxDB, OpenTSDB
+    - NoSQL/Files: MongoDB, FTP, HDFS
     - GUI or Headless environment for KDTS
 
-### Supported Data Sources With Official Type Mapping
+### 2. Supported Data Sources With Official Type Mapping
 
-#### Relational Engine Auto Mapping Supported
+#### 2.1 Relational Engine Auto Mapping Supported
 
 MySQL、Oracle、PostgreSQL、KWDB
 
-#### Time-Series Engine Auto Mapping Supported
+#### 2.2 Time-Series Engine Auto Mapping Supported
 
 TDengine、InfluxDB、KWDB
 
-#### No Automatic Table Mapping (Only Data Migration)
+#### 2.3 No Automatic Table Mapping (Only Data Migration)
 
 ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
-> Rule: The above three types have no official field type mapping rules.
+> Rule: For the above-mentioned types, the official has not yet provided the field type mapping rules.
 > KDTS only migrates data; users need to manually create KWDB table structure and match field types by themselves.
 
-### Permissions Required
+### 3. Permissions Required
 
 - Source database: read permission of migration objects
 - Target KWDB: table creation and write permission
@@ -116,9 +113,9 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 - Network: accessible between source, target, and KDTS server
 - KDTS tool installed and available for GUI or Headless startup
 
-## Heterogeneous Data Source → KWDB Type Mapping Reference
+## KWDB Data Type Mapping Reference
 
-### MySQL → KWDB
+### 1. MySQL → KWDB
 
 | MySQL Data Type    | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
 |--------------------|----------------------------------|-----------------------------------|
@@ -151,7 +148,7 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 | LONGTEXT           | TEXT                             | NVARCHAR                          |
 | JSON               | JSON                             | NVARCHAR                          |
 
-### PostgreSQL → KWDB
+### 2. PostgreSQL → KWDB
 
 | PostgreSQL Data Type | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
 |----------------------|----------------------------------|-----------------------------------|
@@ -181,7 +178,7 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 | UUID                 | UUID                             | VARCHAR                           |
 | UNKNOWN              | UNKNOWN                          | VARCHAR                           |
 
-### Oracle → KWDB
+### 3. Oracle → KWDB
 
 | Oracle Data Type | KWDB Relational Engine Data Type | KWDB Time-Series Engine Data Type |
 |------------------|----------------------------------|-----------------------------------|
@@ -209,7 +206,7 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 | TIMESTAMP(3)     | TIMESTAMP                        | TIMESTAMP                         |
 | TIMESTAMP(6)     | TIMESTAMP                        | TIMESTAMP                         |
 
-### TDengine → KWDB
+### 4. TDengine → KWDB
 
 | TDengine Data Type | KWDB Time-Series Engine Data Type |
 |--------------------|-----------------------------------|
@@ -231,7 +228,7 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 | INT UNSIGNED       | INT8                              |
 | BIGINT UNSIGNED    | INT8                              |
 
-### InfluxDB → KWDB
+### 5. InfluxDB → KWDB
 
 | InfluxDB Data Type | KWDB Time-Series Engine Data Type |
 |--------------------|-----------------------------------|
@@ -243,11 +240,11 @@ ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS
 | STRING             | VARCHAR                           |
 | TIMESTAMP          | TIMESTAMP                         |
 
-### KWDB → KWDB Cross Version
+### 6. KWDB → KWDB Cross Version
 
 Direct compatible mapping, keep original field type without manual adjustment.
 
-### Unmapped Source Special Rule
+### 7. Unmapped Source Special Rule
 
 ClickHouse、SQL Server、OpenTSDB、MongoDB、FTP、HDFS：
 
@@ -274,8 +271,8 @@ If user selects 1 (KWDB → KWDB):
 If user selects 2 (Heterogeneous → KWDB):
 
 - Suggestion: Use KDTS migration tool. It supports multiple data sources, full migration/multiple table migration.
-  - For GUI environment, use graphical interface (recommended); 
-  - For non-GUI environment, use Headless mode.
+    - For GUI environment, use graphical interface (recommended);
+    - For non-GUI environment, use Headless mode.
 - Jump to Step 3 (Heterogeneous Migration with KDTS Tool).
 
 ### Step 2: KWDB → KWDB Migration (EXPORT / IMPORT)
