@@ -47,7 +47,6 @@ python3 scripts/get_kwdb_statements.py --host <host> --limit <N>
 | `--min-latency-ms` | 0 | Minimum service latency filter (ms) |
 | `--sort-by` | service_lat | Sort field |
 | `--json` | false | Output raw JSON |
-| `--insecure` | false | Skip TLS certificate verification |
 
 ### Output Format
 

@@ -7,7 +7,9 @@ description: Run KaiwuDB inspection and health-check tasks. Use this skill for d
 
 ❝ **Never skip Step 1.** Collecting metrics before confirming node addresses, ports, and inspection scope with the user is forbidden. The inspection must not proceed until the user explicitly confirms the node addresses, ports, and inspection scope. ❞
 
-❝ **Anomaly rules are user-driven.** If user does not request alerting, skip alerting. If user requests alerting without specific thresholds, apply default rules from `references/anomaly-rules.md`. If user provides custom thresholds, use those instead. ❞
+❝ **Never call a script without reading its usage doc first.** Before running any script under `scripts/`, you MUST read the corresponding `references/*-script-usage.md` file. This is the only way to know the correct parameters, defaults, and required arguments. Guessing parameters is forbidden. ❞
+
+❝ **Anomaly rules are user-driven.** If user does not request alerting, skip alerting. If user requests alerting without specific thresholds, apply default rules from `references/anomaly-rules.md`. If user provides custom thresholds, use those instead. ❞</
 
 ## Workflow
 
@@ -20,6 +22,12 @@ description: Run KaiwuDB inspection and health-check tasks. Use this skill for d
 4. Present scope menu → user confirms before proceeding
 
 ### Step 2: Collect metrics
+
+**MANDATORY: Read the script usage doc BEFORE calling any script.**
+- `references/ts-metrics-script-usage.md` — for `get_kwdb_ts_metrics.py`
+- `references/statements-script-usage.md` — for `get_kwdb_statements.py`
+
+Do not call any script without first reading its usage doc. Verify the parameter names, required arguments, and defaults match what you are about to pass.
 
 - **Port listener status**: Use Step 1 connectivity probe results.
 - **Most metrics**: Use `scripts/get_kwdb_ts_metrics.py` per `references/ts-metrics-script-usage.md`.

@@ -17,3 +17,5 @@ progress.md
 .venv/
 .coverage
 venv/
+*.html
+*.pdf

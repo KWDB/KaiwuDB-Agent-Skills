@@ -25,12 +25,12 @@ import sys
 from typing import Any
 
 
-def fetch_statements(host: str, port: int, insecure: bool = True) -> dict:
+def fetch_statements(host: str, port: int) -> dict:
     """Fetch statements from KaiwuDB _status/statements API."""
     curl_cmd = [
         "curl",
         "-s",
-        *(["--insecure"] if insecure else []),
+        "--insecure",
         f"http://{host}:{port}/_status/statements"
     ]
     result = subprocess.run(curl_cmd, capture_output=True, text=True)
