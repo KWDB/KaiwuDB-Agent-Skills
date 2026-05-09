@@ -56,3 +56,57 @@ Query `SHOW CLUSTER SETTINGS` via MCP and check each parameter below.
 - `ts.auto_vacuum.enabled` must be true. Disabling it causes stale data accumulation.
 - `ts.agg_recalc.cycle` = 0 disables aggregate recalculation, which can cause stale partition aggregates.
 - `ts.compact.max_limit` should match the I/O capacity of the storage subsystem.
+
+## Diagnostic Queries
+
+Use MCP to fetch current settings:
+
+```sql
+-- Fetch all cluster settings (filter for ts.* prefix)
+SHOW CLUSTER SETTINGS;
+
+-- Fetch individual settings for targeted checks
+SHOW CLUSTER SETTING ts.partition_agg.enabled;
+SHOW CLUSTER SETTING ts.count.use_statistics.enabled;
+SHOW CLUSTER SETTING ts.compress.algorithm;
+SHOW CLUSTER SETTING ts.compress.stage;
+SHOW CLUSTER SETTING ts.compress.level;
+SHOW CLUSTER SETTING ts.compress.last_segment.enabled;
+SHOW CLUSTER SETTING ts.dedup.rule;
+SHOW CLUSTER SETTING ts.block.lru_cache.max_limit;
+SHOW CLUSTER SETTING ts.last_cache_size.max_limit;
+SHOW CLUSTER SETTING ts.mem_segment_size.max_limit;
+SHOW CLUSTER SETTING ts.metric_schema_cache.max_limit;
+SHOW CLUSTER SETTING ts.table_cache.capacity;
+SHOW CLUSTER SETTING ts.rows_per_block.max_limit;
+SHOW CLUSTER SETTING ts.rows_per_block.min_limit;
+SHOW CLUSTER SETTING ts.reserved_last_segment.max_limit;
+SHOW CLUSTER SETTING ts.compact.max_limit;
+SHOW CLUSTER SETTING ts.auto_vacuum.enabled;
+SHOW CLUSTER SETTING ts.agg_recalc.cycle;
+SHOW CLUSTER SETTING ts.block_filter.sampling_ratio;
+```
+
+## Inter-Setting Dependencies
+
+Some settings interact and must be reviewed together:
+
+| Setting A | Setting B | Interaction |
+|-----------|-----------|-------------|
+| `ts.compress.algorithm` | `ts.compress.stage` | `stage=0` makes algorithm irrelevant (no compression applied). `stage=2` without encoding (stage=1 feature) misses delta-of-delta and gorilla encoding. |
+| `ts.last_cache_size.max_limit` | `ts.compress.last_segment.enabled` | Both affect last-row query performance. Increasing cache size helps more than enabling last segment compression. Enabling last segment compression trades write throughput for last-row speed. |
+| `ts.partition_agg.enabled` | `ts.count.use_statistics.enabled` | Both must be true for count optimization. `partition_agg=true` alone is insufficient if `count_statistics=false`. |
+| `ts.compact.max_limit` | `ts.auto_vacuum.enabled` | Compaction and vacuum work together. Disabling either causes data accumulation. `compact.max_limit` controls compaction concurrency; `auto_vacuum` controls stale data cleanup. |
+
+## Memory Sizing Tiers
+
+| Cluster Size | Available RAM | block.lru_cache | last_cache_size | mem_segment_size | table_cache.capacity | metric_schema_cache |
+|-------------|--------------|-----------------|-----------------|------------------|---------------------|-------------------|
+| Small (< 16 GiB) | < 16 GiB | 1.0 GiB (default) | 1.0 GiB (default) | 512 MiB (default) | 1000 (default) | 100 (default) |
+| Medium (16-64 GiB) | 16-64 GiB | 2.0-4.0 GiB | 2.0-4.0 GiB | 1.0 GiB | 2000 | 200 |
+| Large (> 64 GiB) | > 64 GiB | 4.0-8.0 GiB | 4.0-8.0 GiB | 2.0 GiB | 5000 | 500 |
+
+- All cache sizes should be evaluated relative to available system memory and data volume.
+- If the cluster hosts many time-series tables, increase `ts.table_cache.capacity` and `ts.metric_schema_cache.max_limit` to avoid repeated metadata lookups.
+- `ts.last_cache_size.max_limit` is critical for workloads that rely on last-row queries.
+- **Warning**: total cache allocation must not exceed ~50% of available RAM to leave room for query execution and OS.
