@@ -37,7 +37,7 @@ Based on the user's query, read the appropriate reference file:
 | 滑动窗口/session/event | `references/ts-window-events.md` |
 | 关系表查询 | `references/relational.md` |
 | 跨模查询（时序表+关系表） | `references/cross-model.md` |
-| 函数语法速查 | `references/functions.md` |
+| 时序函数语法速查 | `references/ts-functions.md` |
 
 ## Quick Reference
 
@@ -204,7 +204,7 @@ Report to user:
 - `references/ts-window-events.md` - TIME_WINDOW, SESSION_WINDOW, EVENT_WINDOW, TWA, diff
 - `references/relational.md` - Standard SQL for relational tables
 - `references/cross-model.md` - JOIN between relational and time series
-- `references/functions.md` - KWDB function syntax reference
+- `references/ts-functions.md` - KWDB  time-series function syntax reference
 
 
 ## Guardrails
