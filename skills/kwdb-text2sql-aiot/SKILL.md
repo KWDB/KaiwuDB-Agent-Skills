@@ -38,6 +38,7 @@ Based on the user's query, read the appropriate reference file:
 | 关系表查询 | `references/relational.md` |
 | 跨模查询（时序表+关系表） | `references/cross-model.md` |
 | 时序函数语法速查 | `references/ts-functions.md` |
+| 关系函数语法速查 | `references/relational-functions.md` |
 
 ## Quick Reference
 
@@ -99,7 +100,7 @@ When MCP is unavailable:
    - window/session/event → `ts-window-events.md`
    - cross-model → `cross-model.md`
    - relational → `relational.md`
-3. **Function syntax** → see `functions.md`
+3. **Function syntax** → see `ts-functions.md` (time-series) or `relational-functions.md` (relational)
 
 ### Phase 2: SQL Generation
 
@@ -204,7 +205,8 @@ Report to user:
 - `references/ts-window-events.md` - TIME_WINDOW, SESSION_WINDOW, EVENT_WINDOW, TWA, diff
 - `references/relational.md` - Standard SQL for relational tables
 - `references/cross-model.md` - JOIN between relational and time series
-- `references/ts-functions.md` - KWDB  time-series function syntax reference
+- `references/ts-functions.md` - KWDB time-series function syntax reference
+- `references/relational-functions.md` - KWDB relational function syntax reference
 
 
 ## Guardrails
@@ -238,7 +240,7 @@ When a user reports that generated SQL failed, diagnose and regenerate:
 When SQL fails:
 1. Read the error message to identify the error type
 2. If schema issue → re-run MCP discovery
-3. If syntax issue → check `functions.md` and relevant reference file
+3. If syntax issue → check `ts-functions.md` or `relational-functions.md` and relevant reference file
 4. If data issue → ask user for clarification
 5. Regenerate corrected SQL with explanation
 
