@@ -5,12 +5,51 @@ import re
 import sys
 from pathlib import Path
 
-import yaml
 
-
-ALLOWED_PROPERTIES = {"name", "description"}
+ALLOWED_PROPERTIES = {"name", "description", "metadata"}
 NAME_PATTERN = re.compile(r"^[a-z0-9-]+$")
 FRONTMATTER_PATTERN = re.compile(r"^---\n(.*?)\n---", re.DOTALL)
+INTERNAL_METADATA_PATTERN = re.compile(r"^internal:\s*true\s*$", re.MULTILINE)
+
+
+def _parse_frontmatter(frontmatter_text):
+    """Parse the limited frontmatter shape used by local skills."""
+    data = {}
+    current_key = None
+
+    for raw_line in frontmatter_text.splitlines():
+        line = raw_line.rstrip()
+        if not line.strip():
+            continue
+
+        if line.startswith("  "):
+            if current_key != "metadata":
+                return None, f"Unexpected indented line in frontmatter: {line.strip()}"
+            continue
+
+        key, sep, value = line.partition(":")
+        if not sep:
+            return None, f"Invalid frontmatter line: {line}"
+
+        key = key.strip()
+        value = value.strip()
+
+        if key == "metadata":
+            current_key = key
+            metadata = {}
+            if value:
+                return None, "Metadata must be expressed as an indented mapping"
+
+            metadata_match = INTERNAL_METADATA_PATTERN.search(frontmatter_text)
+            if metadata_match:
+                metadata["internal"] = True
+            data[key] = metadata
+            continue
+
+        current_key = key
+        data[key] = value
+
+    return data, None
 
 def validate_skill(skill_path):
     """Basic validation of a skill"""
@@ -35,13 +74,11 @@ def validate_skill(skill_path):
     if len(frontmatter_text) > 1024:
         return False, "Frontmatter is too long. Maximum is 1024 characters."
 
-    # Parse YAML frontmatter
-    try:
-        frontmatter = yaml.safe_load(frontmatter_text)
-        if not isinstance(frontmatter, dict):
-            return False, "Frontmatter must be a YAML dictionary"
-    except yaml.YAMLError as e:
-        return False, f"Invalid YAML in frontmatter: {e}"
+    frontmatter, parse_error = _parse_frontmatter(frontmatter_text)
+    if parse_error:
+        return False, parse_error
+    if not isinstance(frontmatter, dict):
+        return False, "Frontmatter must be a YAML dictionary"
 
     # Check for unexpected properties
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_PROPERTIES
@@ -84,6 +121,20 @@ def validate_skill(skill_path):
         return False, f"Description is too long ({len(description)} characters). Maximum is 1024 characters."
     if not description.startswith("Use when"):
         return False, "Description must start with 'Use when' and describe the trigger conditions."
+
+    metadata = frontmatter.get("metadata")
+    if metadata is not None:
+        if not isinstance(metadata, dict):
+            return False, "Metadata must be a mapping"
+        unexpected_metadata_keys = set(metadata.keys()) - {"internal"}
+        if unexpected_metadata_keys:
+            return False, (
+                "Unexpected key(s) in metadata: "
+                f"{', '.join(sorted(unexpected_metadata_keys))}. Allowed properties are: internal"
+            )
+        internal = metadata.get("internal")
+        if internal is not None and internal is not True:
+            return False, "metadata.internal must be true when provided"
 
     return True, "Skill is valid!"
 
