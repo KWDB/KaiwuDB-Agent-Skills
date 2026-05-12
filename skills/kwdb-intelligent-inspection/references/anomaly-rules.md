@@ -8,6 +8,7 @@ These rules apply only when the user requests alerting. If no alerting is reques
 2. **Port Anomaly**: Port 26257 or 8080 not listening
 3. **Frequent Restarts**: Database restarts > 1 time/day
 4. **Replica sync lag > 5s**: `cr.store.raft.replica.consistent.latency-p99` via `/ts/query` API
+5. **Unavailable Replicas > 0**: `cr.store.ranges.unavailable` via `/ts/query` API — ranges with fewer replicas than quorum requires
 
 ### Configurable Rules (require explicit user threshold)
 

@@ -41,6 +41,7 @@ Perform metrics inspection on the KaiwuDB database and generate a readable repor
 | QPS Anomaly | Write/query QPS sudden spike or drop | No alert by default unless the user specifies an explicit rule |
 | Write/Query Latency Anomaly | Write/query latency is high or spikes suddenly | No alert by default unless the user specifies an explicit rule |
 | Replication Lag | Replica sync lag exceeds a threshold | `cr.store.raft.replica.consistent.latency-p99` > 5s |
+| Unavailable Replicas | Range unavailable count exceeds threshold | `cr.store.ranges.unavailable` > 0 |
 
 ## Report Format
 

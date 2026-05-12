@@ -1,6 +1,6 @@
 ---
 name: kwdb-intelligent-inspection
-description: Run KaiwuDB inspection and health-check tasks. Use this skill for database health checks, metrics collection, anomaly detection, and inspection report generation.
+description: Run KaiwuDB inspection and health-check tasks. Use this skill for database health checks, metrics collection, anomaly detection, and inspection report generation. Trigger phrases: "show me all database metrics", "database metrics for my KWDB cluster", "kwdb cluster metrics", "check database health", "inspect KWDB", "巡检", "数据库指标", "查看数据库指标".
 ---
 
 ## Critical Constraints (non-negotiable)
