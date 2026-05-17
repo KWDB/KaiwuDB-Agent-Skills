@@ -2,6 +2,8 @@
 name: your-skill-name
 description: Describe what the skill does and when it should trigger.
 version: 0.1.0
+metadata:
+  internal: true
 ---
 
 Read the required reference files first.

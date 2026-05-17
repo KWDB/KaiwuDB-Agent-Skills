@@ -8,7 +8,20 @@ This repository is planned to be published at:
 
 ## Install
 
-Install one skill:
+List available public skills with the skills.sh CLI:
+
+```bash
+npx skills add https://github.com/KWDB/KaiwuDB-Agent-Skills --list
+```
+
+Install a skill by name:
+
+```bash
+npx skills add https://github.com/KWDB/KaiwuDB-Agent-Skills \
+  --skill <skill-name>
+```
+
+Manual install for Codex:
 
 ```bash
 git clone https://github.com/KWDB/KaiwuDB-Agent-Skills.git
@@ -16,20 +29,42 @@ cd KaiwuDB-Agent-Skills
 cp -R skills/<skill-name> ~/.codex/skills/
 ```
 
-Install all skills:
-
-```bash
-git clone https://github.com/KWDB/KaiwuDB-Agent-Skills.git
-cd KaiwuDB-Agent-Skills
-cp -R skills/* ~/.codex/skills/
-```
-
-If your agent uses a different local skills directory, replace `~/.codex/skills/` with the correct target path.
+Only install skills that appear in public discovery or release manifests. Planned skill directories may exist in the repository before they are ready.
 
 ## Ready Skills
 
 - `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.
 - `kwdb-text2sql-aiot`: Turn natural language into KWDB SQL for time-series, relational, and cross-model analysis.
+
+## Claude Code Plugin
+
+This repository includes a Claude Code marketplace manifest at `.claude-plugin/marketplace.json`.
+It exposes skills that are ready for plugin distribution.
+
+```bash
+claude plugin marketplace add https://github.com/KWDB/KaiwuDB-Agent-Skills
+claude plugin install <skill-name>@kaiwudb-agent-skills
+```
+
+## ClawHub
+
+Find available KWDB skills on ClawHub:
+
+```bash
+clawhub search kwdb
+```
+
+Install a skill by slug:
+
+```bash
+clawhub install <skill-slug>
+```
+
+Install into a specific local skills directory when needed:
+
+```bash
+clawhub --dir ~/.codex/skills install <skill-slug>
+```
 
 ## Planned Skills
 
@@ -43,10 +78,11 @@ If your agent uses a different local skills directory, replace `~/.codex/skills/
 ## Validate
 
 ```bash
-python3 scripts/validate_repo.py
-python3 -m unittest tests.test_validate_repo
+claude plugin validate .claude-plugin/marketplace.json
+npx skills add . --list
+npx skills add . --list --full-depth
 ```
 
 ## Status
 
-This repository is still being built. The current ready skills are `kwdb-install-deploy` and `kwdb-text2sql-aiot`. The remaining skills are still planned.
+This repository is still being built. Skills move from planned to ready when their runtime files, validation assets, and release metadata are complete.
