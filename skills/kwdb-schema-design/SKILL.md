@@ -2,6 +2,8 @@
 name: kwdb-schema-design
 description: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
 version: 0.1.0
+metadata:
+  internal: true
 ---
 
 Read `references/key-rules.md` first.
