@@ -25,3 +25,10 @@ clawhub skill publish skills/kwdb-text2sql-aiot \
   --version "$version" \
   --tags latest,kwdb,ready \
   "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-intelligent-inspection \
+  --slug kwdb-intelligent-inspection \
+  --name "KWDB Intelligent Inspection" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
