@@ -30,6 +30,7 @@ If your agent uses a different local skills directory, replace `~/.codex/skills/
 
 - `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.
 - `kwdb-text2sql-aiot`: Turn natural language into KWDB SQL for time-series, relational, and cross-model analysis.
+- `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
 
 ## Planned Skills
 
@@ -38,7 +39,6 @@ If your agent uses a different local skills directory, replace `~/.codex/skills/
 - `kwdb-troubleshooting`: Diagnose KWDB errors, connectivity issues, stability problems, and common failures.
 - `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
 - `kwdb-ts-anomaly-detection`: Build anomaly detection SQL for KWDB time-series data.
-- `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
 
 ## Validate
 
