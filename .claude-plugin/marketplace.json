@@ -65,6 +65,34 @@
         "time-series",
         "ready"
       ]
+    },
+    {
+      "name": "kwdb-intelligent-inspection",
+      "source": "./skills/kwdb-intelligent-inspection",
+      "description": "Run KaiwuDB / KWDB inspection and health-check workflows using metrics, system views, and report generation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-intelligent-inspection",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "inspection",
+        "health-check",
+        "metrics",
+        "monitoring"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "inspection",
+        "health-check",
+        "metrics",
+        "ready"
+      ]
     }
   ]
 }

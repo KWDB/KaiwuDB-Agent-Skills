@@ -6,6 +6,7 @@ This repository only publishes Ready Skills. Planned skills may become publishab
 
 - `kwdb-install-deploy`
 - `kwdb-text2sql-aiot`
+- `kwdb-intelligent-inspection`
 
 Planned skills may exist in `skills/`, but they are not part of the release boundary.
 
