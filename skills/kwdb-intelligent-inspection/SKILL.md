@@ -1,6 +1,20 @@
 ---
 name: kwdb-intelligent-inspection
-description: Run KaiwuDB inspection and health-check tasks. Use this skill for database health checks, metrics collection, anomaly detection, and inspection report generation. Trigger phrases: "show me all database metrics", "database metrics for my KWDB cluster", "kwdb cluster metrics", "check database health", "inspect KWDB", "巡检", "数据库指标", "查看数据库指标".
+description: |
+  Run KaiwuDB inspection and health-check tasks. Use this skill for database health checks, metrics collection, anomaly detection, and inspection report generation.
+triggers:
+  - show me all database metrics
+  - database metrics for my KWDB cluster
+  - kwdb cluster metrics
+  - check database health
+  - inspect KWDB cluster
+  - database health check
+  - collect database metrics
+  - kwdb inspection
+  - 巡检
+  - 数据库指标
+  - 查看数据库指标
+  - 检查数据库健康
 ---
 
 ## Critical Constraints (non-negotiable)
@@ -9,7 +23,7 @@ description: Run KaiwuDB inspection and health-check tasks. Use this skill for d
 
 ❝ **Never call a script without reading its usage doc first.** Before running any script under `scripts/`, you MUST read the corresponding `references/*-script-usage.md` file. This is the only way to know the correct parameters, defaults, and required arguments. Guessing parameters is forbidden. ❞
 
-❝ **Anomaly rules are user-driven.** If user does not request alerting, skip alerting. If user requests alerting without specific thresholds, apply default rules from `references/anomaly-rules.md`. If user provides custom thresholds, use those instead. ❞</
+❝ **Anomaly rules are user-driven.** If user does not request alerting, skip alerting. If user requests alerting without specific thresholds, apply default rules from `references/anomaly-rules.md`. If user provides custom thresholds, use those instead. ❞
 
 ## Workflow
 
