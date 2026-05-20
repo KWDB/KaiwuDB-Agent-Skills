@@ -8,5 +8,5 @@
 4. Return inline Markdown report rather than claiming a saved file path unless a file tool actually created that artifact.
 5. If the task runs in cluster mode, the report must cover all nodes rather than only a single node snapshot.
 6. Scheduled inspection should recover thresholds and time-range hints from the task prompt; if missing, use defaults and document that assumption.
-7. HTML and PDF are optional; default to Markdown. When generating PDF, HTML, or Markdown files, use UTF-8 character encoding.
+7. HTML and PDF are optional; default to Markdown. When generating PDF, HTML, or Markdown files, use UTF-8 character encoding, use relevant PDF or HTML generation skills to produce reports in the corresponding format if available.
 8. If the user explicitly asks for charts, hand structured metrics to a visualization tool. Chart generation failure must not block the main report.
