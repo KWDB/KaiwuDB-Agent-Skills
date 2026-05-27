@@ -37,6 +37,15 @@ This skill helps users optimize queries by following the correct engine-specific
    - TTL configurations
    - DICT ENCODING for high-cardinality strings
 
+5. **Storage Storage Configuration Optimization**
+   - Compression Group: ts.compress.stage / ts.compress.algorithm / ts.compress.level — tune compression ratio vs CPU trade-off
+   - Rows Per Block Group: ts.rows_per_block.min_limit / ts.rows_per_block.max_limit — tune block size for write throughput vs memory
+   - Cache tuning: ts.block.lru_cache.max_limit / ts.last_cache_size.max_limit — optimize query performance or reduce memory usage
+   - Write tuning: ts.compress.last_segment.enabled / ts.mem_segment_size.max_limit — optimize write performance
+   - Compaction tuning: ts.reserved_last_segment.max_limit / ts.compact.max_limit — manage compaction backlog
+   - Filter pushdown: ts.block_filter.sampling_ratio — optimize filter pushdown accuracy
+   - Data cleanup: ts.auto_vacuum.enabled — enable/disable automatic reorganization
+
 ## Success Criteria
 
 ### Mandatory
@@ -53,10 +62,18 @@ This skill helps users optimize queries by following the correct engine-specific
 9. **Join Order**: For cross-model, small relational table must be driver
 10. **TIME_BUCKET**: Prefer specialized function over manual GROUP BY for time aggregation
 
+### Storage Configuration Optimization Quality Gates
+11. **Pre-condition Check**: Confirm memory/disk/CPU resources before suggesting config changes
+12. **Never Auto-execute SET**: Only provide SQL for user to review and execute
+13. **Never SHOW CLUSTER SETTINGS**: Always query specific settings individually
+14. **Risk Warning**: Always include risk when recommending reduced values for memory/CPU-impact parameters
+15. **On-Demand Review**: Only review parameters matching the user's trigger condition, not full scan
+16. **Group Dependencies**: Compression Group params must be reviewed together; Rows Per Block Group params must be reviewed together
+
 ## Non-Goals
 
 - DDL operations (schema design, index creation for relational tables) → kwdb-schema-design
-- Deployment and configuration
+- Deployment and infrastructure configuration (install, replication, network, cluster topology) — NOT the same as storage config parameter tuning, which IS in scope (Use Case 5)
 - Data migration planning
 - Write optimization (bulk INSERT, import)
 - Hardware sizing recommendations
@@ -81,6 +98,7 @@ This skill helps users optimize queries by following the correct engine-specific
 **Tier 4 (Low-Frequency)**
 - `references/schema-tuning.md` - Partition interval, TTL, encoding
 - `references/index-analysis.md` - Index review for relational tables
+- `references/config-optimization.md` - Storage configuration parameter optimization
 
 ## Pattern Choice
 
@@ -93,6 +111,7 @@ Diagnosis-first workflow: analyze query and EXPLAIN output, identify bottleneck 
 3. **Pattern Matching**: Identify anti-pattern
 4. **Recommendation**: Provide specific SQL rewrite or schema suggestion
 5. **Validation**: Show expected EXPLAIN improvement
+6. **Storage Configuration Optimization (Conditional)**: If SQL optimization exhausted or user explicitly requests config tuning, review relevant storage configuration parameters using the decision tree
 
 ## Edge Cases
 
@@ -111,3 +130,14 @@ Diagnosis-first workflow: analyze query and EXPLAIN output, identify bottleneck 
 ### Cross-Model Edge Cases
 - Join with time-series as driver → warn about full scan
 - Missing time filter in joined query → warn about excessive data
+
+### Storage Configuration Optimization Edge Cases
+- User asks for config optimization without confirming resources → MUST ask for memory/disk/CPU status first
+- User wants to increase cache without confirming free memory → MUST require free memory confirmation (Guardrail #8)
+- User asks to auto-execute SET CLUSTER SETTING → MUST refuse, only provide SQL for review (Guardrail #9)
+- User asks for all config parameters at once → MUST only review parameters matching trigger condition, not full scan
+- Memory parameter with bidirectional trigger → MUST ask about both overload (reduce) and idle (increase) directions
+- Compression Group parameter reviewed individually → MUST warn that all 3 params (stage/algorithm/level) have dependencies and must be reviewed together
+- Rows Per Block Group parameter reviewed individually → MUST warn that both min_limit/max_limit have dependencies and must be reviewed together
+- ts.mem_segment_size.max_limit requested for write performance → MUST check ts.compress.last_segment.enabled first (important note: check this parameter first)
+- ts.last_cache_size.max_limit increase requested → MUST note max value = default = 1.0 GiB, only decrease direction applies

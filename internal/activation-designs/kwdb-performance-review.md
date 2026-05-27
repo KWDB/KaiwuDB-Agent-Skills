@@ -29,15 +29,26 @@
 - "create index to speed up"
 - "索引优化" / "索引建议"
 
+### Storage Configuration Optimization
+- "config optimization" / "配置优化"
+- "parameter tuning" / "参数调优"
+- "存储配置" / "参数调整"
+- "内存占用过大" / "memory too high"
+- "磁盘空间紧张" / "disk space tight"
+- "CPU占用过高" / "CPU too high"
+- "compaction积压" / "compaction backlog"
+- "缓存调优" / "cache tuning"
+- "压缩算法调整" / "compression algorithm"
+- SQL optimization exhausted and performance issues persist
+
 ## Should NOT Trigger
 
 ### Schema Design
 - "design a table" / "create table" / "create index" → kwdb-schema-design
 - "add column" / "alter table" / "drop index" → kwdb-schema-design
 
-### Deployment/Config
+### Deployment
 - "how to install KWDB"
-- "memory settings" / "配置调优"
 
 ### DML Write Optimization
 - "INSERT performance" / "bulk insert"
@@ -95,6 +106,62 @@ Ask or determine:
 
 Output specific SQL rewrites or configuration suggestions.
 
+### Step 5: Storage Configuration Optimization (Conditional)
+
+Only activate when:
+1. User explicitly mentions "config optimization" / "parameter tuning" / "配置优化" / "参数调优", OR
+2. SQL optimization steps (1-4) are exhausted and performance issues persist
+
+**Per-Parameter Trigger (review on demand, not full scan):**
+
+| Parameter | Config Group | Trigger Condition |
+|-----------|-------------|-------------------|
+| ts.compress.stage | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.compress.algorithm | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.compress.level | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.rows_per_block.min_limit | Rows Per Block Group | User reports excessive small blocks from flushing, long write visibility delay, or high per-device data volume with low compression ratio |
+| ts.rows_per_block.max_limit | Rows Per Block Group | User reports excessive small blocks from flushing, long write visibility delay, or high per-device data volume with low compression ratio |
+| ts.compress.last_segment.enabled | Independent | User wants compression optimization or smaller disk space usage, or needs to optimize write performance |
+| ts.block.lru_cache.max_limit | Independent | User wants to optimize overall query performance, or memory usage is too high |
+| ts.last_cache_size.max_limit | Independent | User wants to optimize last-related SQL query performance, or memory usage is too high |
+| ts.mem_segment_size.max_limit | Independent | Write performance optimization (after ts.compress.last_segment.enabled reviewed), or memory usage is too high (after ts.block.lru_cache.max_limit and ts.last_cache_size.max_limit reviewed) |
+| ts.reserved_last_segment.max_limit | Independent | Frequent compaction triggers or disk space is tight |
+| ts.compact.max_limit | Independent | User reports compaction backlog with significant CPU idle, or CPU usage is too high |
+| ts.auto_vacuum.enabled | Independent | User wants to clean up data |
+| ts.block_filter.sampling_ratio | Independent | User reports poor query performance with range conditions or null checks, suspects inefficient filter pushdown |
+
+**Decision Tree:**
+
+1. Compression optimization / disk space reduction → Compression Group
+   - Performance priority, disk sufficient → snappy/lz4, level=any, stage=1; extreme: stage=0
+   - Disk space priority, CPU sufficient → zstd, level=high, stage=3
+   - CPU usage too high → lz4, level=any, stage=1; if still high → stage=0
+2. Excessive small blocks / write visibility delay / low compression ratio → Rows Per Block Group
+   - High-throughput write → increase max (8192-16384)
+   - Memory constrained → decrease max (2048)
+   - Point queries → decrease max
+   - Sequential scan → increase max
+   - Low-latency small batch → increase min (1024+)
+3. Write performance → ts.compress.last_segment.enabled (SSD: false, HDD: true)
+4. Query performance / high memory → ts.block.lru_cache.max_limit
+5. Last query performance / high memory → ts.last_cache_size.max_limit
+6. Write performance (after #3) / high memory (after #4,#5) → ts.mem_segment_size.max_limit
+7. Frequent compaction / disk tight → ts.reserved_last_segment.max_limit
+8. Compaction backlog / high CPU → ts.compact.max_limit
+9. Data cleanup → ts.auto_vacuum.enabled
+10. Poor filter pushdown → ts.block_filter.sampling_ratio
+
+**Pre-conditions (confirm relevant resources before suggesting):**
+- Memory-related params: confirm available free memory with user
+- Disk-related params: confirm available disk space with user
+- CPU-related params: confirm CPU availability with user
+
+**Important:**
+- NEVER execute `SET CLUSTER SETTING` automatically
+- Only provide SQL statements for user to review and execute
+- NEVER use `SHOW CLUSTER SETTINGS` — always query specific settings individually
+- Always include risk warning when recommending reduced values for memory/CPU-impact parameters
+
 ## Activation Examples
 
 ### Example 1: Time-Series Query Without Time Filter
@@ -121,3 +188,30 @@ Output specific SQL rewrites or configuration suggestions.
 **User**: "How to speed up my bulk INSERT"
 **Activation**: NO
 **Reason**: Write optimization, not read performance
+
+### Example 6: Storage Configuration Optimization - Memory Pressure
+**User**: "我的KWDB内存占用过大，想通过配置优化减少内存使用"
+**Activation**: YES
+**Step**: Step 5 (Storage Configuration Optimization)
+**Trigger Condition**: ts.block.lru_cache.max_limit, ts.last_cache_size.max_limit
+**Pre-condition**: Confirm available free memory
+
+### Example 7: Storage Configuration Optimization - Disk Space
+**User**: "磁盘空间快满了，想调整压缩算法节省空间"
+**Activation**: YES
+**Step**: Step 5 (Storage Configuration Optimization)
+**Trigger Condition**: ts.compress.algorithm, ts.compress.level, ts.compress.stage (Compression Group)
+**Pre-condition**: Confirm CPU and disk space status
+
+### Example 8: SQL + Config Hybrid
+**User**: "查询优化后还是有点慢，还能再快吗？"
+**Activation**: YES
+**Step**: Steps 1-4 first, then Step 5 if SQL optimization exhausted
+**Reason**: SQL optimization may not fully resolve the issue; config tuning (e.g., cache increase) may help
+
+### Example 9: Config Optimization - Compaction
+**User**: "compaction积压严重，CPU比较空闲"
+**Activation**: YES
+**Step**: Step 5 (Storage Configuration Optimization)
+**Trigger Condition**: ts.compact.max_limit, ts.reserved_last_segment.max_limit
+**Pre-condition**: Confirm compaction backlog and CPU idle level

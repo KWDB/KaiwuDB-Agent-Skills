@@ -25,15 +25,25 @@
 - "explain query: SELECT * FROM metrics WHERE ts >= '2026-04-01'"
 - "查看这个SQL的执行计划"
 
+### Storage Configuration Optimization
+- "配置优化" / "参数调优"
+- "内存占用过大" / "memory too high"
+- "磁盘空间紧张" / "disk space tight"
+- "CPU占用过高" / "CPU too high"
+- "compaction积压" / "compaction backlog"
+- "缓存调优" / "cache tuning"
+- "压缩算法调整" / "compression optimization"
+- "存储配置优化" / "storage config tuning"
+- "写入性能优化" (when ts.compress.last_segment.enabled or ts.mem_segment_size.max_limit is relevant)
+
 ## Negative Cases (Should NOT Activate)
 
 ### Schema Design
 - "design a time-series table for sensors"
 - "create index on orders table"
 
-### Deployment/Config
+### Deployment
 - "how to install KWDB"
-- "KWDB memory configuration"
 
 ### Write Optimization
 - "how to speed up bulk INSERT"
@@ -45,3 +55,8 @@
 
 ### Other Skills
 - "design schema for my database"
+
+### Parameter Definition Management (→ st-config-performance)
+- "帮我修改参数定义" → st-config-performance
+- "添加存储配置优化参数" → st-config-performance
+- "参数定义变更" → st-config-performance

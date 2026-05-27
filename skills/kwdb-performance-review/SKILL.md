@@ -27,6 +27,7 @@ Read the required reference files first.
 **Tier 4 (Low-Frequency)**
 - `references/schema-tuning.md` - Partition interval, TTL, encoding
 - `references/index-analysis.md` - Index review for relational tables
+- `references/config-optimization.md` - Storage configuration parameter optimization
 
 ## When to Activate
 
@@ -40,6 +41,9 @@ Read the required reference files first.
 - "时序数据查询慢" / "传感器数据"
 - "TIME_BUCKET" / "时间聚合"
 - "索引优化" (relational tables only)
+- "config optimization" / "配置优化"
+- "parameter tuning" / "参数调优"
+- "存储配置" / "参数调整"
 
 **Should NOT trigger:**
 - Schema design ("create table", "add index") → kwdb-schema-design
@@ -105,6 +109,68 @@ Always provide:
 
 Include `EXPLAIN (ANALYZE)` to verify the optimization works.
 
+### Step 5: Configuration Optimization (Conditional)
+
+Only activate when:
+1. User explicitly mentions "config optimization" / "parameter tuning" / "配置优化" / "参数调优", OR
+2. SQL optimization steps (1-4) are exhausted and performance issues persist
+
+**Per-Parameter Trigger (review on demand, not full scan):**
+
+| Parameter | Config Group | Trigger Condition |
+|-----------|-------------|-------------------|
+| ts.compress.stage | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.compress.algorithm | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.compress.level | Compression Group | User wants compression optimization or smaller disk space usage |
+| ts.rows_per_block.min_limit | Rows Per Block Group | User reports excessive small blocks from flushing, long write visibility delay, or high per-device data volume with low compression ratio |
+| ts.rows_per_block.max_limit | Rows Per Block Group | User reports excessive small blocks from flushing, long write visibility delay, or high per-device data volume with low compression ratio |
+| ts.compress.last_segment.enabled | Independent | User wants compression optimization or smaller disk space usage, or needs to optimize write performance |
+| ts.block.lru_cache.max_limit | Independent | User wants to optimize overall query performance, or memory usage is too high |
+| ts.last_cache_size.max_limit | Independent | User wants to optimize last-related SQL query performance, or memory usage is too high |
+| ts.mem_segment_size.max_limit | Independent | Write performance optimization (after ts.compress.last_segment.enabled reviewed), or memory usage is too high (after ts.block.lru_cache.max_limit and ts.last_cache_size.max_limit reviewed) |
+| ts.reserved_last_segment.max_limit | Independent | Frequent compaction triggers or disk space is tight |
+| ts.compact.max_limit | Independent | User reports compaction backlog with significant CPU idle, or CPU usage is too high |
+| ts.auto_vacuum.enabled | Independent | User wants to clean up data |
+| ts.block_filter.sampling_ratio | Independent | User reports poor query performance with range conditions or null checks, suspects inefficient filter pushdown |
+
+**Decision Tree:**
+
+1. Compression optimization / disk space reduction → Compression Group
+   - Performance priority, disk sufficient → snappy/lz4, level=any, stage=1; extreme: stage=0
+   - Disk space priority, CPU sufficient → zstd, level=high, stage=3
+   - CPU usage too high → lz4, level=any, stage=1; if still high → stage=0
+2. Excessive small blocks / write visibility delay / low compression ratio → Rows Per Block Group
+   - High-throughput write → increase max (8192-16384)
+   - Memory constrained → decrease max (2048)
+   - Point queries → decrease max
+   - Sequential scan → increase max
+   - Low-latency small batch → increase min (1024+)
+3. Write performance → ts.compress.last_segment.enabled (SSD: false, HDD: true)
+4. Query performance / high memory → ts.block.lru_cache.max_limit
+5. Last query performance / high memory → ts.last_cache_size.max_limit
+6. Write performance (after #3) / high memory (after #4,#5) → ts.mem_segment_size.max_limit
+7. Frequent compaction / disk tight → ts.reserved_last_segment.max_limit
+8. Compaction backlog / high CPU → ts.compact.max_limit
+9. Data cleanup → ts.auto_vacuum.enabled
+10. Poor filter pushdown → ts.block_filter.sampling_ratio
+
+**Pre-conditions (confirm relevant resources before suggesting):**
+- Memory-related params: confirm available free memory with user
+- Disk-related params: confirm available disk space with user
+- CPU-related params: confirm CPU availability with user
+
+Read `references/config-optimization.md` for detailed parameter guidance.
+See `assets/example-configs.md` for configuration tuning examples.
+
+**Config query approach:**
+- Use MCP tool if available: `mcp__kwdb__read-query("SHOW CLUSTER SETTING ts.xxx")`
+- Otherwise, ask user to run: `SHOW CLUSTER SETTING ts.xxx;`
+- NEVER use `SHOW CLUSTER SETTINGS`
+
+**Important:**
+- NEVER execute `SET CLUSTER SETTING` automatically
+- Only provide SQL statements for user to review and execute
+
 ## NOT for
 
 - **DDL operations**: Creating/dropping tables, indexes (→ kwdb-schema-design)
@@ -123,6 +189,10 @@ Include `EXPLAIN (ANALYZE)` to verify the optimization works.
 5. **Verify table type before index recommendations**
 6. **Explain WHY the optimization works** - not just what to change
 7. **Validate with EXPLAIN** before finishing
+8. **Confirm memory and disk before config changes** - never suggest cache/memory size increases without confirmed free resources
+9. **Never auto-execute SET CLUSTER SETTING** - only provide SQL for user to review
+10. **Never use SHOW CLUSTER SETTINGS** - always query specific settings individually
+11. **Resource overload reduce warning** - when recommending reduced values for memory/CPU-impact parameters, always include the risk warning about potential performance degradation
 
 ## Output Format
 
@@ -154,3 +224,5 @@ Include `EXPLAIN (ANALYZE)` to verify the optimization works.
 EXPLAIN (ANALYZE) [optimized query];
 ```
 ```
+
+For configuration optimization output format, see `assets/config-output-template.md`.
