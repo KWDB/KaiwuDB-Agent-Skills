@@ -51,7 +51,7 @@ Execute the following steps in strict order. **MUST** See `references/workflow.m
 
 7. **MUST Show SQL to User** — Display the final SQL before execution.
 
-8. **Data Count Check** — Before executing the full data query, first execute a COUNT query to check data volume in **refined_sql**. If count > 1,000,00, stop and inform user: "数据量过大（{count} 条），无法执行异常检测。建议先对数据进行时间范围筛选或降采样后再试。" 
+8. **Data Count Check (Conditional)** — **ONLY skip this step if `refined_sql_limited` contains a `LIMIT` clause** (indicating data volume is already constrained by Step 5). If there is no `LIMIT` clause, execute COUNT query on **refined_sql_limited**. If count > 100,000, stop and inform user: "数据量过大（{count} 条），无法执行异常检测。建议先对数据进行时间范围筛选或降采样后再试。"
 
 9. **Execute SQL** — Run via `kwdb_sql_execute.py`, save result to `/tmp/sql-result-*`.
 

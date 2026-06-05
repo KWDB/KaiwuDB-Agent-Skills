@@ -7,41 +7,12 @@ description: Detailed step-by-step workflow for the anomaly detection skill.
 
 ## 0. Security Confirmation (MANDATORY)
 
-### 0.1 Security Warning
-
-> **⚠️ IMPORTANT SECURITY NOTICE**
->
-> **Database configuration information is SENSITIVE data.**
->
-> - Your database credentials (username, password) will be used for anomaly detection
-> - Anomaly detection operations must be performed in **insecure mode** only
-> - Ensure you have proper authorization before proceeding
->
-> **By proceeding, you confirm that:**
-> 1. You understand that database credentials are sensitive information
-> 2. You are performing anomaly detection in an appropriate environment
-> 3. You have authorization to access the target database
-
-### 0.2 User Agreement (REQUIRED)
-
-**Before proceeding, you MUST obtain explicit user consent and display the following confirmation prompt to the user.**
+**Before proceeding, you MUST display the following confirmation prompt to the user.**
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    🔒 SECURITY CONFIRMATION                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  Database configuration information is SENSITIVE.               │
-│                                                                 │
-│  By proceeding with anomaly detection, you confirm that:        │
-│                                                                 │
-│  □ I understand database credentials are sensitive information  │
-│  □ I am performing this operation in an appropriate environment │
-│  □ I have proper authorization to access the target database    │
-│                                                                 │
-│  Type "I AGREE" to proceed: ___________                         │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
+🔒 Security Confirmation                                                    
+Database configuration information is SENSITIVE data, anomaly detection SKILL should be used in insecure mode
+Type "I AGREE" to proceed
 ```
 
 **IMPORTANT:**
@@ -118,9 +89,9 @@ If the SQL statement violates any rule below, **stop permanently** and tell the 
 | Rule | Action |
 |------|--------|
 | Remove irrelevant columns | Keep only the timestamp and numeric columns needed for detection. |
-| Remove non-numeric columns | Drop any filtered column that is not `INTEGER` / `FLOAT` / `DOUBLE` / `TIMESTAMP`. |
+| Remove non-numeric columns | **Drop any filtered column that is not `INTEGER` / `FLOAT` / `DOUBLE` / `DECIMAL` / `NUMERIC` /`TIMESTAMP`**. |
 | Ensure timestamp in SELECT | If no timestamp column is in the filtered clause, look it up in table metadata and add it. |
-| Limit without time filter | If there is **no timestamp condition** in `WHERE`, **MUST add `ORDER BY <timestamp_column> DESC` and `LIMIT 1000`**. |
+| Limit without time filter | If there is **no time filter condition** in `WHERE`, **MUST add `ORDER BY <timestamp_column> DESC` and `LIMIT 1000`**. |
 
 **Output**: The refined SQL after this step is called `refined_sql_limited`.
 
@@ -135,8 +106,19 @@ SELECT * FROM (<refined_sql_limited>) AS anomaly_subquery ORDER BY <timestamp_co
 **MUST** display the final fixed SQL before execution.
 In **All Tags** cases, show the SQL for the current primary tag value and indicate progress (e.g. "Processing device dev_001 of 10...").
 
-### 8. Data Count Check
-Before executing the full data query, first execute a COUNT query to check data volume in **refined_sql_limited**:
+### 8. Data Count Check (Conditional)
+
+**ONLY skip this step if `refined_sql_limited` contains a `LIMIT` clause** (indicating data volume is already constrained by Step 5).
+
+| Condition | Action |
+|-----------|--------|
+| `refined_sql_limited` has `LIMIT` clause | **Skip** this step, proceed directly to step 9 |
+| `refined_sql_limited` has **no** `LIMIT` clause | Execute COUNT check |
+
+**Rationale**: In Step 5, `LIMIT 1000` is automatically added when there is no timestamp filter. This already constrains the data volume, so COUNT check is unnecessary. When `LIMIT` is present, the data volume is already bounded and no COUNT check is needed.
+
+**When to execute:**
+Execute a COUNT query to check data volume in **refined_sql_limited**:
 
 ```bash
 python scripts/kwdb_sql_execute.py <host> <port> <username> <password> "SELECT COUNT(*) FROM (<refined_sql_limited>) AS count_subquery"
