@@ -36,6 +36,7 @@ Only install skills that appear in public discovery or release manifests. Planne
 - `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.
 - `kwdb-text2sql-aiot`: Turn natural language into KWDB SQL for time-series, relational, and cross-model analysis.
 - `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
+- `kwdb-performance-review`: Review slow SQL, schema issues, execution plans, and tuning options.
 - `kwdb-troubleshooting`: Diagnose KWDB errors, connectivity issues, stability problems, and common failures.
 
 ## Claude Code Plugin
@@ -71,7 +72,6 @@ clawhub --dir ~/.codex/skills install <skill-slug>
 ## Planned Skills
 
 - `kwdb-schema-design`: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
-- `kwdb-performance-review`: Review slow SQL, schema issues, execution plans, and tuning options.
 - `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
 - `kwdb-ts-anomaly-detection`: Build anomaly detection SQL for KWDB time-series data.
 
