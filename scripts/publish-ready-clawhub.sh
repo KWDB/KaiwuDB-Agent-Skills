@@ -32,3 +32,17 @@ clawhub skill publish skills/kwdb-intelligent-inspection \
   --version "$version" \
   --tags latest,kwdb,ready \
   "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-performance-review \
+  --slug kwdb-performance-review \
+  --name "KWDB Performance Review" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-troubleshooting \
+  --slug kwdb-troubleshooting \
+  --name "KWDB Troubleshooting" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"

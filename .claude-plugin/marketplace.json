@@ -93,6 +93,62 @@
         "metrics",
         "ready"
       ]
+    },
+    {
+      "name": "kwdb-performance-review",
+      "source": "./skills/kwdb-performance-review",
+      "description": "Review slow KWDB SQL, schema issues, execution plans, and tuning options for time-series, relational, and cross-model queries.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-performance-review",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "performance",
+        "sql-tuning",
+        "explain",
+        "time-series"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "performance",
+        "sql-tuning",
+        "explain",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-troubleshooting",
+      "source": "./skills/kwdb-troubleshooting",
+      "description": "Diagnose KWDB incidents from logs, metrics, and system evidence, including crashes, OOM, slow SQL, restarts, and cluster-wide availability symptoms.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-troubleshooting",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "troubleshooting",
+        "diagnostics",
+        "logs",
+        "metrics"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "troubleshooting",
+        "diagnostics",
+        "logs",
+        "ready"
+      ]
     }
   ]
 }
