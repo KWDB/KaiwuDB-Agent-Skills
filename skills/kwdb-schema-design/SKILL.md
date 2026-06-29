@@ -1,6 +1,5 @@
 ---
 name: kwdb-schema-design
-<<<<<<< HEAD
 description: |
   Design KWDB schemas and generate DDL for relational, time-series, and mixed workloads.
   Covers: CREATE/ALTER/DROP TABLE, INDEX, VIEW, constraints, partitioning, retention, tags.
