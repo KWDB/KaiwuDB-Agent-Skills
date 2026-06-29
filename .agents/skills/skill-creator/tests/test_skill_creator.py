@@ -55,7 +55,35 @@ class ValidateSkillTests(unittest.TestCase):
             valid, message = validate_skill(skill_dir)
 
         self.assertFalse(valid)
-        self.assertIn("Allowed properties are: description, name", message)
+        self.assertIn("Allowed properties are: description, metadata, name", message)
+
+    def test_accepts_internal_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = self.make_skill(
+                Path(tmp),
+                """
+                ---
+                name: demo-skill
+                description: Use when users need help creating or refining a skill.
+                metadata:
+                  internal: true
+                ---
+
+                # Demo Skill
+                """,
+            )
+
+            valid, message = validate_skill(skill_dir)
+
+        self.assertTrue(valid, message)
+
+    def test_repo_skill_creator_is_marked_internal(self) -> None:
+        skill_dir = Path(__file__).resolve().parents[1]
+
+        valid, message = validate_skill(skill_dir)
+
+        self.assertTrue(valid, message)
+        self.assertIn("internal: true", (skill_dir / "SKILL.md").read_text())
 
     def test_rejects_descriptions_without_trigger_language(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

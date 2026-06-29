@@ -1,0 +1,154 @@
+{
+  "$schema": "https://code.claude.com/schemas/marketplace.json",
+  "name": "kaiwudb-agent-skills",
+  "owner": {
+    "name": "KWDB",
+    "url": "https://github.com/KWDB"
+  },
+  "metadata": {
+    "description": "Ready KaiwuDB / KWDB agent skills.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "kwdb-install-deploy",
+      "source": "./skills/kwdb-install-deploy",
+      "description": "Install and deploy KaiwuDB / KWDB with standard single-node and cluster workflows.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-install-deploy",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "database",
+        "install",
+        "deploy",
+        "cluster"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "database",
+        "install",
+        "deploy",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-text2sql-aiot",
+      "source": "./skills/kwdb-text2sql-aiot",
+      "description": "Convert natural language into KWDB SQL for time-series, relational, and cross-model analysis.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-text2sql-aiot",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "sql",
+        "text-to-sql",
+        "time-series",
+        "aiot"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "sql",
+        "text-to-sql",
+        "time-series",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-intelligent-inspection",
+      "source": "./skills/kwdb-intelligent-inspection",
+      "description": "Run KaiwuDB / KWDB inspection and health-check workflows using metrics, system views, and report generation.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-intelligent-inspection",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "inspection",
+        "health-check",
+        "metrics",
+        "monitoring"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "inspection",
+        "health-check",
+        "metrics",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-performance-review",
+      "source": "./skills/kwdb-performance-review",
+      "description": "Review slow KWDB SQL, schema issues, execution plans, and tuning options for time-series, relational, and cross-model queries.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-performance-review",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "performance",
+        "sql-tuning",
+        "explain",
+        "time-series"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "performance",
+        "sql-tuning",
+        "explain",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-troubleshooting",
+      "source": "./skills/kwdb-troubleshooting",
+      "description": "Diagnose KWDB incidents from logs, metrics, and system evidence, including crashes, OOM, slow SQL, restarts, and cluster-wide availability symptoms.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-troubleshooting",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "troubleshooting",
+        "diagnostics",
+        "logs",
+        "metrics"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "troubleshooting",
+        "diagnostics",
+        "logs",
+        "ready"
+      ]
+    }
+  ]
+}

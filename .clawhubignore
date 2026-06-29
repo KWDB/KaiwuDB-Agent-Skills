@@ -1,0 +1,16 @@
+# Root-level ClawHub package boundary.
+# Ready Skills are published explicitly from their own skill directories.
+#
+# Keep internal, planned, and marketplace-only files out of accidental
+# root-level package uploads.
+.agents/
+.github/
+.claude-plugin/
+internal/
+docs/
+skills/kwdb-schema-design/
+skills/kwdb-performance-review/
+skills/kwdb-nl2sql-mcp/
+skills/kwdb-troubleshooting/
+skills/kwdb-data-migration/
+skills/kwdb-ts-anomaly-detection/

@@ -1,5 +1,6 @@
 ---
 name: kwdb-schema-design
+<<<<<<< HEAD
 description: |
   Design KWDB schemas and generate DDL for relational, time-series, and mixed workloads.
   Covers: CREATE/ALTER/DROP TABLE, INDEX, VIEW, constraints, partitioning, retention, tags.
@@ -7,6 +8,9 @@ description: |
   TAGS, PRIMARY TAGS, RETENTIONS, primary key, foreign key, DDL.
   NOT for: DML queries, deployment, backup, performance tuning.
 version: 0.4.1
+||||||| e4c7360
+description: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
+version: 0.1.0
 ---
 
 <EXTREMELY-IMPORTANT>

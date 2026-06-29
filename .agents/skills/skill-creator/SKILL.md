@@ -1,6 +1,8 @@
 ---
 name: skill-creator
 description: Use when users want to create a new skill or improve an existing one, especially when they need help defining scope, choosing a skill pattern, designing activation boundaries, structuring references or scripts, or validating the final package.
+metadata:
+  internal: true
 ---
 
 # Skill Creator

@@ -8,7 +8,20 @@ This repository is planned to be published at:
 
 ## Install
 
-Install one skill:
+List available public skills with the skills.sh CLI:
+
+```bash
+npx skills add https://github.com/KWDB/KaiwuDB-Agent-Skills --list
+```
+
+Install a skill by name:
+
+```bash
+npx skills add https://github.com/KWDB/KaiwuDB-Agent-Skills \
+  --skill <skill-name>
+```
+
+Manual install for Codex:
 
 ```bash
 git clone https://github.com/KWDB/KaiwuDB-Agent-Skills.git
@@ -16,37 +29,60 @@ cd KaiwuDB-Agent-Skills
 cp -R skills/<skill-name> ~/.codex/skills/
 ```
 
-Install all skills:
+Only install skills that appear in public discovery or release manifests. Planned skill directories may exist in the repository before they are ready.
+
+## Ready Skills
+
+- `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.
+- `kwdb-text2sql-aiot`: Turn natural language into KWDB SQL for time-series, relational, and cross-model analysis.
+- `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
+- `kwdb-performance-review`: Review slow SQL, schema issues, execution plans, and tuning options.
+- `kwdb-troubleshooting`: Diagnose KWDB errors, connectivity issues, stability problems, and common failures.
+
+## Claude Code Plugin
+
+This repository includes a Claude Code marketplace manifest at `.claude-plugin/marketplace.json`.
+It exposes skills that are ready for plugin distribution.
 
 ```bash
-git clone https://github.com/KWDB/KaiwuDB-Agent-Skills.git
-cd KaiwuDB-Agent-Skills
-cp -R skills/* ~/.codex/skills/
+claude plugin marketplace add https://github.com/KWDB/KaiwuDB-Agent-Skills
+claude plugin install <skill-name>@kaiwudb-agent-skills
 ```
 
-If your agent uses a different local skills directory, replace `~/.codex/skills/` with the correct target path.
+## ClawHub
 
-## Implemented Baseline Skill
+Find available KWDB skills on ClawHub:
 
-- `kwdb-schema-design`: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
+```bash
+clawhub search kwdb
+```
+
+Install a skill by slug:
+
+```bash
+clawhub install <skill-slug>
+```
+
+Install into a specific local skills directory when needed:
+
+```bash
+clawhub --dir ~/.codex/skills install <skill-slug>
+```
 
 ## Planned Skills
 
-- `kwdb-performance-review`: Review slow SQL, schema issues, execution plans, and tuning options.
-- `kwdb-nl2sql-mcp`: Turn natural language into KWDB SQL with MCP-assisted query generation and validation.
-- `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.
-- `kwdb-troubleshooting`: Diagnose KWDB errors, connectivity issues, stability problems, and common failures.
+- `kwdb-schema-design`: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
 - `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
 - `kwdb-ts-anomaly-detection`: Build anomaly detection SQL for KWDB time-series data.
-- `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
 
 ## Validate
 
 ```bash
-python3 scripts/validate_repo.py
-python3 -m unittest tests.test_validate_repo
+claude plugin validate .claude-plugin/marketplace.json
+npx skills add . --list
+npx skills add . --list --full-depth
 ```
 
 ## Status
 
-This repository is still being built. `kwdb-schema-design` is the reviewed baseline example skill. The remaining planned skills are not implemented yet.
+This repository is still being built. Skills move from planned to ready when their runtime files, validation assets, and release metadata are complete.
