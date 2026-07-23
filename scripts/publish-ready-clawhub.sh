@@ -46,3 +46,24 @@ clawhub skill publish skills/kwdb-troubleshooting \
   --version "$version" \
   --tags latest,kwdb,ready \
   "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-ts-anomaly-detection \
+  --slug kwdb-ts-anomaly-detection \
+  --name "KWDB Time-Series Anomaly Detection" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-build \
+  --slug kwdb-build \
+  --name "KWDB Build" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-schema-design \
+  --slug kwdb-schema-design \
+  --name "KWDB Schema Design" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
