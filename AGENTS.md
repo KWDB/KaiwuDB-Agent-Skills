@@ -15,18 +15,23 @@ Its goals are:
 - separate publishable runtime files from internal development materials
 - keep structure, writing style, and release boundaries consistent across skills
 
-## Planned Skills
+## Skill Portfolio
 
-The repository currently plans to maintain these skills:
+The repository currently maintains these Ready Skills:
 
-- `kwdb-schema-design`
-- `kwdb-performance-review`
-- `kwdb-nl2sql-mcp`
 - `kwdb-install-deploy`
-- `kwdb-troubleshooting`
-- `kwdb-data-migration`
-- `kwdb-ts-anomaly-detection`
+- `kwdb-text2sql-aiot`
 - `kwdb-intelligent-inspection`
+- `kwdb-performance-review`
+- `kwdb-troubleshooting`
+- `kwdb-ts-anomaly-detection`
+- `kwdb-build`
+- `kwdb-schema-design`
+
+The following skill directories are still planned:
+
+- `kwdb-data-migration`
+- `kwdb-nl2sql-mcp`
 
 ## Stack Baseline
 

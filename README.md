@@ -38,6 +38,9 @@ Only install skills that appear in public discovery or release manifests. Planne
 - `kwdb-intelligent-inspection`: Run health checks and inspection workflows based on KWDB monitoring and system views.
 - `kwdb-performance-review`: Review slow SQL, schema issues, execution plans, and tuning options.
 - `kwdb-troubleshooting`: Diagnose KWDB errors, connectivity issues, stability problems, and common failures.
+- `kwdb-ts-anomaly-detection`: Detect anomalies and generate reports for KWDB time-series data.
+- `kwdb-build`: Build and test KaiwuDB source with the supported CMake, C++, and Go workflows.
+- `kwdb-schema-design`: Design KWDB schemas and DDL for relational, time-series, and mixed workloads.
 
 ## Claude Code Plugin
 
@@ -71,9 +74,8 @@ clawhub --dir ~/.codex/skills install <skill-slug>
 
 ## Planned Skills
 
-- `kwdb-schema-design`: Design KWDB schemas and minimal DDL for relational, time-series, and mixed workloads.
 - `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
-- `kwdb-ts-anomaly-detection`: Build anomaly detection SQL for KWDB time-series data.
+- `kwdb-nl2sql-mcp`: Provide natural-language-to-SQL workflows through a KWDB MCP integration.
 
 ## Validate
 

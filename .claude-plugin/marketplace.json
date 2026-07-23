@@ -149,6 +149,90 @@
         "logs",
         "ready"
       ]
+    },
+    {
+      "name": "kwdb-ts-anomaly-detection",
+      "source": "./skills/kwdb-ts-anomaly-detection",
+      "description": "Detect anomalies and generate reports for KWDB time-series data.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-ts-anomaly-detection",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "anomaly-detection",
+        "time-series",
+        "outliers",
+        "data-quality"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "anomaly-detection",
+        "time-series",
+        "outliers",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-build",
+      "source": "./skills/kwdb-build",
+      "description": "Build and test KaiwuDB source with the supported CMake, C++, and Go workflows.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-build",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "build",
+        "cmake",
+        "cpp",
+        "golang"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "build",
+        "cmake",
+        "cpp",
+        "ready"
+      ]
+    },
+    {
+      "name": "kwdb-schema-design",
+      "source": "./skills/kwdb-schema-design",
+      "description": "Design KWDB schemas and DDL for relational, time-series, and mixed workloads.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-schema-design",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "schema-design",
+        "ddl",
+        "time-series",
+        "relational"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "schema-design",
+        "ddl",
+        "time-series",
+        "ready"
+      ]
     }
   ]
 }
