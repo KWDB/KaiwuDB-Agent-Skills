@@ -1,0 +1,292 @@
+# KWDB Data Migration Scripts
+
+Complete Python implementation for KaiwuDB heterogeneous database migration via KDTS REST API.
+
+## Architecture Overview
+
+```
+scripts/
+├── __init__.py          # Package init
+├── api_client.py        # Unified KDTS API client (10 endpoints)
+├── data_source.py       # Data source management (14 types)
+├── migration_task.py    # Migration workflow orchestration
+├── config_validator.py  # Configuration validation
+├── error_handler.py     # Error code handling (18 error codes)
+└── README.md            # This file
+```
+
+## Module Details
+
+### 1. api_client.py - Unified KDTS API Client
+
+Full implementation of all 10 KDTS REST API endpoints.
+
+**Classes:**
+- `KDTSClient`: Main API client with methods for all endpoints
+- `build_source_config()`: Helper to create source configurations
+- `build_table_mapping()`: Helper to create table mappings
+
+**Supported Endpoints:**
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Health check |
+| POST | `/datasource/validate` | Test connection |
+| POST | `/datasource/databases` | List databases |
+| POST | `/datasource/metadata` | Read metadata |
+| POST | `/metadata/preview` | Preview DDL |
+| POST | `/metadata/execute` | Execute DDL |
+| POST | `/datax/build` | Build migration script |
+| POST | `/datax/execute` | Execute migration |
+| GET | `/datax/status` | Query task status |
+| POST | `/datax/control` | Kill/control task |
+
+**Key Features:**
+- Automatic error handling with standardized response format
+- Connection and read timeout management
+- HTTP 503 retry support
+- Request/response logging
+
+### 2. data_source.py - Complete Data Source Management
+
+Comprehensive data source configuration for all 14 KDTS supported types.
+
+**Classes:**
+- `Engine`: Enum for engine types (RELATIONAL, TIMESERIES, DOCUMENT, FILE, BOTH)
+- `SourceType`: Enum for all 14 source types
+- `SourceCapability`: Enum for capability levels
+- `DataSourceManager`: Main manager class
+
+**Supported Source Types:**
+| Type | Engine | Default Port | Capability |
+|------|--------|--------------|------------|
+| MYSQL | RELATIONAL | 3306 | Full Migration |
+| ORACLE | RELATIONAL | 1521 | Full Migration |
+| POSTGRESQL | RELATIONAL | 5432 | Full Migration |
+| SQLSERVER | RELATIONAL | 1433 | Table-Level Only |
+| CLICKHOUSE | RELATIONAL | 9000 | Full Migration |
+| KAIWUDB | BOTH | **26257** | Full Migration |
+| TDENGINE3X | TIMESERIES | 6030 | Full Migration |
+| TDENGINE2X | TIMESERIES | 6030 | Table-Level Only |
+| INFLUXDB1X | TIMESERIES | 8086 | Table-Level Only |
+| INFLUXDB2X | TIMESERIES | 8086 | Table-Level Only |
+| OPENTSDB | TIMESERIES | 4242 | Table-Level Only |
+| MONGODB | DOCUMENT | 27017 | Table-Level Only |
+| FTP | FILE | 21 | Table-Level Only |
+| HDFS | FILE | 8020 | Table-Level Only |
+
+**Key Features:**
+- Auto-detect engine type from source type
+- JDBC URL construction for relational databases
+- Source-specific configuration builders (FTP, HDFS, MongoDB)
+- Connection test integration with api_client
+- Configuration template generation
+
+### 3. migration_task.py - Migration Workflow Orchestration
+
+End-to-end migration workflow management by composing KDTS API calls.
+
+**Classes:**
+- `MigrationWorkflow`: Enum for workflow types
+- `MigrationStep`: Enum for workflow steps
+- `MigrationStatus`: Enum for task statuses (SUBMITTED, RUNNING, SUCCEEDED, FAILED, KILLED)
+- `MigrationWorkflowManager`: Main workflow manager
+
+**Supported Workflows:**
+1. `FULL_MIGRATION`: Schema + Data (full migration)
+2. `SCHEMA_ONLY`: DDL only (no data)
+3. `DATA_ONLY`: Data only (tables must exist)
+4. `TABLE_LEVEL`: Specific tables (for restricted sources)
+
+**Key Features:**
+- Complete workflow orchestration (test → metadata → DDL → build → execute → monitor)
+- Step-by-step result tracking
+- Progress monitoring with polling
+- Batch migration support for large datasets
+- Safe task termination with confirmation
+
+**Important:** KDTS API only supports KILL and QUERY actions. No pause/resume.
+
+### 4. config_validator.py - Configuration Validation
+
+Validates all migration parameters before API calls.
+
+**Classes:**
+- `ConfigValidator`: Static validation methods
+
+**Validations:**
+- Source type against 14 supported types
+- Source capability against requested operation
+- Required field presence
+- Target must be KAIWUDB
+- Table mapping structure
+
+### 5. error_handler.py - Error Code Handling
+
+Maps all KDTS error codes to human-readable messages and fix suggestions.
+
+**Classes:**
+- `ErrorHandler`: Error lookup and formatting
+
+**Error Categories:**
+| Category | Code Range | Examples |
+|----------|------------|----------|
+| Parameter | 1xxx | 1001 (invalid params), 1002 (unsupported type) |
+| Connection | 2xxx | 2001 (connection failed) |
+| Metadata | 3xxx | 3001 (metadata error), 3004 (tag limit) |
+| DataX | 4xxx | 4001 (build failed), 4002 (launch failed) |
+| Resource | 5xxx | 5001 (thread pool full), 5002 (Python not found) |
+| System | 9xxx | 9999 (internal error) |
+
+## Usage Examples
+
+### Quick Start - Full Migration
+
+```python
+from scripts.api_client import KDTSClient
+from scripts.data_source import DataSourceManager
+from scripts.migration_task import MigrationWorkflowManager
+
+# Initialize
+client = KDTSClient(base_url="http://localhost:8080")
+ds_manager = DataSourceManager(api_client=client)
+workflow = MigrationWorkflowManager(api_client=client)
+
+# Build configurations
+source_config = ds_manager.build_relational_config(
+    source_type="MYSQL",
+    host="192.168.1.100",
+    username="root",
+    password="secret",
+    db_name="source_db",
+)
+
+target_config = ds_manager.build_target_config(
+    engine="RELATIONAL",
+    host="127.0.0.1",
+    username="root",
+    password="kwdb_secret",
+    db_name="target_db",
+)
+
+# Run full migration
+result = workflow.run_full_migration(
+    source_config=source_config,
+    target_config=target_config,
+)
+
+print(f"Migration {'succeeded' if result['success'] else 'failed'}")
+```
+
+### Manual API Calls
+
+```python
+from scripts.api_client import KDTSClient, build_source_config
+
+client = KDTSClient(base_url="http://localhost:8080")
+
+# Test connection
+source = build_source_config(
+    source_type="MYSQL",
+    host="127.0.0.1",
+    port=3306,
+    username="root",
+    password="123456",
+    db_name="test_db",
+)
+result = client.test_connection(source)
+print(f"Connection: {result}")
+
+# Read metadata
+metadata = client.read_metadata(source)
+print(f"Tables found: {len(metadata.get('data', {}).get('tableMap', {}))}")
+```
+
+### Error Handling
+
+```python
+from scripts.error_handler import ErrorHandler
+
+response = client.build_migration(source, target)
+if response.get("code") != 0:
+    hint = ErrorHandler.get_error_hint(response["code"])
+    print(f"Error: {response['message']}")
+    print(f"Hint: {hint}")
+```
+
+### Batch Migration
+
+```python
+# Split large tables into batches
+batches = [
+    [{"source": {...}, "target": {...}} for table in batch1],
+    [{"source": {...}, "target": {...}} for table in batch2],
+    # ... more batches
+]
+
+result = workflow.run_batch_migration(
+    source_config=source_config,
+    target_config=target_config,
+    table_batches=batches,
+)
+
+print(f"Completed: {result['completed_batches']}/{result['total_batches']}")
+```
+
+## Requirements
+
+- Python 3.8+
+- requests library (`pip install requests`)
+- KDTS Server running and accessible
+
+## Dependencies Between Modules
+
+```
+api_client.py ──────────────────────────┐
+    │                                    │
+    ▼                                    ▼
+data_source.py ──► migration_task.py ──► config_validator.py
+                                        │
+                                        ▼
+                                    error_handler.py
+```
+
+## Response Format
+
+All API responses follow:
+
+```json
+{
+  "code": 0,           // 0 = success, non-zero = error
+  "message": "success",
+  "timestamp": 1719290000000,
+  "data": { ... }      // Varies by endpoint
+}
+```
+
+## Important Notes
+
+1. KDTS Server is the backend; these scripts are the client library
+2. All operations are stateless per call; manage state at the workflow level
+3. Migration can be time-consuming; use `wait_for_completion()` for long-running tasks
+4. Always test connections before migration
+5. For large migrations (>1M rows), use batch migration or parallel channels
+6. KDTS API only supports KILL operation; NO pause/resume
+7. MetaData fields: `primaryKey`, `constraint`, `comment`, `index`, `view` (NOT includePK, etc.)
+8. DDL uses Database object for `sourceDb` parameter (NOT string)
+
+## References
+
+- KDTS API: `references/api-reference.md`
+- Source Types: `references/source-types.md`
+- Error Codes: `references/error-codes.md`
+- Type Mapping: `references/type-mapping.md`
+- Config Templates: `references/config-templates.md`
+
+## Testing
+
+Test utilities are located in `internal/tests/kwdb-data-migration/scripts/`:
+
+- `mock_server.py`: Mock KDTS server for local testing
+- `test_migration_flow.py`: End-to-end migration flow test
+
+Refer to the internal test directory for usage instructions.

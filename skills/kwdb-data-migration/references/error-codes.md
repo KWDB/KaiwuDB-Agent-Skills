@@ -1,0 +1,599 @@
+# Error Code Reference
+
+Complete error code reference for KDTS migration. Includes causes, symptoms, and fix suggestions.
+
+## Error Code Ranges
+
+| Range | Category | Description |
+|-------|----------|-------------|
+| 1001-1005 | Parameter | Invalid or missing request parameters |
+| 2001 | Connection | Database connection failures |
+| 3001-3006 | Metadata | Source metadata reading and DDL generation |
+| 4001-4003 | DataX | Migration script building and execution |
+| 5001-5002 | Resource | System resource availability |
+| 9999 | System | Unexpected internal errors |
+
+---
+
+## Parameter Errors (1xxx)
+
+### 1001 - PARAM_INVALID
+
+**Title**: Invalid Request Parameters
+
+**Symptoms**: API returns with `code: 1001`
+
+**Common Causes**:
+- Missing required field
+- Incorrect field type (string vs number)
+- Invalid enum value
+
+**Checks**:
+1. Verify all required fields present: `engine`, `type`, `host`, `port`, `username`, `password`
+2. Check `port` is an integer, not string
+3. Ensure `type` is uppercase: `MYSQL` not `mysql`
+4. Verify `engine` is `RELATIONAL` or `TIMESERIES`
+
+**Example Fix**:
+```json
+// WRONG
+{"type": "mysql", "port": "3306"}
+
+// CORRECT
+{"type": "MYSQL", "port": 3306}
+```
+
+---
+
+### 1002 - PARAM_SOURCE_TYPE_INVALID
+
+**Title**: Unsupported Source Type
+
+**Symptoms**: API rejects source type with code 1002
+
+**Common Causes**:
+- Typo in source type name
+- Using non-existent source type
+- Copy-paste error from documentation
+
+**Supported Types** (exact match required):
+```
+MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE, 
+KAIWUDB, TDENGINE2X, TDENGINE3X, INFLUXDB1X, INFLUXDB2X, 
+OPENTSDB, MONGODB, FTP, HDFS
+```
+
+**Fix**: Correct the `type` field to one of the supported types.
+
+---
+
+### 1003 - PARAM_TARGET_TYPE_INVALID
+
+**Title**: Invalid Target Type
+
+**Symptoms**: API rejects target configuration
+
+**Cause**: Target `type` is not `KAIWUDB`
+
+**Fix**:
+```json
+// Target MUST be KaiwuDB
+{
+  "target": {
+    "type": "KAIWUDB",
+    "engine": "RELATIONAL" // or TIMESERIES
+  }
+}
+```
+
+---
+
+### 1004 - PARAM_TABLE_MAPPING_MISMATCH
+
+**Title**: Table Mapping Error
+
+**Symptoms**: Build API rejects with mapping error
+
+**Common Causes**:
+- `tables` array has items without both `source` and `target`
+- `source.sourceType` not specified
+- `target.sourceType` not `KAIWUDB`
+
+**Correct Format**:
+```json
+{
+  "tables": [
+    {
+      "source": {"sourceType": "RDBMS", "table": "t1", "column": "*"},
+      "target": {"sourceType": "KAIWUDB", "table": "t1", "column": "*", "writeMode": "insert"}
+    }
+  ]
+}
+```
+
+---
+
+### 1005 - JSON_PARSE_ERROR
+
+**Title**: JSON Parse Error
+
+**Symptoms**: Request cannot be parsed as JSON
+
+**Common Causes**:
+- Trailing comma in JSON
+- Single quotes instead of double quotes
+- Control characters in strings
+- Comments in JSON
+
+**JSON Validation Tips**:
+1. Use JSON validator: `jsonlint file.json` or online tool
+2. No trailing commas
+3. All keys and strings use double quotes
+4. No comments
+
+---
+
+## Connection Errors (2xxx)
+
+### 2001 - CONNECTION_FAILED
+
+**Title**: Database Connection Failed
+
+**Symptoms**: API returns code 2001 with message containing connection details
+
+**Diagnostic Steps**:
+
+1. **Check database service**:
+```bash
+# MySQL
+mysqladmin ping -h host -P port -u user -p
+
+# PostgreSQL
+pg_isready -h host -p port
+
+# Generic: Test TCP connection
+telnet host port
+nc -zv host port
+```
+
+2. **Verify credentials**:
+```bash
+# Try connecting manually
+mysql -h host -P port -u user -p
+```
+
+3. **Check network/firewall**:
+- KDTS server can reach database host?
+- Port not blocked by firewall/security group?
+- VPN required for remote databases?
+
+4. **Database-specific checks**:
+- MySQL: user permission, host allow list
+- Oracle: TNS listener running, service name correct
+- PostgreSQL: `pg_hba.conf` allows connections
+
+**Common Connection String Patterns**:
+```
+MySQL:      jdbc:mysql://host:3306/dbname
+Oracle:     jdbc:oracle:thin:@host:1521:ORCL
+PostgreSQL: jdbc:postgresql://host:5432/dbname
+KaiwuDB:    jdbc:mysql://host:9092/dbname (MySQL protocol compatibility)
+```
+
+---
+
+## Metadata Errors (3xxx)
+
+### 3001 - METADATA_PARSE_FAILED
+
+**Title**: Metadata Reading Failed
+
+**Symptoms**: `/datasource/metadata` returns code 3001
+
+**Common Causes**:
+- Source does not support metadata (e.g., TDENGINE2X, INFLUXDB2X)
+- Database user lacks metadata privileges
+- Source is corrupted or incompatible version
+
+**Check**:
+1. Verify source supports metadata: See `references/source-types.md`
+2. Check user has privileges: SELECT on INFORMATION_SCHEMA / system tables
+3. Test with simpler tables first
+
+---
+
+### 3002 - METADATA_DDL_BUILD_FAILED
+
+**Title**: DDL Generation Failed
+
+**Symptoms**: `/metadata/preview` returns code 3002
+
+**Common Causes**:
+- Unsupported column type in source
+- Complex constraint (check constraint, trigger)
+- Type mapping not available
+
+**Workaround**:
+1. Manually create DDL in KaiwuDB
+2. Use data-only migration (skip DDL)
+3. Filter problematic columns with `column` field
+
+---
+
+### 3003 - METADATA_EXECUTE_FAILED
+
+**Title**: DDL Execution Failed
+
+**Symptoms**: `/metadata/execute` returns code 3003
+
+**Common Causes**:
+- Table already exists with different structure
+- Insufficient privileges on target
+- Invalid KaiwuDB syntax (version mismatch)
+
+**Check**:
+1. `SHOW TABLES` on target - drop conflicting tables if safe
+2. Verify user has CREATE, ALTER privileges
+3. Check KaiwuDB version compatibility
+
+---
+
+### 3004 - METADATA_TAG_LIMIT_EXCEEDED
+
+**Title**: Tag Column Limit Exceeded
+
+**Symptoms**: Time-series migration fails with tag limit error
+
+**Rule**: KaiwuDB time-series tables have:
+- Max 128 columns total (Tag + Value)
+- Max 4 primary tags
+
+**Solutions**:
+1. Reduce columns to ≤ 128
+2. Split into multiple migrations
+3. Convert primary tags to secondary tags if possible
+
+---
+
+### 3005 - METADATA_TAG_NAME_TOO_LONG
+
+**Title**: Tag/Column Name Too Long
+
+**Rule**: KaiwuDB column names ≤ 128 bytes
+
+**Solutions**:
+1. Shorten source column names
+2. Use column alias mapping in migration config
+3. Consider ASCII-only names for multi-byte characters
+
+---
+
+### 3006 - METADATA_NO_PRIMARY_TAG
+
+**Title**: No Valid Primary Tag
+
+**Symptoms**: Time-series migration cannot identify primary tag
+
+**Cause**: No column suitable for primary key in source
+
+**Solutions**:
+1. Identify unique, non-null column (device ID, sensor ID)
+2. Add a primary key column to source
+3. If source has auto-increment ID, use that
+
+**KaiwuDB Time Series Design**:
+```sql
+CREATE TABLE sensor_data (
+  ts TIMESTAMP,
+  device_id INT,        -- Primary tag
+  metric VARCHAR(32),   -- Primary tag
+  value DOUBLE,         -- Value field
+  quality INT           -- Secondary tag
+) TAGS(quality);
+```
+
+---
+
+## DataX Errors (4xxx)
+
+### 4001 - DATAX_BUILD_SCRIPT_FAILED
+
+**Title**: Migration Script Build Failed
+
+**Symptoms**: `/datax/build` returns code 4001
+
+**Checklist**:
+1. `target.sourceType` must be `KAIWUDB`
+2. `source.sourceType` correct for source type
+3. Table mapping has both `source` and `target` sections
+4. Empty `tables` array is valid (auto-discovery)
+
+**Debug**:
+- Print the exact request body
+- Check if DataX templates exist on KDTS server
+- Try with single simple table first
+
+---
+
+### 4002 - DATAX_PROCESS_LAUNCH_FAILED
+
+**Title**: DataX Process Cannot Start
+
+**Symptoms**: `/datax/execute` returns code 4002
+
+**Checklist**:
+
+1. **Python 3 available?**
+```bash
+which python3
+python3 --version
+```
+
+2. **DataX installed?**
+```bash
+ls /opt/kdts/datax/  # or configured path
+cat /opt/kdts/datax/version.txt  # if exists
+```
+
+3. **Permissions?**
+```bash
+# KDTS user can execute DataX?
+sudo -u kdts /opt/kdts/datax/bin/datax.py --help
+```
+
+4. **KDTS config check**:
+```yaml
+# In application.yml
+datax:
+  home.path: /opt/kdts/datax
+  python.path: /usr/bin/python3  # if not default
+```
+
+---
+
+### 4003 - DATAX_PROCESS_TIMEOUT
+
+**Title**: Migration Process Timeout
+
+**Symptoms**: Migration killed after timeout
+
+**Default Timeout**: 3600 seconds (1 hour)
+
+**Solutions**:
+
+1. **Increase timeout**:
+```yaml
+# application.yml
+datax:
+  timeout: 7200  # 2 hours
+```
+
+2. **Optimize migration**:
+```json
+{
+  "data": {
+    "fetchSize": 5000,
+    "batchSize": 5000,
+    "setting": {"speed": {"channel": 4}}
+  }
+}
+```
+
+3. **Reduce data volume**:
+- Add `where` clause to filter source
+- Migrate in batches by time range
+- Skip large tables initially
+
+4. **Check performance**:
+- Source: slow queries? locks?
+- Network: bandwidth between source and target
+- Target: disk I/O, index overhead
+
+---
+
+## Resource Errors (5xxx)
+
+### 5001 - RESOURCE_THREAD_POOL_FULL
+
+**Title**: Service Thread Pool Exhausted
+
+**HTTP Status**: 503 (with Retry-After header)
+
+**Symptoms**: KDTS returns 503, cannot accept new requests
+
+**Cause**: Too many concurrent migrations, thread pool saturated
+
+**Actions**:
+1. Wait for Retry-After seconds (typically 60)
+2. Kill unnecessary running migrations
+3. Reduce concurrent migration requests
+4. Increase thread pool size in KDTS config
+
+**Configuration**:
+```yaml
+# application.yml
+server:
+  tomcat:
+    threads:
+      max: 200  # Increase from default
+```
+
+---
+
+### 5002 - RESOURCE_PYTHON_NOT_FOUND
+
+**Title**: Python 3 Not Available
+
+**Symptoms**: Any migration returns 5002
+
+**Check and Fix**:
+
+```bash
+# Check if Python 3 installed
+python3 --version  # Should show 3.x
+
+# If not installed (Ubuntu/Debian)
+sudo apt-get update && sudo apt-get install python3
+
+# If not installed (CentOS/RHEL)
+sudo yum install python3
+
+# Install dependencies (optional)
+pip3 install requests pymysql psycopg2
+```
+
+**Configure KDTS**:
+```yaml
+# application.yml
+datax:
+  python.path: /usr/bin/python3  # Full path
+```
+
+**Restart KDTS**:
+```bash
+# After any configuration change
+sudo systemctl restart kdts  # or however KDTS is managed
+```
+
+---
+
+## System Error (9xxx)
+
+### 9999 - SYSTEM_INTERNAL_ERROR
+
+**Title**: Unexpected Internal Error
+
+**Symptoms**: Any operation returns code 9999
+
+**Diagnostic Steps**:
+
+1. **Check KDTS logs**:
+```bash
+tail -f /var/log/kdts/app.log
+grep "ERROR\|Exception" /var/log/kdts/app.log
+```
+
+2. **Check KDTS version**:
+```bash
+curl http://localhost:8080/kdts/info/version
+```
+
+3. **Check system resources**:
+```bash
+free -m  # Memory
+df -h  # Disk space
+top  # CPU
+```
+
+4. **Restart KDTS** (if possible):
+```bash
+sudo systemctl restart kdts
+# or
+sudo kill -9 $(pgrep -f kdts) && java -jar kdts-server.jar
+```
+
+5. **Report issue** with:
+   - KDTS version
+   - Operating system
+   - Full stack trace from logs
+   - Steps to reproduce
+
+---
+
+## Error Resolution Flowchart
+
+```
+API Call Returns Error
+        │
+        ▼
+   Is code = 0? ──── YES ────► Success!
+        │
+        NO
+        │
+        ▼
+   Get error info from this doc
+        │
+        ▼
+   Code category?
+   ├── 1xxx (Parameter)
+   │   → Check all required fields, types, enum values
+   │
+   ├── 2xxx (Connection)
+   │   → Test connection manually, check network/firewall
+   │
+   ├── 3xxx (Metadata)
+   │   → Check source support, privileges, schema compatibility
+   │
+   ├── 4xxx (DataX)
+   │   → Check Python/DataX installation, optimize migration params
+   │
+   ├── 5xxx (Resource)
+   │   → Wait, reduce concurrency, install dependencies
+   │
+   └── 9xxx (System)
+       → Check logs, restart KDTS, report bug
+        │
+        ▼
+   Apply fix suggestion
+        │
+        ▼
+   Retry API call
+        │
+        ▼
+   Still failing?
+   ├── Try simpler case (single table, no DDL)
+   ├── Contact KDTS support
+   └── Use alternative migration method
+```
+
+---
+
+## Common Error Scenarios
+
+### Scenario 1: MySQL to KaiwuDB fails at build
+
+**Error**: 4001 (BUILD_FAILED)
+
+**Check**:
+1. Is target `type: KAIWUDB`?
+2. Is `sourceType` `RDBMS`?
+3. Is the table accessible?
+
+### Scenario 2: Oracle connection fails
+
+**Error**: 2001 (CONNECTION_FAILED)
+
+**Check**:
+1. Is Oracle TNS listener running?
+2. Correct service name (not SID)?
+3. Username has CONNECT privilege?
+
+### Scenario 3: Large table timeout
+
+**Error**: 4003 (TIMEOUT)
+
+**Fix**:
+1. Increase `fetchSize` and `batchSize`
+2. Add `where` clause to filter
+3. Split into multiple migrations
+
+### Scenario 4: Time-series tag limit
+
+**Error**: 3004 (TAG_LIMIT_EXCEEDED)
+
+**Fix**:
+1. Identify which columns are truly tags vs values
+2. Move tag data to value columns where possible
+3. Use multiple target tables
+
+---
+
+## Get Help
+
+If unable to resolve:
+
+1. Collect full error details: code, message, stack trace
+2. Collect KDTS version and configuration
+3. Collect source/target database versions
+4. Document exact steps to reproduce
+5. Contact KDTS team or file issue in kw-datax-utils repo
