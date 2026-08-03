@@ -15,30 +15,37 @@ Options:
     --limit N        Limit output to top N slowest statements (default: 10)
     --min-latency-ms Minimum service latency in ms to filter (default: 0, show all)
     --sort-by        Sort by: service_lat, run_lat, plan_lat, count (default: service_lat)
-    --json           Output raw JSON data
 """
 
 import argparse
 import json
-import subprocess
+import ssl
 import sys
+import urllib.error
+import urllib.request
 from typing import Any
 
 
 def fetch_statements(host: str, port: int) -> dict:
     """Fetch statements from KaiwuDB _status/statements API."""
-    curl_cmd = [
-        "curl",
-        "-s",
-        "--insecure",
-        f"http://{host}:{port}/_status/statements"
-    ]
-    result = subprocess.run(curl_cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        print(f"Error: Failed to fetch statements: {result.stderr}", file=sys.stderr)
-        sys.exit(1)
+    request = urllib.request.Request(
+        f"http://{host}:{port}/_status/statements",
+        method="GET",
+    )
+    # Admin endpoints commonly serve over HTTPS with self-signed certs; mirror
+    # the previous curl --insecure behavior so we don't depend on a system
+    # trust store that isn't guaranteed inside the slim runtime image.
+    context = ssl._create_unverified_context()
+
     try:
-        return json.loads(result.stdout)
+        with urllib.request.urlopen(request, timeout=30, context=context) as resp:
+            body = resp.read().decode("utf-8")
+    except (TimeoutError, urllib.error.URLError, ConnectionError) as e:
+        print(f"Error: Failed to fetch statements: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        return json.loads(body)
     except json.JSONDecodeError as e:
         print(f"Error: Failed to parse JSON response: {e}", file=sys.stderr)
         sys.exit(1)
@@ -158,15 +165,10 @@ def main():
         default="service_lat",
         help="Sort criteria (default: service_lat)"
     )
-    parser.add_argument("--json", action="store_true", help="Output raw JSON")
 
     args = parser.parse_args()
 
     data = fetch_statements(args.host, args.port)
-
-    if args.json:
-        print(json.dumps(data, indent=2))
-        return
 
     statements = parse_statements(data)
     filtered = filter_and_sort(statements, args.min_latency_ms, args.sort_by)

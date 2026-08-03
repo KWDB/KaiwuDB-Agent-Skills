@@ -15,10 +15,17 @@ When user provides a target (e.g., "inspect 10.110.10.146 26257 8080"), extract 
 
 ### Step 2: Probe Connectivity
 
-After confirming target info with user, verify reachability using appropriate tools (e.g., `nc`, `telnet`, `curl`, `ping`):
-- Check database port (26257) and admin console port (8080)
-- If ports unreachable: inform user and ask them to verify network/firewall/service
-- Only proceed if ports are reachable
+After confirming target info with user, call
+`scripts/probe_ports.py` directly with `python3` and one `--port` flag
+per port that needs to be reachable. The script does not accept a
+loopback host — give it the remote IP / DNS name. See
+`probe-ports-script-usage.md` for full options.
+
+- Pass `--port 26257` and `--port 8080` in a single call.
+- A port that returns `reachable: false` is **not** an exception. Re-read
+  the result, report it to the user, and ask them to verify network /
+  firewall / service.
+- Only proceed if all required ports are reachable.
 
 **Do NOT proceed to Step 3 until ports are confirmed reachable.**
 
@@ -26,14 +33,17 @@ After confirming target info with user, verify reachability using appropriate to
 
 ### Step 3: TLS Mode Detection
 
-Only after connectivity is confirmed, check TLS status:
+Only after connectivity is confirmed, call
+`scripts/detect_tls_mode.py` directly with `python3` against the admin
+port (`8080` by default). See `detect-tls-mode-script-usage.md`.
 
-**Must strictly use this exact command format, only replace `<host>` and `<admin-port>` with actual values:**
-```
-curl -k https://<host>:<admin-port>/health
-```
-- If output contains `error:0A00010B` or `wrong version number` → TLS not enforced, proceed
-- If returns JSON health data with no error → TLS enabled, **inspection not supported** (stop here)
+Decision rules based on the JSON result:
+
+| `determined` | `tls_enabled` | Action |
+|--------------|---------------|--------|
+| `true` | `true`  | TLS is enforced. **Inspection not supported — stop here.** |
+| `true` | `false` | Server returned `wrong version number` / `0A00010B`. Plaintext. Proceed. |
+| `false` | (any) | Could not classify (refused, timeout, unknown SSL error). Do not assume plaintext. Stop and ask the user / re-probe. |
 
 **Do NOT proceed to Step 4 until TLS mode is determined.**
 
@@ -41,9 +51,10 @@ curl -k https://<host>:<admin-port>/health
 
 ### Step 4: Present Scope Menu
 
-Read `references/report-template.md` and `references/anomaly-rules.md`, then show user:
+Read `references/report-template.md` and `references/anomaly-rules.md`,
+then show the user:
 - Full inspection scope (Sections 1-6)
 - Default rules and configurable rules (only applied if user requests alerting)
-- Ask user to confirm which metrics to inspect and whether to enable alerting
+- Ask the user to confirm which metrics to inspect and whether to enable alerting
 
 **Do NOT proceed to metrics collection until user confirms the scope.**

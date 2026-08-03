@@ -1,10 +1,13 @@
-# Port Listening Detection Reference
-
-This document describes how to check KaiwuDB port reachability status.
+# Port Reachability Detection Reference
 
 ## Critical Constraint (non-negotiable)
 
-**Do not SSH into the target server to run inspection commands there.** Always use local tools on the machine where the inspection is being performed. Only use remote port probing tools (`nc`, `telnet`, `curl`, `wget`) to check if KaiwuDB ports are reachable on target servers.
+**Do not SSH into the target server to run inspection commands there.**
+Always use local tools on the machine where the inspection is being
+performed. Reachability is checked via the local script
+`scripts/probe_ports.py` invoked directly with `python3`. This script
+uses Python stdlib only (`asyncio` + `socket`); it does **not** shell
+out to `nc` / `curl` / `wget` / `telnet`.
 
 ## Default Ports
 
@@ -13,64 +16,43 @@ This document describes how to check KaiwuDB port reachability status.
 | SQL Port | `26257` | KaiwuDB SQL/API port |
 | Admin Console | `8080` | Admin UI port |
 
-## Supported Detection Methods
+## Invocation
 
-Use remote port probing tools to check if KaiwuDB ports are listening on target servers. Common tools:
+```
+python3 scripts/probe_ports.py \
+    --host <target_ip_or_dns> \
+    --port 26257 \
+    --port 8080 \
+    [--timeout 5]
+```
 
-- **All platforms**: `nc` (netcat), `telnet`
-- **For HTTP ports**: `curl`, `wget`
+## Result Handling
+
+The script returns a JSON document with one entry per port:
+`port`, `reachable`, `response_time_ms`, and an `error` field when
+`reachable` is false. Iterate the results and report per-port status
+to the user. Do not infer a global "host is down" from a single port.
+
+## Multi-port Scanning
+
+Call `probe_ports.py` once with all required `--port` flags. The script
+deduplicates ports and caps the batch at 32. The skill workflow always
+passes both 26257 and 8080 in a single call.
 
 ## Tool Installation
 
-If the required port detection tool is not available on the local system:
-
-1. **Do NOT install tool automatically** — always request user permission first
-2. Explain to the user which tool is missing and why it is needed
-3. Ask for explicit confirmation before proceeding with installation
-4. Only after user approval, proceed with installation using system package manager
-
-Example prompt when tool is missing:
-```
-[TOOL_MISSING] The port probing tool 'nc' is not installed on this system.
-Required for: Checking if KaiwuDB ports (26257, 8080) are reachable on target server.
-Do you want me to install it? (y/n)
-```
-
-## Example Commands
-
-### Using `nc` (netcat)
-```bash
-nc -zv <target_host> 26257 8080 -w 5
-```
-
-### Using `telnet`
-```bash
-echo "quit" | telnet <target_host> 26257
-```
-
-### Using `curl` (for HTTP ports)
-```bash
-curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 http://<target_host>:8080
-```
-
-### Using `wget` (for HTTP ports)
-```bash
-wget --spider --timeout=5 -q http://<target_host>:8080
-```
+`probe_ports.py` is a single Python file with no third-party
+dependencies. If `python3` is missing on the host, the runtime image
+must be rebuilt — do not attempt to install Python on demand.
 
 ## Expected Output
 
-The inspection should verify:
-1. Whether each port is reachable (open/closed)
-2. Connection response time (if available)
-
-## Output Format
-
-Report the port reachability status:
 ```json
 {
-  "port": 26257,
-  "reachable": true,
-  "response_time_ms": 12
+  "host": "10.110.10.146",
+  "results": [
+    {"port": 26257, "reachable": true,  "response_time_ms": 12},
+    {"port": 8080,   "reachable": false, "response_time_ms": 5000, "error": "ConnectionRefusedError"}
+  ]
 }
 ```

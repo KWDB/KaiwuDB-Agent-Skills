@@ -8,7 +8,7 @@ only the metrics needed for inspection per references/report-template.md.
 
 Usage:
     python3 get_kwdb_ts_metrics.py [--host HOST] [--port PORT] [--start TIME] [--end TIME]
-                                    [--sample INTERVAL] [--metric NAME] [--json]
+                                    [--sample INTERVAL] [--metric NAME]
 
 Options:
     --host           KaiwuDB admin host (default: localhost)
@@ -16,15 +16,15 @@ Options:
     --start          Start time (ISO format or unix timestamp in ns, default: 1 hour ago)
     --end            End time (ISO format or unix timestamp in ns, default: now)
     --sample         Sample interval in seconds (default: 60)
-    --metric         Filter by specific metric name (e.g., sys.cpu.user.percent)
-    --json           Output raw JSON data
+    --metric         Filter by specific metric name (e.g., cr.node.sys.cpu.user.percent)
 """
 
 import argparse
 import json
-import subprocess
+import ssl
 import sys
 import time
+import urllib.request
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
@@ -132,24 +132,26 @@ def build_ts_query(host: str, port: int, start_ns: int, end_ns: int, sample_ns: 
         "queries": queries
     }
 
-    curl_cmd = [
-        "curl", "-s", "--insecure", "-X", "POST",
-        "-H", "Content-Type: application/json",
-        "-d", json.dumps(payload),
-        f"http://{host}:{port}/ts/query"
-    ]
+    request = urllib.request.Request(
+        f"http://{host}:{port}/ts/query",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    # KaiwuDB admin endpoints commonly run with self-signed certs even when
+    # served over HTTPS; --insecure was used in the curl form for the same
+    # reason. Keep parity: trust nothing by default, opt in via env if HTTPS.
+    context = ssl._create_unverified_context()
 
     try:
-        result = subprocess.run(curl_cmd, capture_output=True, text=True, timeout=30)
-    except subprocess.TimeoutExpired:
-        print("Error: Connection to KaiwuDB timed out (30s)", file=sys.stderr)
-        sys.exit(1)
-    if result.returncode != 0:
-        print(f"Error: Failed to fetch metrics: {result.stderr}", file=sys.stderr)
+        with urllib.request.urlopen(request, timeout=30, context=context) as resp:
+            body = resp.read().decode("utf-8")
+    except (TimeoutError, urllib.error.URLError, ConnectionError) as e:
+        print(f"Error: Failed to fetch metrics: {e}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        return json.loads(result.stdout)
+        return json.loads(body)
     except json.JSONDecodeError as e:
         print(f"Error: Failed to parse JSON response: {e}", file=sys.stderr)
         sys.exit(1)
@@ -306,7 +308,6 @@ def main():
     parser.add_argument("--end", help="End time (ISO 8601 format or unix timestamp in ns). Examples: '2026-04-28T11:00:00', '2026-04-28T11:00:00Z', '1745850000000000000'")
     parser.add_argument("--sample", type=int, default=60, help="Sample interval in seconds")
     parser.add_argument("--metric", action="append", help="Filter by metric name (can repeat)")
-    parser.add_argument("--json", action="store_true", help="Output raw JSON")
 
     args = parser.parse_args()
 
@@ -349,10 +350,6 @@ def main():
 
     data = build_ts_query(args.host, args.port, start_ns, end_ns, sample_ns,
                           args.metric)
-
-    if args.json:
-        print(json.dumps(data, indent=2))
-        return
 
     metrics = parse_metrics(data)
 

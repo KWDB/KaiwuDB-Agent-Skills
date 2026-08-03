@@ -23,6 +23,10 @@ triggers:
 
 ❝ **Never call a script without reading its usage doc first.** Before running any script under `scripts/`, you MUST read the corresponding `references/*-script-usage.md` file. This is the only way to know the correct parameters, defaults, and required arguments. Guessing parameters is forbidden. ❞
 
+❝ **Scripts are pure-Python stdlib and run directly with `python3`.** Each script under `scripts/` is a standalone `#!/usr/bin/env python3` program with an `argparse` CLI; invoke it as `python3 scripts/<script>.py [flags]` (or via any host-local shell wrapper that can launch a Python script). Do not reach for agent-specific MCP wrappers (e.g. `run_skill_scripts`, `run_local_command`, `run_shell_command`) — the skill has no runtime dependency on them. ❞
+
+❝ **Use the new helpers for connectivity and TLS.** Port probing goes through `probe_ports.py`. TLS detection goes through `detect_tls_mode.py`. Local time stamps go through `get_local_timestamp.py`. Do not improvise with `curl` / `wget` / `nc` / `date`. ❞
+
 ❝ **Anomaly rules are user-driven.** If user does not request alerting, skip alerting. If user requests alerting without specific thresholds, apply default rules from `references/anomaly-rules.md`. If user provides custom thresholds, use those instead. ❞
 
 ## Workflow
@@ -31,21 +35,23 @@ triggers:
 
 **Before collecting any metrics**, follow `references/inspection-requirements-confirmation.md` EXACTLY in order:
 1. Parse user intent → confirm target (host, ports)
-2. Probe connectivity → verify ports reachable (see `references/inspection-port-listening-reference.md`)
-3. TLS mode detection → determine if inspection supported
+2. Probe connectivity → call `probe_ports.py` per `references/probe-ports-script-usage.md`
+3. TLS mode detection → call `detect_tls_mode.py` per `references/detect-tls-mode-script-usage.md`
 4. Present scope menu → user confirms before proceeding
 
 ### Step 2: Collect metrics
 
 **MANDATORY: Read the script usage doc BEFORE calling any script.**
-- `references/ts-metrics-script-usage.md` — for `get_kwdb_ts_metrics.py`
-- `references/statements-script-usage.md` — for `get_kwdb_statements.py`
+
+| Script | Usage doc |
+|--------|-----------|
+| `scripts/get_kwdb_statements.py` | `references/statements-script-usage.md` |
+| `scripts/get_kwdb_ts_metrics.py` | `references/ts-metrics-script-usage.md` |
+| `scripts/probe_ports.py` | `references/probe-ports-script-usage.md` |
+| `scripts/detect_tls_mode.py` | `references/detect-tls-mode-script-usage.md` |
+| `scripts/get_local_timestamp.py` | `references/get-local-timestamp-script-usage.md` |
 
 Do not call any script without first reading its usage doc. Verify the parameter names, required arguments, and defaults match what you are about to pass.
-
-- **Port listener status**: Use Step 1 connectivity probe results.
-- **Most metrics**: Use `scripts/get_kwdb_ts_metrics.py` per `references/ts-metrics-script-usage.md`.
-- **Slow queries**: Use `scripts/get_kwdb_statements.py` per `references/statements-script-usage.md`.
 
 ### Step 3: Apply anomaly rules
 
@@ -53,17 +59,10 @@ Apply anomaly judgment rules only when user requests alerting. See `references/a
 
 ### Step 4: Generate report
 
-Produce a Markdown inspection report with metric values, anomaly judgments, and data-source notes per `references/output-rules.md`.
-
-## Anomaly Rules
-
-See `references/anomaly-rules.md` for default rules and configurable rules.
-
-## Output Rules
-
-See `references/output-rules.md` — **do not deviate from these rules when producing any inspection report.**
+Produce a Markdown inspection report with metric values, anomaly judgments, and data-source notes per `references/output-rules.md`. Use `get_local_timestamp.py` to obtain the report timestamp; never fabricate it from training data or `datetime.utcnow()`. PDF / HTML rendering goes through the `markdown-to-html` / `pdf` skills when those are available — they are independent of this skill and may be invoked separately if needed.
 
 ## Limitations
 
-- **Windows is not supported**: This skill does not support Windows operating systems.
-- **TLS mode inspection is not supported**: This skill does not support inspecting KaiwuDB deployed with TLS mode enabled.
+- **Windows is not supported**.
+- **TLS mode inspection is not supported**.
+- **No third-party Python deps in skill scripts**: all new scripts are stdlib-only. Existing scripts (`md_to_*.sh` etc.) declare their packages via the shared `_venv.sh` wrapper.
