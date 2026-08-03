@@ -20,30 +20,35 @@ logger = logging.getLogger(__name__)
 
 
 # Supported source types with their capabilities
+# Based on KDTS SourceTypes.java implementation
 SOURCE_TYPE_CAPABILITIES = {
     # (engine, supports_full_migration, supports_metadata, note)
-    "MYSQL":         ("RELATIONAL", True, True, ""),
-    "ORACLE":        ("RELATIONAL", True, True, ""),
-    "POSTGRESQL":    ("RELATIONAL", True, True, ""),
-    "SQLSERVER":     ("RELATIONAL", False, True, "Table-level only"),
-    "CLICKHOUSE":    ("RELATIONAL", True, False, ""),
-    "KAIWUDB":       ("BOTH", True, True, ""),
-    "TDENGINE3X":    ("TIMESERIES", True, True, ""),
-    "TDENGINE2X":    ("TIMESERIES", False, False, "Table-level only"),
-    "INFLUXDB1X":    ("TIMESERIES", False, True, "Table-level only"),
-    "INFLUXDB2X":    ("TIMESERIES", False, False, "Table-level only"),
-    "OPENTSDB":      ("TIMESERIES", False, False, "Table-level only"),
-    "MONGODB":       ("-", False, False, "Table-level only"),
-    "FTP":           ("-", False, False, "Table-level only"),
-    "HDFS":          ("-", False, False, "Table-level only"),
+    "MYSQL":         ("RELATIONAL", True, True, "Full migration supported"),
+    "ORACLE":        ("RELATIONAL", True, True, "Full migration supported"),
+    "POSTGRESQL":    ("RELATIONAL", True, True, "Full migration supported"),
+    "SQLSERVER":     ("RELATIONAL", False, True, "Metadata + Data, no full migration"),
+    "CLICKHOUSE":    ("RELATIONAL", True, False, "Full migration, no metadata"),
+    "KAIWUDB":       (None, False, False, "Only supports data migration (as source)"),
+    "TDENGINE3X":    ("TIMESERIES", True, True, "Full migration supported"),
+    "TDENGINE2X":    ("TIMESERIES", False, False, "Only supports data migration"),
+    "INFLUXDB1X":    ("TIMESERIES", False, True, "Metadata + Data, no full migration"),
+    "INFLUXDB2X":    ("TIMESERIES", False, True, "Metadata + Data, no full migration"),
+    "OPENTSDB":      ("TIMESERIES", False, False, "Only supports data migration"),
+    "MONGODB":       ("TIMESERIES", False, False, "Only supports data migration"),
+    "FTP":           ("TIMESERIES", False, False, "Only supports data migration"),
+    "HDFS":          ("TIMESERIES", False, False, "Only supports data migration"),
 }
 
 # Target must be KAIWUDB
 TARGET_ONLY_TYPES = {"KAIWUDB"}
 
-# Required fields per source type
-REQUIRED_FIELDS = ["engine", "type", "host", "port", "username", "password"]
-REQUIRED_FIELDS_WITH_DB = REQUIRED_FIELDS + ["dbName"]
+# Required fields for source config (engine is REQUIRED per KDTS API)
+SOURCE_REQUIRED_FIELDS = ["engine", "type", "host", "port", "username", "password"]
+SOURCE_REQUIRED_FIELDS_WITH_DB = SOURCE_REQUIRED_FIELDS + ["dbName"]
+
+# Required fields for target config (engine is required)
+TARGET_REQUIRED_FIELDS = ["engine", "type", "host", "port", "username", "password"]
+TARGET_REQUIRED_FIELDS_WITH_DB = TARGET_REQUIRED_FIELDS + ["dbName"]
 
 
 class ConfigValidator:
@@ -91,8 +96,11 @@ class ConfigValidator:
         """
         Validate complete source configuration.
 
+        Note: engine is REQUIRED per KDTS API specification.
+        Use SourceType.get_engine(source_type) to determine the correct engine value.
+
         Args:
-            config: DataSource config dict
+            config: DataSource config dict (must include 'engine' field)
             require_db: If True, dbName is required
 
         Returns:
@@ -108,13 +116,15 @@ class ConfigValidator:
             type_result = ConfigValidator.validate_source_type(config["type"])
             if not type_result["valid"]:
                 errors.append(type_result["message"])
-            else:
-                # Auto-correct engine if not set
-                if "engine" not in config:
-                    config["engine"] = type_result["capabilities"]["engine"]
+
+        # Check engine
+        if "engine" not in config:
+            errors.append("Missing required field: engine (RELATIONAL or TIMESERIES)")
+        elif config["engine"] not in ("RELATIONAL", "TIMESERIES"):
+            errors.append(f"Invalid engine: {config['engine']}. Must be RELATIONAL or TIMESERIES")
 
         # Check required fields
-        required = REQUIRED_FIELDS_WITH_DB if require_db else REQUIRED_FIELDS
+        required = SOURCE_REQUIRED_FIELDS_WITH_DB if require_db else SOURCE_REQUIRED_FIELDS
         for field in required:
             if field not in config or config[field] is None or config[field] == "":
                 missing.append(field)
@@ -159,7 +169,7 @@ class ConfigValidator:
             errors.append(f"Invalid engine: {config['engine']}. Must be RELATIONAL or TIMESERIES")
 
         # Check required fields
-        required = REQUIRED_FIELDS + ["dbName"]
+        required = TARGET_REQUIRED_FIELDS_WITH_DB
         missing = [f for f in required if f not in config or config[f] is None or config[f] == ""]
         if missing:
             errors.append(f"Missing fields: {', '.join(missing)}")

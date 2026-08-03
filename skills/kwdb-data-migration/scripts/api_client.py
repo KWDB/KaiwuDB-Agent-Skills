@@ -35,8 +35,10 @@ from typing import Dict, List, Optional, Any
 # Handle imports for both package and direct script usage
 try:
     from .config import KDTSConfig, resolve_base_url, get_environment_info
+    from .data_source import DataSourceManager
 except ImportError:
     from config import KDTSConfig, resolve_base_url, get_environment_info
+    from data_source import DataSourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -252,10 +254,10 @@ class KDTSClient:
             "index": True,
             "view": False
         }
-        
+
         # Merge with user-provided options
         metadata = {**default_metadata, **(metadata_options or {})}
-        
+
         request = {
             "source": source_config,
             "metadata": metadata
@@ -282,8 +284,13 @@ class KDTSClient:
                     "viewMap": { "viewName": { ... View object ... } }
                 }
             metadata: Optional MetaData config dict (same as read_metadata):
-                { "primaryKey": true, "constraint": true, "comment": true, 
-                  "index": true, "view": false, ... }
+                {
+                    "primaryKey": True,
+                    "constraint": True,
+                    "comment": True,
+                    "index": True,
+                    "view": False
+                }
             is_time_series: If True, generate time series table DDL (default: False)
 
         Returns:
@@ -291,8 +298,8 @@ class KDTSClient:
                 {
                     "dbName": "SOURCE_DB",
                     "createDb": "CREATE DATABASE ...",
-                    "table": { "tableName": "CREATE TABLE ..." },
-                    "view": { "viewName": "CREATE VIEW ..." }
+                    "table": { "tableName": "CREATE TABLE xxx" },
+                    "view": { "viewName": "CREATE VIEW xxx" }
                 }
         """
         # Default metadata if not provided
@@ -303,7 +310,7 @@ class KDTSClient:
             "index": True,
             "view": False
         }
-        
+
         request = {
             "target": target_config,
             "sourceDb": source_db,
@@ -312,9 +319,7 @@ class KDTSClient:
         }
         return self._request('POST', '/metadata/preview', data=request)
 
-    def execute_ddl(self, target_config: Dict,
-                    ddl_script: Dict,
-                    auto_ddl: bool = True) -> Dict[str, Any]:
+    def execute_ddl(self, target_config: Dict, ddl_script: Dict, auto_ddl: bool = True) -> Dict[str, Any]:
         """
         Execute DDL on target KaiwuDB.
 
@@ -324,8 +329,8 @@ class KDTSClient:
                 Structure: {
                     "dbName": "SOURCE_DB",
                     "createDb": "CREATE DATABASE ...",
-                    "table": { "tableName": "CREATE TABLE ..." },
-                    "view": { "viewName": "CREATE VIEW ..." }
+                    "table": { "tableName": "CREATE TABLE xxx" },
+                    "view": { "viewName": "CREATE VIEW xxx" }
                 }
             auto_ddl: If True, auto-create database and tables (default: True)
 
@@ -379,10 +384,12 @@ class KDTSClient:
 
         Returns:
             Response with data containing list of log file paths.
+
+        Note: KDTS API expects the request body to be a direct list of strings,
+        not an object with a scriptNames field.
         """
-        # Wrap script_names in proper request format
-        data = {"scriptNames": script_names}
-        return self._request('POST', '/datax/execute', data=data)
+        # Directly send the list as request body (KDTS expects List<String>)
+        return self._request('POST', '/datax/execute', data=script_names)
 
     def query_status(self, script_name: str) -> Dict[str, Any]:
         """
@@ -397,8 +404,7 @@ class KDTSClient:
                 - progress: Progress percentage (0-100)
                 - message: Status message
         """
-        return self._request('GET', '/datax/status',
-                             params={'scriptName': script_name})
+        return self._request('GET', '/datax/status', params={'scriptName': script_name})
 
     def control_task(self, script_name: str, action: str = "KILL") -> Dict[str, Any]:
         """
@@ -420,27 +426,38 @@ class KDTSClient:
         return self._request('POST', '/datax/control', data=request)
 
 
-def build_source_config(engine: str, source_type: str,
+def build_source_config(source_type: str,
                         host: str, port: int,
                         username: str, password: str,
+                        engine: str,
                         db_name: Optional[str] = None,
                         url: Optional[str] = None) -> Dict[str, Any]:
     """
     Helper function to build DataSource request dict.
+    
+    Note: engine is REQUIRED for all source configs per KDTS API specification.
+    Use SourceType.get_engine(source_type) to determine the correct engine value.
 
     Args:
-        engine: "RELATIONAL" or "TIMESERIES"
         source_type: Source type (MYSQL, ORACLE, KAIWUDB, etc.)
         host: Hostname or IP
         port: Port number
         username: Database username
         password: Database password
+        engine: REQUIRED - Engine type (RELATIONAL or TIMESERIES)
         db_name: Optional database name
         url: Optional full JDBC URL (overrides host:port)
 
     Returns:
         DataSource request dict ready for API calls.
+
+    Raises:
+        ValueError: If engine is not 'RELATIONAL' or 'TIMESERIES'
     """
+    # Validate engine value
+    if engine not in ('RELATIONAL', 'TIMESERIES'):
+        raise ValueError(f"engine must be 'RELATIONAL' or 'TIMESERIES', got '{engine}'")
+    
     config = {
         "engine": engine,
         "type": source_type,
@@ -452,6 +469,42 @@ def build_source_config(engine: str, source_type: str,
 
     if url:
         config["url"] = url
+    if db_name:
+        config["dbName"] = db_name
+
+    return config
+
+
+def build_target_config(engine: str,
+                        host: str, port: int = 26257,
+                        username: str = "root", password: str = "",
+                        db_name: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Helper function to build KAIWUDB target config.
+    
+    Note: engine is REQUIRED for target config (RELATIONAL or TIMESERIES).
+
+    Args:
+        engine: Required engine type (RELATIONAL or TIMESERIES)
+        host: KAIWUDB host
+        port: KAIWUDB port (default: 26257)
+        username: KAIWUDB username (default: root)
+        password: KAIWUDB password
+        db_name: Target database name
+
+    Returns:
+        Target DataSource request dict ready for API calls.
+    """
+    config = {
+        "engine": engine,
+        "type": "KAIWUDB",
+        "host": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "isTarget": True
+    }
+
     if db_name:
         config["dbName"] = db_name
 
@@ -534,8 +587,9 @@ def main():
     # Quick example usage
     if action == "test_connection":
         client = KDTSClient(base_url="http://localhost:8080")
+        # engine is optional - will be auto-detected from source_type
         source = build_source_config(
-            engine="RELATIONAL", source_type="MYSQL",
+            source_type="MYSQL",
             host="127.0.0.1", port=3306,
             username="root", password="123456"
         )

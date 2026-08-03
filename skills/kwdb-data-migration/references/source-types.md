@@ -4,33 +4,41 @@ Complete reference of all source types supported by KDTS, their capabilities, an
 
 ## Capability Legend
 
-| Symbol | Meaning |
-|--------|---------|
+| Symbol         | Meaning                                                  |
+|----------------|----------------------------------------------------------|
+| [YES]          | Supported                                                |
+| [NO]           | Not Supported                                            |
 | Full Migration | Can migrate entire database (all tables auto-discovered) |
-| Metadata | Supports reading table structure for DDL generation |
-| Table-Level | Can migrate specific tables (without auto-discovery) |
-| Time Series | Special handling for time-series data |
+| Metadata       | Supports reading table structure for DDL generation      |
+| Table-Level    | Can migrate specific tables (without auto-discovery)     |
+| Time Series    | Special handling for time-series data                    |
 
 ---
 
 ## Source Type Matrix
 
-| Source Type | Engine | Full Migration | Metadata | Time Series | Notes |
-|-------------|--------|----------------|----------|-------------|-------|
-| **MYSQL** | RELATIONAL | ✅ | ✅ | ❌ | Most common source |
-| **ORACLE** | RELATIONAL | ✅ | ✅ | ❌ | Enterprise DB |
-| **POSTGRESQL** | RELATIONAL | ✅ | ✅ | ❌ | Open-source alternative |
-| **SQLSERVER** | RELATIONAL | ❌ | ✅ | ❌ | Table-level only |
-| **CLICKHOUSE** | RELATIONAL | ✅ | ❌ | ❌ | Analytics DB, no metadata |
-| **KAIWUDB** | BOTH | ✅ | ✅ | ✅ | KWDB-to-KWDB direct |
-| **TDENGINE3X** | TIMESERIES | ✅ | ✅ | ✅ | Recommended TDengine version |
-| **TDENGINE2X** | TIMESERIES | ❌ | ❌ | ✅ | Legacy version |
-| **INFLUXDB1X** | TIMESERIES | ❌ | ✅ | ✅ | Old InfluxDB |
-| **INFLUXDB2X** | TIMESERIES | ❌ | ❌ | ✅ | New InfluxDB |
-| **OPENTSDB** | TIMESERIES | ❌ | ❌ | ✅ | Time-series DB |
-| **MONGODB** | - | ❌ | ❌ | ❌ | Document DB |
-| **FTP** | - | ❌ | ❌ | ❌ | File transfer |
-| **HDFS** | - | ❌ | ❌ | ❌ | Hadoop filesystem |
+| Source Type    | Full Migration | Metadata | Engine       | Notes                          |
+|----------------|----------------|----------|--------------|--------------------------------|
+| **MYSQL**      | [YES]          | [YES]    | RELATIONAL   | Most common source             |
+| **ORACLE**     | [YES]          | [YES]    | RELATIONAL   | Enterprise DB                  |
+| **POSTGRESQL** | [YES]          | [YES]    | RELATIONAL   | Open-source alternative        |
+| **SQLSERVER**  | [NO]           | [YES]    | RELATIONAL   | Metadata + Data only           |
+| **CLICKHOUSE** | [YES]          | [NO]     | RELATIONAL   | Analytics DB, no metadata      |
+| **KAIWUDB**    | [NO]           | [NO]     | *REQUIRED*   | Data migration only as source  |
+| **TDENGINE3X** | [YES]          | [YES]    | TIMESERIES   | Recommended TDengine version   |
+| **TDENGINE2X** | [NO]           | [NO]     | TIMESERIES   | Legacy version                 |
+| **INFLUXDB1X** | [NO]           | [YES]    | TIMESERIES   | Metadata + Data only           |
+| **INFLUXDB2X** | [NO]           | [YES]    | TIMESERIES   | Metadata + Data only           |
+| **OPENTSDB**   | [NO]           | [NO]     | TIMESERIES   | Time-series DB                 |
+| **MONGODB**    | [NO]           | [NO]     | TIMESERIES   | Document DB                    |
+| **FTP**        | [NO]           | [NO]     | TIMESERIES   | File transfer                  |
+| **HDFS**       | [NO]           | [NO]     | TIMESERIES   | Hadoop filesystem              |
+
+**Notes:**
+- All source configurations require explicit `engine` field
+- For KAIWUDB as source, engine must be explicitly specified based on data type
+- SQLSERVER, INFLUXDB1X/2X support metadata + data migration, but NOT full migration
+- Full migration is only supported for: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, TDENGINE3X
 
 ---
 
@@ -38,10 +46,10 @@ Complete reference of all source types supported by KDTS, their capabilities, an
 
 **IMPORTANT**: Target is **ALWAYS** KaiwuDB with type = `KAIWUDB`.
 
-| Target | Engine | Required |
-|--------|--------|----------|
-| Relational KWDB | RELATIONAL | ✅ |
-| Time Series KWDB | TIMESERIES | ✅ |
+| Target           | Engine     | Required |
+|------------------|------------|----------|
+| Relational KWDB  | RELATIONAL | [YES]    |
+| Time Series KWDB | TIMESERIES | [YES]    |
 
 Cannot migrate to other database types. For other targets, use native database tools or ETL solutions.
 
@@ -51,28 +59,34 @@ Cannot migrate to other database types. For other targets, use native database t
 
 When building migration scripts, use the correct `sourceType` based on KDTS source type:
 
-| KDTS Source Type | sourceType Value | Description |
-|------------------|------------------|-------------|
-| MYSQL | `RDBMS` | Relational DB (MySQL) |
-| ORACLE | `RDBMS` | Relational DB (Oracle) |
-| POSTGRESQL | `RDBMS` | Relational DB (PostgreSQL) |
-| SQLSERVER | `RDBMS` | Relational DB (SQL Server) |
-| CLICKHOUSE | `RDBMS` | Relational DB (ClickHouse) |
-| KAIWUDB | `KAIWUDB` | KaiwuDB (source or target) |
-| TDENGINE2X | `TDENGINE` | TDengine time-series |
-| TDENGINE3X | `TDENGINE` | TDengine time-series |
-| INFLUXDB1X | `INFLUXDB` | InfluxDB time-series |
-| INFLUXDB2X | `INFLUXDB` | InfluxDB time-series |
-| OPENTSDB | `OPENTSDB` | OpenTSDB time-series |
-| MONGODB | `MONGODB` | MongoDB document |
-| FTP | `FTP` | File transfer |
-| HDFS | `HDFS` | Hadoop filesystem |
+| KDTS Source Type | sourceType Value | Description                |
+|------------------|------------------|----------------------------|
+| MYSQL            | `RDBMS`          | Relational DB (MySQL)      |
+| ORACLE           | `RDBMS`          | Relational DB (Oracle)     |
+| POSTGRESQL       | `RDBMS`          | Relational DB (PostgreSQL) |
+| SQLSERVER        | `RDBMS`          | Relational DB (SQL Server) |
+| CLICKHOUSE       | `RDBMS`          | Relational DB (ClickHouse) |
+| KAIWUDB          | `KAIWUDB`        | KaiwuDB (source or target) |
+| TDENGINE2X       | `TDENGINE`       | TDengine time-series       |
+| TDENGINE3X       | `TDENGINE`       | TDengine time-series       |
+| INFLUXDB1X       | `INFLUXDB`       | InfluxDB time-series       |
+| INFLUXDB2X       | `INFLUXDB`       | InfluxDB time-series       |
+| OPENTSDB         | `OPENTSDB`       | OpenTSDB time-series       |
+| MONGODB          | `MONGODB`        | MongoDB document           |
+| FTP              | `FTP`            | File transfer              |
+| HDFS             | `HDFS`           | Hadoop filesystem          |
 
 ---
 
 ## Per-Source Configuration Templates
 
+**IMPORTANT**: For ALL source configurations, the `engine` field is **REQUIRED**:
+- Use `RELATIONAL` for: MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE
+- Use `TIMESERIES` for: KAIWUDB, TDENGINE2X, TDENGINE3X, INFLUXDB1X, INFLUXDB2X, OPENTSDB, MONGODB, FTP, HDFS
+
 ### Relational Sources (MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE)
+
+**Engine**: `RELATIONAL`
 
 **sourceType for migration**: `RDBMS`
 
@@ -89,6 +103,7 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **Table-Level Mapping** (for build API):
+
 ```json
 {
   "source": {
@@ -106,17 +121,20 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **RDBMS-specific options** (in source config):
+
 - `splitPk`: Primary key column for splitting (enables parallel reads)
 - `where`: SQL WHERE clause for filtering source data
 - `querySql`: Custom SQL query (overrides table + column)
 
 ### KaiwuDB Source
 
+**Engine**: Depends on data type - must be explicitly specified (RELATIONAL or TIMESERIES)
+
 **sourceType for migration**: `KAIWUDB`
 
 ```json
 {
-  "engine": "RELATIONAL",
+  "engine": "TIMESERIES",
   "type": "KAIWUDB",
   "host": "127.0.0.1",
   "port": 26257,
@@ -126,7 +144,10 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 }
 ```
 
+**Note**: KAIWUDB as source only supports data migration (no metadata reading).
+
 **Table-Level Mapping**:
+
 ```json
 {
   "source": {
@@ -145,11 +166,14 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **KAIWUDB-specific options**:
+
 - `writeMode`: "read" for source, "insert" for target
 - `preSql`: SQL to execute before migration
 - `postSql`: SQL to execute after migration
 
 ### Time Series Sources (TDENGINE, INFLUXDB, OPENTSDB)
+
+**Engine**: `TIMESERIES`
 
 **sourceType for migration**: `TDENGINE`, `INFLUXDB`, or `OPENTSDB`
 
@@ -165,7 +189,28 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 }
 ```
 
+**InfluxDB 1.x/2.x Notes**:
+
+- Supports metadata reading and data migration, but NOT full migration
+- Use two-step approach: Schema migration first, then data migration
+- Target KaiwuDB will have TIMESERIES engine automatically
+
+**InfluxDB Configuration Example**:
+
+```json
+{
+  "engine": "TIMESERIES",
+  "type": "INFLUXDB2X",
+  "host": "127.0.0.1",
+  "port": 8086,
+  "username": "admin",
+  "password": "secret",
+  "dbName": "source_bucket"
+}
+```
+
 **Table-Level Mapping**:
+
 ```json
 {
   "source": {
@@ -185,16 +230,19 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **Time Series-specific options**:
+
 - `beginDateTime`: Start of time range (ISO format)
 - `endDateTime`: End of time range (ISO format)
 
 ### MongoDB Source
 
+**Engine**: `TIMESERIES`
+
 **sourceType for migration**: `MONGODB`
 
 ```json
 {
-  "engine": "DOCUMENT",
+  "engine": "TIMESERIES",
   "type": "MONGODB",
   "host": "127.0.0.1",
   "port": 27017,
@@ -205,6 +253,7 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **Table-Level Mapping**:
+
 ```json
 {
   "source": {
@@ -223,17 +272,20 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **MongoDB-specific options**:
+
 - `collectionName`: MongoDB collection name
 - `query`: JSON query filter
 - `column`: Field selection (comma-separated or "*")
 
 ### File Sources (FTP, HDFS)
 
+**Engine**: `TIMESERIES`
+
 **sourceType for migration**: `FTP` or `HDFS`
 
 ```json
 {
-  "engine": "FILE",
+  "engine": "TIMESERIES",
   "type": "FTP",
   "host": "ftp.example.com",
   "port": 21,
@@ -243,6 +295,7 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **Table-Level Mapping**:
+
 ```json
 {
   "source": {
@@ -262,14 +315,59 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 ```
 
 **FTP-specific options**:
+
 - `path`: File path on FTP server
 - `fieldDelimiter`: Field separator character
 - `connectPattern`: FTP connection pattern
 
 **HDFS-specific options**:
+
 - `defaultFS`: Hadoop NameNode URI (e.g., hdfs://namenode:8020)
 - `path`: HDFS file path
 - `fileType`: File format (csv, json, etc.)
+
+---
+
+## Target Configuration (KaiwuDB)
+
+**IMPORTANT**: Target is **ALWAYS** KaiwuDB and requires `engine` field to specify the storage type.
+
+### KaiwuDB Target - Relational Engine
+
+```json
+{
+  "type": "KAIWUDB",
+  "engine": "RELATIONAL",
+  "host": "127.0.0.1",
+  "port": 26257,
+  "username": "root",
+  "password": "kwdb_password",
+  "dbName": "target_db",
+  "isTarget": true
+}
+```
+
+### KaiwuDB Target - Time Series Engine
+
+```json
+{
+  "type": "KAIWUDB",
+  "engine": "TIMESERIES",
+  "host": "127.0.0.1",
+  "port": 26257,
+  "username": "root",
+  "password": "kwdb_password",
+  "dbName": "target_ts_db",
+  "isTarget": true
+}
+```
+
+**Target Configuration Notes**:
+
+- `engine`: **REQUIRED** - Must be "RELATIONAL" or "TIMESERIES"
+- `isTarget`: Set to `true` for target configuration
+- Use RELATIONAL engine for: MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse sources
+- Use TIMESERIES engine for: TDengine, InfluxDB, OpenTSDB sources
 
 ---
 
@@ -279,17 +377,17 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 
 | Source Type | Default Port |
 |-------------|--------------|
-| MySQL | 3306 |
-| Oracle | 1521 |
-| PostgreSQL | 5432 |
-| SQL Server | 1433 |
-| ClickHouse | 9000 |
-| KaiwuDB | 26257 |
-| TDengine | 6030 |
-| InfluxDB | 8086 |
-| MongoDB | 27017 |
-| FTP | 21 |
-| HDFS | 8020 |
+| MySQL       | 3306         |
+| Oracle      | 1521         |
+| PostgreSQL  | 5432         |
+| SQL Server  | 1433         |
+| ClickHouse  | 9000         |
+| KaiwuDB     | 26257        |
+| TDengine    | 6030         |
+| InfluxDB    | 8086         |
+| MongoDB     | 27017        |
+| FTP         | 21           |
+| HDFS        | 8020         |
 
 ### 2. Authentication
 
@@ -303,10 +401,50 @@ When building migration scripts, use the correct `sourceType` based on KDTS sour
 - Table structure must match between source and target
 - Time-series tables in KWDB require primary tag(s)
 
+### 4. KaiwuDB Time-Series Table Constraints
+
+When migrating to KaiwuDB with TIMESERIES engine, the following constraints apply:
+
+| Constraint                       | Limit     | Error Code | Description                       |
+|----------------------------------|-----------|------------|-----------------------------------|
+| Maximum columns per table        | 128       | 3004       | Total of Tag + Value columns      |
+| Maximum primary tags             | 4         | 3004       | Cannot exceed 4 primary tags      |
+| Maximum tag/column name length   | 128 bytes | 3005       | Each name must be within limit    |
+| Must have at least 1 primary tag | 1         | 3006       | Required for time-series indexing |
+
+**Solutions for exceeding constraints:**
+
+1. Reduce columns to meet the limit
+2. Split data into multiple tables or migrations
+3. Convert some primary tags to secondary tags
+4. Shorten column names if too long
+
+**Example Time-Series Table Design:**
+
+```sql
+CREATE TABLE sensor_data
+(
+    ts         TIMESTAMP,
+    device_id  INT,          -- Primary tag
+    metric     VARCHAR(32),  -- Primary tag
+    value      DOUBLE,       -- Value field
+    quality    INT           -- Secondary tag
+) TAGS(quality);
+```
+
+**KaiwuDB Time-Series Migration Tips:**
+
+- Identify columns suitable for primary tags (unique identifiers like device_id, sensor_id)
+- Keep primary tags to a minimum (1-4 is ideal)
+- Use secondary tags for categorical data (status, type, etc.)
+- Value columns should be numeric (DOUBLE, FLOAT, INT) or string
+- Timestamp column is mandatory for time-series tables
+
 ---
 
 ## Reference
 
 - KDTS API: `references/api-reference.md`
 - Type Mapping: `references/type-mapping.md`
+- Error Codes: `references/error-codes.md`
 - Source Code: `kw-datax-utils/.../constant/SourceTypes.java`

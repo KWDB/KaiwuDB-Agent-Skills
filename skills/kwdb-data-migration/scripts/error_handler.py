@@ -34,7 +34,8 @@ ERROR_CODE_MAP = {
             "Enum value is not in allowed range"
         ],
         "fix_suggestions": [
-            "Check all required fields are provided: engine, type, host, port, username, password",
+            "Check all required fields: type, host, port, username, password",
+            "Note: 'engine' is only required for TARGET config (KAIWUDB), not for source",
             "Ensure field values match expected types (numbers for port, strings for text)",
             "Verify enum values are correct (e.g., 'MYSQL' not 'mysql', 'RELATIONAL' not 'relational')",
             "If using URL, ensure JDBC URL format is correct: jdbc:mysql://host:port/dbname"
@@ -147,11 +148,11 @@ ERROR_CODE_MAP = {
             "Unsupported database version"
         ],
         "fix_suggestions": [
-            "Check source type supports metadata (see capabilities: MYSQL, ORACLE, POSTGRESQL, KAIWUDB, SQLSERVER, TDENGINE3X, INFLUXDB1X)",
+            "Check source type supports metadata (see capabilities: MYSQL, ORACLE, POSTGRESQL, KAIWUDB, SQLSERVER, TDENGINE3X, INFLUXDB1X, INFLUXDB2X)",
             "Ensure database user has SELECT privilege on system catalog tables",
             "Verify source database is not corrupted",
             "Check KDTS version compatibility with source database version",
-            "For unsupported metadata sources (TDENGINE2X, INFLUXDB2X, etc.), use table-level migration with manual column specification"
+            "For unsupported metadata sources (TDENGINE2X, OPENTSDB, etc.), use table-level migration with manual column specification"
         ]
     },
     3002: {

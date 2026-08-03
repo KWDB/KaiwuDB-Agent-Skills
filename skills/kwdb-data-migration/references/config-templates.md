@@ -1,4 +1,4 @@
-# Configuration Templates
+﻿# Configuration Templates
 
 Ready-to-use JSON templates for KDTS migration requests.
 
@@ -21,6 +21,7 @@ Ready-to-use JSON templates for KDTS migration requests.
 ```
 
 **Alternative with JDBC URL**:
+
 ```json
 {
   "engine": "RELATIONAL",
@@ -89,6 +90,7 @@ Ready-to-use JSON templates for KDTS migration requests.
 ```
 
 **Time Series Target**:
+
 ```json
 {
   "engine": "TIMESERIES",
@@ -112,7 +114,6 @@ For sources that support full migration: MySQL, Oracle, PostgreSQL, KaiwuDB, Cli
 ```json
 {
   "source": {
-    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -135,14 +136,19 @@ For sources that support full migration: MySQL, Oracle, PostgreSQL, KaiwuDB, Cli
     "fetchSize": 1000,
     "batchSize": 1000,
     "setting": {
-      "speed": {"channel": 2},
-      "errorLimit": {"percentage": 0.02}
+      "speed": {
+        "channel": 2
+      },
+      "errorLimit": {
+        "percentage": 0.02
+      }
     }
   }
 }
 ```
 
 **Key Points**:
+
 - Empty `tables` array = auto-discover all tables
 - `speed.channel` = parallel read/write threads
 - `errorLimit.percentage` = % of rows that can fail before stopping
@@ -154,7 +160,6 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
-    "engine": "RELATIONAL",
     "type": "SQLSERVER",
     "host": "192.168.1.102",
     "port": 1433,
@@ -199,7 +204,6 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
-    "engine": "TIMESERIES",
     "type": "TDENGINE3X",
     "host": "192.168.1.103",
     "port": 6030,
@@ -246,7 +250,6 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
-    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -292,7 +295,6 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
-    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -330,7 +332,9 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
     "fetchSize": 5000,
     "batchSize": 5000,
     "setting": {
-      "speed": {"channel": 8}
+      "speed": {
+        "channel": 8
+      }
     }
   }
 }
@@ -343,7 +347,6 @@ Skip DDL steps, go directly to build.
 ```json
 {
   "source": {
-    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -388,6 +391,7 @@ Skip DDL steps, go directly to build.
 ## 3. Metadata Configuration
 
 Metadata config uses `MetaData` fields from KDTS API. Full field reference:
+
 - `enable` (boolean): Enable metadata extraction, default `true`
 - `autoDdl` (boolean): Auto-generate DDL statements, default `true`
 - `primaryKey` (boolean): Include primary key definitions, default `true`
@@ -453,8 +457,17 @@ Do NOT pass a string - use the full object structure.
       "users": {
         "tableName": "users",
         "columns": {
-          "id": { "columnName": "id", "dataType": "BIGINT", "nullable": false, "primaryKey": true },
-          "name": { "columnName": "name", "dataType": "VARCHAR(100)", "nullable": true }
+          "id": {
+            "columnName": "id",
+            "dataType": "BIGINT",
+            "nullable": false,
+            "primaryKey": true
+          },
+          "name": {
+            "columnName": "name",
+            "dataType": "VARCHAR(100)",
+            "nullable": true
+          }
         }
       }
     },
@@ -513,8 +526,9 @@ GET /kdts/api/v1/datax/status?scriptName=MYSQL2KAIWUDB_1719290000.json
 
 ### Kill Task
 
-```json
 POST /kdts/api/v1/datax/control
+
+```json
 {
   "scriptName": "MYSQL2KAIWUDB_1719290000.json",
   "action": "KILL"
@@ -525,25 +539,59 @@ POST /kdts/api/v1/datax/control
 
 ## 6. Data Source Compatibility Matrix
 
-| Source Type | Full Migration | Metadata | Time Filter | Custom SQL |
-|-------------|---------------|----------|-------------|------------|
-| MYSQL | Yes | Yes | No | Yes |
-| ORACLE | Yes | Yes | No | Yes |
-| POSTGRESQL | Yes | Yes | No | Yes |
-| SQLSERVER | No | Yes | No | Yes |
-| CLICKHOUSE | Yes | No | No | Yes |
-| KAIWUDB | Yes | Yes | No | Yes |
-| TDENGINE3X | Yes | Yes | Yes | No |
-| TDENGINE2X | No | No | Yes | No |
-| INFLUXDB1X | No | Yes | Yes | No |
-| INFLUXDB2X | No | No | Yes | No |
-| MONGODB | No | No | No | Yes |
-| FTP | No | No | No | No |
-| HDFS | No | No | No | No |
+| Source Type | Full Migration | Metadata | Time Filter | Custom SQL | Notes                              |
+|-------------|----------------|----------|-------------|------------|------------------------------------|
+| MYSQL       | Yes            | Yes      | No          | Yes        | Full support                       |
+| ORACLE      | Yes            | Yes      | No          | Yes        | Full support                       |
+| POSTGRESQL  | Yes            | Yes      | No          | Yes        | Full support                       |
+| SQLSERVER   | No             | Yes      | No          | Yes        | Metadata + Data only               |
+| CLICKHOUSE  | Yes            | No       | No          | Yes        | Full migration, no metadata        |
+| KAIWUDB     | No             | No       | No          | Yes        | Data migration only (as source)    |
+| TDENGINE3X  | Yes            | Yes      | Yes         | No         | Full support                       |
+| TDENGINE2X  | No             | No       | Yes         | No         | Data migration only                |
+| INFLUXDB1X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration |
+| INFLUXDB2X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration |
+| OPENTSDB    | No             | No       | Yes         | No         | Data migration only                |
+| MONGODB     | No             | No       | No          | Yes        | Data migration only                |
+| FTP         | No             | No       | No          | No         | Data migration only                |
+| HDFS        | No             | No       | No          | No         | Data migration only                |
 
 ---
 
-## 7. Performance Tips
+## 7. KaiwuDB Time-Series Table Constraints
+
+When migrating to KaiwuDB with TIMESERIES engine, the following constraints apply:
+
+| Constraint                       | Limit     | Error Code | Description                       |
+|----------------------------------|-----------|------------|-----------------------------------|
+| Maximum columns per table        | 128       | 3004       | Total of Tag + Value columns      |
+| Maximum primary tags             | 4         | 3004       | Cannot exceed 4 primary tags      |
+| Maximum tag/column name length   | 128 bytes | 3005       | Each name must be within limit    |
+| Must have at least 1 primary tag | 1         | 3006       | Required for time-series indexing |
+
+### Solutions for Exceeding Constraints
+
+1. Reduce columns to meet the limit
+2. Split data into multiple tables or migrations
+3. Convert some primary tags to secondary tags
+4. Shorten column names if too long
+
+### Example Time-Series Table Design
+
+```sql
+CREATE TABLE sensor_data
+(
+    ts         TIMESTAMP,
+    device_id  INT,          -- Primary tag
+    metric     VARCHAR(32),  -- Primary tag
+    value      DOUBLE,       -- Value field
+    quality    INT           -- Secondary tag
+) TAGS(quality);
+```
+
+---
+
+## 8. Performance Tips
 
 ### Large Data Sets
 
@@ -554,8 +602,13 @@ POST /kdts/api/v1/datax/control
     "fetchSize": 5000,
     "batchSize": 5000,
     "setting": {
-      "speed": {"channel": 4, "record": -1},
-      "errorLimit": {"percentage": 0.01}
+      "speed": {
+        "channel": 4,
+        "record": -1
+      },
+      "errorLimit": {
+        "percentage": 0.01
+      }
     }
   }
 }
@@ -594,7 +647,9 @@ POST /kdts/api/v1/datax/control
     "fetchSize": 1000,
     "batchSize": 1000,
     "setting": {
-      "speed": {"channel": 1},
+      "speed": {
+        "channel": 1
+      },
       "errorLimit": {
         "percentage": 5.0,
         "record": 1000

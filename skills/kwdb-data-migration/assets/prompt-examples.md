@@ -2,7 +2,12 @@
 
 This document shows natural language user requests and how the Skill processes them.
 
-**Note**: For Chinese version, see [prompt-examples.zh.md](./prompt-examples.zh.md)
+## Language Versions
+
+- **English Version**: This file (`prompt-examples.md`)
+- **Chinese Version**: [prompt-examples.zh.md](./prompt-examples.zh.md)
+
+**ALWAYS respond in the same language the user uses.** Both versions contain real user input examples that the AI Agent should handle appropriately.
 
 ---
 
@@ -10,7 +15,7 @@ This document shows natural language user requests and how the Skill processes t
 
 ### User Input 1 (English)
 
-> I want to migrate the users table from MySQL to KaiwuDB. The source is test_db on 192.168.1.100:3306, username root with password 123456. The target KaiwuDB is on localhost at port 9092.
+> I want to migrate the users table from MySQL to KaiwuDB. The source is "test_db" on 192.168.1.100:3306, username root with password 123456. The target KaiwuDB is on localhost at port 9092.
 
 ### Processing Flow
 
@@ -129,7 +134,33 @@ This document shows natural language user requests and how the Skill processes t
 
 ---
 
-## 6. MongoDB Migration
+## 6. InfluxDB Migration (Two-Step Method)
+
+### User Input (English)
+
+> I need to migrate InfluxDB 2.x metrics bucket to KaiwuDB time series DB. InfluxDB is at influx.local:8086, org is myorg, token is xxxxxxx, bucket is metrics.
+
+### Processing Flow
+
+1. **Intent Recognition**: InfluxDB 2.x -> KaiwuDB (TIMESERIES)
+2. **Capability Note**: InfluxDB supports metadata + data (META_AND_DATA), but NOT full migration
+3. **Two-Step Reminder**:
+   - Step 1: Migrate Schema (DDL)
+   - Step 2: Migrate Data
+4. **Interaction Flow**:
+   - Confirm two-step method
+   - Collect InfluxDB 2.x specific parameters: org, token, bucket
+   - List measurements
+   - Preview DDL for each measurement
+   - Execute Schema migration
+   - Execute Data migration
+   - Verify results
+
+**Note**: InfluxDB 1.x and 2.x both use HTTP protocol, not JDBC.
+
+---
+
+## 7. MongoDB Migration
 
 ### User Input (English)
 
@@ -151,7 +182,7 @@ This document shows natural language user requests and how the Skill processes t
 
 ---
 
-## 7. Migration Status Query
+## 8. Migration Status Query
 
 ### User Input (English)
 
@@ -171,7 +202,7 @@ This document shows natural language user requests and how the Skill processes t
 
 ---
 
-## 8. Migration Troubleshooting
+## 9. Migration Troubleshooting
 
 ### User Input 1 (English)
 
@@ -213,7 +244,7 @@ This document shows natural language user requests and how the Skill processes t
 
 ---
 
-## 9. Migration Config Save/Load
+## 10. Migration Config Save/Load
 
 ### User Input (English)
 
@@ -229,16 +260,16 @@ This document shows natural language user requests and how the Skill processes t
 3. **Config Example**:
    ```json
    {
-     "source": { "type": "MYSQL", ... },
-     "target": { "type": "KAIWUDB", ... },
+     "source": { "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
+     "target": { "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "engine": "TIMESERIES" },
      "tables": [],
-     "data": { ... }
+     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
    }
    ```
 
 ---
 
-## 10. Dangerous Operation Intercept
+## 11. Dangerous Operation Intercept
 
 ### User Input (English)
 
@@ -248,7 +279,7 @@ This document shows natural language user requests and how the Skill processes t
 
 1. **Intent Recognition**: Task termination (dangerous operation)
 2. **Safety Check**:
-   - ⚠️ Warning: Terminating running migration may cause data inconsistency
+   - [WARNING]: Terminating running migration may cause data inconsistency
    - Show current task status and progress
    - **Require user confirmation**: "Please type YES to confirm termination"
 3. **After Confirmation**:

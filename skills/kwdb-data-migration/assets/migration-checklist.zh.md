@@ -2,7 +2,12 @@
 
 完整的迁移流程检查清单，确保每个步骤正确执行。
 
-**英文版**：[migration-checklist.md](./migration-checklist.md)
+## 语言版本
+
+- **中文版**: 本文件 (`migration-checklist.zh.md`)
+- **英文版**: [migration-checklist.md](./migration-checklist.md)
+
+AI Agent 将使用与用户相同的语言进行回复。
 
 ---
 
@@ -11,26 +16,26 @@
 ### 1.1 环境检查
 
 - [ ] KDTS Server 已启动并可访问
-  - 访问 `http://{kdts_host}:{port}/kdts/api/v1/health` 确认状态
-  - 默认端口：8080
+    - 访问 `http://{kdts_host}:{port}/kdts/api/v1/health` 确认状态
+    - 默认端口：8080
 - [ ] 源数据库可从 KDTS 服务器网络访问
-  - 测试连通性：`ping {source_host}` 或 `telnet {source_host} {port}`
+    - 测试连通性：`ping {source_host}` 或 `telnet {source_host} {port}`
 - [ ] 目标 KaiwuDB 已安装并启动
-  - 测试连接：`mysql -h {kwdb_host} -P {port} -u root -p`
+    - 测试连接：`mysql -h {kwdb_host} -P {port} -u root -p`
 - [ ] Python 3 已安装（KDTS 服务器）
-  - 执行：`python3 --version`
+    - 执行：`python3 --version`
 
 ### 1.2 账号权限
 
 - [ ] 源数据库账号权限充足
-  - MySQL: 对目标库有 SELECT 权限
-  - Oracle: SELECT_CATALOG_ROLE 或 DBA
-  - PostgreSQL: 对 schema 有 USAGE 权限
-  - 其他数据库: 参考对应文档
+    - MySQL: 对目标库有 SELECT 权限
+    - Oracle: SELECT_CATALOG_ROLE 或 DBA
+    - PostgreSQL: 对 schema 有 USAGE 权限
+    - 其他数据库: 参考对应文档
 - [ ] 目标 KaiwuDB 账号权限充足
-  - CREATE、DROP、ALTER（用于 DDL）
-  - INSERT、SELECT（用于数据迁移）
-  - 目标库已创建或允许自动创建
+    - CREATE、DROP、ALTER（用于 DDL）
+    - INSERT、SELECT（用于数据迁移）
+    - 目标库已创建或允许自动创建
 - [ ] 网络防火墙/安全组已开放所需端口
 
 ### 1.3 备份提醒
@@ -46,43 +51,45 @@
 ### 2.1 连接测试
 
 - [ ] 源数据库连接测试通过
-  ```json
+
   POST /kdts/api/v1/datasource/validate
+  ```json
   {
     "engine": "RELATIONAL",
     "type": "MYSQL",
-    "host": "...",
+    "host": "example-host",
     "port": 3306,
-    "username": "...",
-    "password": "...",
-    "dbName": "...",
+    "username": "user",
+    "password": "pass",
+    "dbName": "example_db",
     "isTarget": false
   }
   ```
-  - 预期返回: `{"code": 0, "data": "SUCCEED"}`
+    - 预期返回: `{"code": 0, "data": "SUCCEED"}`
 - [ ] 目标 KaiwuDB 连接测试通过
-  - 设置 `isTarget: true`
+    - 设置 `isTarget: true`
 
 ### 2.2 源端元数据
 
 - [ ] 列出源数据库
-  ```json
+  ```
   POST /kdts/api/v1/datasource/databases
-  { /* 源配置 */ }
+  { "source": "源配置对象" }
   ```
 - [ ] 读取目标表元数据
-  ```json
+
   POST /kdts/api/v1/datasource/metadata
+  ```json
   {
-    "source": { /* 含 dbName 的源配置 */ },
+    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "root", "password": "password", "dbName": "example_db" },
     "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false }
   }
   ```
 - [ ] 确认元数据完整性
-  - 表数量正确
-  - 列数量和类型正确
-  - 主键/约束正确
-  - （可选）注释、索引已包含
+    - 表数量正确
+    - 列数量和类型正确
+    - 主键/约束正确
+    - （可选）注释、索引已包含
 
 ### 2.3 不支持元数据的源
 
@@ -99,38 +106,40 @@
 ### 3.1 DDL 预览
 
 - [ ] 预览目标 DDL
-  ```json
+
   POST /kdts/api/v1/metadata/preview
+  ```json
   {
-    "target": { /* 目标配置 */ },
-    "sourceDb": { /* /datasource/metadata 返回的完整 Database 对象 */ },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
+    "sourceDb": { "tables": [{"name": "example_table", "columns": [{"name": "id", "type": "INT"}]}] },
     "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false },
     "isTimeSeries": false
   }
   ```
 - [ ] 检查生成的 DDL
-  - 表名是否匹配
-  - 列名和类型是否正确映射
-  - 主键/约束是否保留
-  - 特殊类型是否正确转换
+    - 表名是否匹配
+    - 列名和类型是否正确映射
+    - 主键/约束是否保留
+    - 特殊类型是否正确转换
 
 ### 3.2 DDL 执行
 
 - [ ] （如需要）删除目标现有表
-  - 确认目标表数据已备份或可丢弃
-  - 使用 KaiwuDB DROP TABLE 命令
+    - 确认目标表数据已备份或可丢弃
+    - 使用 KaiwuDB DROP TABLE 命令
 - [ ] 执行 DDL
-  ```json
+
   POST /kdts/api/v1/metadata/execute
+  ```json
   {
-    "target": { /* 目标配置 */ },
-    "ddlScript": { /* 预览得到的 DDL */ },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
+    "ddlScript": { "createTableStatements": ["CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"] },
     "autoDdl": false
   }
   ```
 - [ ] 验证 DDL 执行结果
-  - 检查表是否创建成功
-  - 检查列类型是否正确
+    - 检查表是否创建成功
+    - 检查列类型是否正确
 
 ### 3.3 仅数据迁移场景
 
@@ -147,24 +156,25 @@
 ### 4.1 构建迁移脚本
 
 - [ ] 构建 DataX 迁移脚本
-  ```json
   POST /kdts/api/v1/datax/build
+  ```json
   {
-    "source": { /* 源配置 */ },
-    "target": { /* 目标配置 (type=KAIWUDB) */ },
+    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "root", "password": "password", "dbName": "src_db" },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
     "tables": [],
     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
   }
   ```
 - [ ] 记录返回的脚本文件名
-  - 格式：`{SOURCE}2KAIWUDB_{timestamp}.json`
-  - 记录文件名用于后续查询
+    - 格式：`{SOURCE}2KAIWUDB_{timestamp}.json`
+    - 记录文件名用于后续查询
 
 ### 4.2 执行迁移
 
 - [ ] 启动迁移
-  ```json
+
   POST /kdts/api/v1/datax/execute
+  ```json
   ["MYSQL2KAIWUDB_1719290000.json"]
   ```
 - [ ] 记录返回的日志文件路径
@@ -176,11 +186,11 @@
   GET /kdts/api/v1/datax/status?scriptName=MYSQL2KAIWUDB_1719290000.json
   ```
 - [ ] 状态说明
-  - `SUBMITTED`: 已提交，等待执行
-  - `RUNNING`: 执行中
-  - `SUCCEEDED`: 成功完成
-  - `FAILED`: 执行失败
-  - `KILLED`: 被终止
+    - `SUBMITTED`: 已提交，等待执行
+    - `RUNNING`: 执行中
+    - `SUCCEEDED`: 成功完成
+    - `FAILED`: 执行失败
+    - `KILLED`: 被终止
 - [ ] 如失败，查看详细日志
 
 ### 4.4 大规模数据迁移建议
@@ -228,6 +238,7 @@
 ### Q1: 连接测试失败
 
 **检查清单：**
+
 - [ ] 数据库服务是否启动
 - [ ] host/port 是否正确
 - [ ] 网络是否通畅（防火墙）
@@ -238,6 +249,7 @@
 ### Q2: DDL 预览错误
 
 **检查清单：**
+
 - [ ] 源类型是否支持元数据
 - [ ] 是否有不支持的列类型
 - [ ] KaiwuDB 版本是否兼容
@@ -245,12 +257,14 @@
 ### Q3: 迁移超时
 
 **检查清单：**
+
 - [ ] 源表是否过大
 - [ ] 是否需要分批次迁移
 - [ ] 网络带宽是否足够
 - [ ] KDTS 服务器资源是否充足
 
 **解决方案：**
+
 - 增加超时时间
 - 缩小迁移范围
 - 启用并行（splitPk）
@@ -259,11 +273,13 @@
 ### Q4: 部分数据丢失
 
 **检查清单：**
+
 - [ ] 是否有报错日志
 - [ ] 是否有数据被过滤器排除
 - [ ] 是否有写入失败
 
 **解决方案：**
+
 - 检查错误日志
 - 增加 errorLimit 百分比
 - 重试失败的表
@@ -284,8 +300,8 @@
 1. 查询任务状态：`GET /datax/status?scriptName=...`
 2. 如可恢复：检查是否支持 resume（有限场景）
 3. 如不可恢复：
-   - 清空目标表（TRUNCATE）
-   - 重新构建并执行迁移
+    - 清空目标表（TRUNCATE）
+    - 重新构建并执行迁移
 
 ### 场景 3: 迁移完成但数据有问题
 
@@ -322,11 +338,11 @@
 
 ## 成功标准
 
-✅ 所有表迁移完成  
-✅ 记录数一致  
-✅ 数据抽样无差异  
-✅ 业务功能正常  
-✅ 性能达标  
+[OK] 所有表迁移完成  
+[OK] 记录数一致  
+[OK] 数据抽样无差异  
+[OK] 业务功能正常  
+[OK] 性能达标
 
 ---
 

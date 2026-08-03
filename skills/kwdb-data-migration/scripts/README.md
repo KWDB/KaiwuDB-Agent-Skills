@@ -51,7 +51,7 @@ Full implementation of all 10 KDTS REST API endpoints.
 Comprehensive data source configuration for all 14 KDTS supported types.
 
 **Classes:**
-- `Engine`: Enum for engine types (RELATIONAL, TIMESERIES, DOCUMENT, FILE, BOTH)
+- `Engine`: Enum for KaiwuDB target engine types (RELATIONAL, TIMESERIES)
 - `SourceType`: Enum for all 14 source types
 - `SourceCapability`: Enum for capability levels
 - `DataSourceManager`: Main manager class
@@ -62,17 +62,21 @@ Comprehensive data source configuration for all 14 KDTS supported types.
 | MYSQL | RELATIONAL | 3306 | Full Migration |
 | ORACLE | RELATIONAL | 1521 | Full Migration |
 | POSTGRESQL | RELATIONAL | 5432 | Full Migration |
-| SQLSERVER | RELATIONAL | 1433 | Table-Level Only |
-| CLICKHOUSE | RELATIONAL | 9000 | Full Migration |
-| KAIWUDB | BOTH | **26257** | Full Migration |
+| SQLSERVER | RELATIONAL | 1433 | Metadata + Data, No Full Migration |
+| CLICKHOUSE | RELATIONAL | 9000 | Full Migration (No Metadata) |
+| KAIWUDB | *REQUIRED* | 26257 | Data Migration Only |
 | TDENGINE3X | TIMESERIES | 6030 | Full Migration |
-| TDENGINE2X | TIMESERIES | 6030 | Table-Level Only |
-| INFLUXDB1X | TIMESERIES | 8086 | Table-Level Only |
-| INFLUXDB2X | TIMESERIES | 8086 | Table-Level Only |
-| OPENTSDB | TIMESERIES | 4242 | Table-Level Only |
-| MONGODB | DOCUMENT | 27017 | Table-Level Only |
-| FTP | FILE | 21 | Table-Level Only |
-| HDFS | FILE | 8020 | Table-Level Only |
+| TDENGINE2X | TIMESERIES | 6030 | Data Migration Only |
+| INFLUXDB1X | TIMESERIES | 8086 | Metadata + Data, No Full Migration |
+| INFLUXDB2X | TIMESERIES | 8086 | Metadata + Data, No Full Migration |
+| OPENTSDB | TIMESERIES | 4242 | Data Migration Only |
+| MONGODB | TIMESERIES | 27017 | Data Migration Only |
+| FTP | TIMESERIES | 21 | Data Migration Only |
+| HDFS | TIMESERIES | 8020 | Data Migration Only |
+
+**Note:** 
+- Engine must be explicitly specified for KAIWUDB (RELATIONAL or TIMESERIES)
+- Engine is required for all source configurations per KDTS API
 
 **Key Features:**
 - Auto-detect engine type from source type
@@ -238,6 +242,11 @@ print(f"Completed: {result['completed_batches']}/{result['total_batches']}")
 - requests library (`pip install requests`)
 - KDTS Server running and accessible
 
+### Other Dependencies
+
+All other modules use Python standard library only:
+- typing, enum, json, os, re, time, sys, logging, pathlib
+
 ## Dependencies Between Modules
 
 ```
@@ -256,10 +265,10 @@ All API responses follow:
 
 ```json
 {
-  "code": 0,           // 0 = success, non-zero = error
+  "code": 0,
   "message": "success",
   "timestamp": 1719290000000,
-  "data": { ... }      // Varies by endpoint
+  "data": {}
 }
 ```
 
@@ -288,5 +297,6 @@ Test utilities are located in `internal/tests/kwdb-data-migration/scripts/`:
 
 - `mock_server.py`: Mock KDTS server for local testing
 - `test_migration_flow.py`: End-to-end migration flow test
+- `agent_dialogue_simulator.py`: AI Agent dialogue simulation
 
 Refer to the internal test directory for usage instructions.

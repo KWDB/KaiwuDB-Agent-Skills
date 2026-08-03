@@ -2,7 +2,12 @@
 
 Complete migration workflow checklist to ensure every step is executed correctly.
 
-**Note**: For Chinese version, see [migration-checklist.zh.md](./migration-checklist.zh.md)
+## Language Versions
+
+- **English Version**: This file (`migration-checklist.md`)
+- **Chinese Version**: [migration-checklist.zh.md](./migration-checklist.zh.md)
+
+The AI Agent will respond in the same language the user uses.
 
 ---
 
@@ -11,26 +16,26 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### 1.1 Environment Check
 
 - [ ] KDTS Server is running and accessible
-  - Access `http://{kdts_host}:{port}/kdts/api/v1/health` to confirm status
-  - Default port: 8080
+    - Access `http://{kdts_host}:{port}/kdts/api/v1/health` to confirm status
+    - Default port: 8080
 - [ ] Source database is network-accessible from KDTS Server
-  - Test connectivity: `ping {source_host}` or `telnet {source_host} {port}`
+    - Test connectivity: `ping {source_host}` or `telnet {source_host} {port}`
 - [ ] Target KaiwuDB is installed and running
-  - Test connection: `mysql -h {kwdb_host} -P {port} -u root -p`
+    - Test connection: `mysql -h {kwdb_host} -P {port} -u root -p`
 - [ ] Python 3 is installed (on KDTS Server)
-  - Run: `python3 --version`
+    - Run: `python3 --version`
 
 ### 1.2 Account Permissions
 
 - [ ] Source database account has sufficient permissions
-  - MySQL: SELECT on target database
-  - Oracle: SELECT_CATALOG_ROLE or DBA
-  - PostgreSQL: USAGE on schema
-  - Other databases: refer to their documentation
+    - MySQL: SELECT on target database
+    - Oracle: SELECT_CATALOG_ROLE or DBA
+    - PostgreSQL: USAGE on schema
+    - Other databases: refer to their documentation
 - [ ] Target KaiwuDB account has sufficient permissions
-  - CREATE, DROP, ALTER (for DDL)
-  - INSERT, SELECT (for data migration)
-  - Target database exists or auto-creation is allowed
+    - CREATE, DROP, ALTER (for DDL)
+    - INSERT, SELECT (for data migration)
+    - Target database exists or auto-creation is allowed
 - [ ] Network firewall/security group has required ports open
 
 ### 1.3 Backup Reminder
@@ -46,51 +51,54 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### 2.1 Connection Test
 
 - [ ] Source database connection test passed
-  ```json
+
   POST /kdts/api/v1/datasource/validate
+  ```json
   {
     "engine": "RELATIONAL",
     "type": "MYSQL",
-    "host": "...",
+    "host": "127.0.0.1",
     "port": 3306,
-    "username": "...",
-    "password": "...",
-    "dbName": "...",
+    "username": "user",
+    "password": "pass",
+    "dbName": "example_db",
     "isTarget": false
   }
   ```
-  - Expected response: `{"code": 0, "data": "SUCCEED"}`
+    - Expected response: `{"code": 0, "data": "SUCCEED"}`
 - [ ] Target KaiwuDB connection test passed
-  - Set `isTarget: true`
+    - Set `isTarget: true`
 
-### 2.2 Source Metadata
+### 2.2 Source-side Metadata
 
 - [ ] List source databases
-  ```json
+
   POST /kdts/api/v1/datasource/databases
-  { /* source config */ }
-  ```
-- [ ] Read target table metadata
-  ```json
+
+- [ ] Read source table metadata
+
   POST /kdts/api/v1/datasource/metadata
+  ```json
   {
-    "source": { /* source config with dbName */ },
+    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "user", "password": "pass", "dbName": "example_db" },
     "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false }
   }
   ```
 - [ ] Verify metadata completeness
-  - Correct table count
-  - Correct column count and types
-  - Correct primary keys/constraints
-  - (Optional) Comments and indexes included
+    - Correct table count
+    - Correct column count and types
+    - Correct primary keys/constraints
+    - (Optional) Comments and indexes included
 
 ### 2.3 Sources Without Metadata Support
 
-**If source does NOT support metadata (SQL Server partial versions, TDengine 2.x, InfluxDB 2.x, MongoDB, FTP, HDFS):**
+**If source does NOT support metadata (TDengine 2.x, OpenTSDB, MongoDB, FTP, HDFS):**
 
 - [ ] Skip metadata step
 - [ ] Manually prepare table mapping configuration
 - [ ] Explicitly specify tables field in migration request
+
+**Note:** SQL Server, InfluxDB 1.x and 2.x support metadata reading (META_AND_DATA capability), but do NOT support full migration. Use two-step migration approach for these sources.
 
 ---
 
@@ -99,38 +107,49 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### 3.1 DDL Preview
 
 - [ ] Preview target DDL
-  ```json
+
   POST /kdts/api/v1/metadata/preview
+  ```json
   {
-    "target": { /* target config */ },
-    "sourceDb": { /* full Database object from /datasource/metadata */ },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
+    "sourceDb": { "tables": [{"name": "example_table", "columns": [{"name": "id", "type": "INT"}]}] },
     "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false },
     "isTimeSeries": false
   }
   ```
 - [ ] Review generated DDL
-  - Table names match
-  - Column names and types map correctly
-  - Primary keys/constraints preserved
-  - Special types converted correctly
+    - Table names match
+    - Column names and types map correctly
+    - Primary keys/constraints preserved
+    - Special types converted correctly
+
+- [ ] Verify KaiwuDB Time-Series Table Constraints (for TIMESERIES engine)
+    - Total columns (Tags + Values) <= 128
+    - Primary Tags count <= 4
+    - Tag/Column names <= 128 bytes
+    - At least 1 Primary Tag defined
+    - If exceeded, consider splitting into multiple tables or migrations
 
 ### 3.2 DDL Execution
 
 - [ ] (If needed) Drop existing target tables
-  - Confirm target table data is backed up or can be discarded
-  - Use KaiwuDB DROP TABLE command
+    - Confirm target table data is backed up or can be discarded
+    - Use KaiwuDB DROP TABLE command
 - [ ] Execute DDL
-  ```json
+
   POST /kdts/api/v1/metadata/execute
+  ```json
   {
-    "target": { /* target config */ },
-    "ddlScript": { /* DDL from preview */ },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
+    "ddlScript": { "createTableStatements": ["CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"] },
     "autoDdl": false
   }
   ```
+
+
 - [ ] Verify DDL execution result
-  - Check table creation success
-  - Check column type correctness
+    - Check table creation success
+    - Check column type correctness
 
 ### 3.3 Data-Only Migration Scenario
 
@@ -147,24 +166,27 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### 4.1 Build Migration Script
 
 - [ ] Build DataX migration script
-  ```json
+
   POST /kdts/api/v1/datax/build
+  ```json
   {
-    "source": { /* source config */ },
-    "target": { /* target config (type=KAIWUDB) */ },
+    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
+    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
     "tables": [],
     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
   }
   ```
+
 - [ ] Record returned script filename
-  - Format: `{SOURCE}2KAIWUDB_{timestamp}.json`
-  - Note filename for later queries
+    - Format: `{SOURCE}2KAIWUDB_{timestamp}.json`
+    - Note filename for later queries
 
 ### 4.2 Execute Migration
 
 - [ ] Start migration
-  ```json
+
   POST /kdts/api/v1/datax/execute
+  ```json
   ["MYSQL2KAIWUDB_1719290000.json"]
   ```
 - [ ] Record returned log file path
@@ -176,11 +198,11 @@ Complete migration workflow checklist to ensure every step is executed correctly
   GET /kdts/api/v1/datax/status?scriptName=MYSQL2KAIWUDB_1719290000.json
   ```
 - [ ] Status definitions
-  - `SUBMITTED`: Submitted, waiting to execute
-  - `RUNNING`: In progress
-  - `SUCCEEDED`: Completed successfully
-  - `FAILED`: Execution failed
-  - `KILLED`: Terminated
+    - `SUBMITTED`: Submitted, waiting to execute
+    - `RUNNING`: In progress
+    - `SUCCEEDED`: Completed successfully
+    - `FAILED`: Execution failed
+    - `KILLED`: Terminated
 - [ ] If failed, view detailed logs
 
 ### 4.4 Large Dataset Migration Tips
@@ -228,6 +250,7 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### Q1: Connection Test Failed
 
 **Checklist:**
+
 - [ ] Database service is running
 - [ ] Correct host/port
 - [ ] Network connectivity (firewall)
@@ -238,6 +261,7 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### Q2: DDL Preview Error
 
 **Checklist:**
+
 - [ ] Source type supports metadata
 - [ ] No unsupported column types
 - [ ] KaiwuDB version compatibility
@@ -245,12 +269,14 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### Q3: Migration Timeout
 
 **Checklist:**
+
 - [ ] Source table too large
 - [ ] Batch migration needed
 - [ ] Sufficient network bandwidth
 - [ ] KDTS Server has sufficient resources
 
 **Solutions:**
+
 - Increase timeout
 - Reduce migration scope
 - Enable parallelism (splitPk)
@@ -259,11 +285,13 @@ Complete migration workflow checklist to ensure every step is executed correctly
 ### Q4: Partial Data Loss
 
 **Checklist:**
+
 - [ ] Any error logs
 - [ ] Any data filtered out
 - [ ] Any write failures
 
 **Solutions:**
+
 - Check error logs
 - Increase errorLimit percentage
 - Retry failed tables
@@ -284,8 +312,8 @@ Complete migration workflow checklist to ensure every step is executed correctly
 1. Query task status: `GET /datax/status?scriptName=...`
 2. If resumable: check resume support (limited scenarios)
 3. If not resumable:
-   - Clear target table (TRUNCATE)
-   - Rebuild and re-execute migration
+    - Clear target table (TRUNCATE)
+    - Rebuild and re-execute migration
 
 ### Scenario 3: Migration Completed But Data Has Issues
 
@@ -322,11 +350,11 @@ Complete migration workflow checklist to ensure every step is executed correctly
 
 ## Success Criteria
 
-✅ All tables migrated successfully  
-✅ Row counts match  
-✅ Data sampling shows no differences  
-✅ Business functionality normal  
-✅ Performance meets expectations  
+[OK] All tables migrated successfully  
+[OK] Row counts match  
+[OK] Data sampling shows no differences  
+[OK] Business functionality normal  
+[OK] Performance meets expectations
 
 ---
 

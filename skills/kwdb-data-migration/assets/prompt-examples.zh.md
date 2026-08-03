@@ -2,7 +2,12 @@
 
 本文档展示用户可能提出的自然语言请求，以及 Skill 的处理方式。
 
-**英文版**：[prompt-examples.md](./prompt-examples.md)
+## 语言版本
+
+- **中文版**: 本文件 (`prompt-examples.zh.md`)
+- **英文版**: [prompt-examples.md](./prompt-examples.md)
+
+**请始终使用与用户相同的语言进行回复。** 两个版本都包含 AI Agent 应该能够正确处理的真实用户输入示例。
 
 ---
 
@@ -129,7 +134,33 @@
 
 ---
 
-## 6. MongoDB 迁移
+## 6. InfluxDB 迁移（两步法）
+
+### 用户输入
+
+> 我需要把 InfluxDB 2.x 的 metrics bucket 迁到 KaiwuDB 时序库。InfluxDB 在 influx.local:8086，org 是 myorg，token 是 xxxxxxx，bucket 是 metrics。
+
+### Skill 处理流程
+
+1. **意图识别**: InfluxDB 2.x → KaiwuDB（TIMESERIES）
+2. **能力说明**: InfluxDB 支持元数据+数据（META_AND_DATA），但不支持完整迁移
+3. **两步法提醒**:
+   - 步骤 1：迁移 Schema（DDL）
+   - 步骤 2：迁移数据
+4. **交互流程**:
+   - 确认两步法
+   - 收集 InfluxDB 2.x 特有参数：org、token、bucket
+   - 列出 measurements
+   - 预览每个 measurement 对应的 DDL
+   - 执行 Schema 迁移
+   - 执行数据迁移
+   - 验证结果
+
+**注意**: InfluxDB 1.x 和 2.x 都使用 HTTP 协议，不通过 JDBC 连接。
+
+---
+
+## 7. MongoDB 迁移
 
 ### 用户输入
 
@@ -151,7 +182,7 @@
 
 ---
 
-## 7. 迁移状态查询
+## 8. 迁移状态查询
 
 ### 用户输入
 
@@ -171,7 +202,7 @@
 
 ---
 
-## 8. 迁移问题排查
+## 9. 迁移问题排查
 
 ### 用户输入 1
 
@@ -213,7 +244,7 @@
 
 ---
 
-## 9. 迁移配置保存/加载
+## 10. 迁移配置保存/加载
 
 ### 用户输入
 
@@ -229,16 +260,16 @@
 3. **配置示例**:
    ```json
    {
-     "source": { "type": "MYSQL", ... },
-     "target": { "type": "KAIWUDB", ... },
+     "source": { "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
+     "target": { "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "engine": "TIMESERIES" },
      "tables": [],
-     "data": { ... }
+     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
    }
    ```
 
 ---
 
-## 10. 危险操作拦截
+## 11. 危险操作拦截
 
 ### 用户输入
 
@@ -248,7 +279,7 @@
 
 1. **意图识别**: 任务终止（危险操作）
 2. **安全检查**:
-   - ⚠️ 警告：终止运行中的迁移可能导致数据不一致
+   - [WARNING] 警告：终止运行中的迁移可能导致数据不一致
    - 展示当前任务状态和进度
    - **要求用户二次确认**: "请输入 YES 确认终止"
 3. **确认后执行**:

@@ -21,12 +21,21 @@ logger = logging.getLogger(__name__)
 
 
 class Engine(str, Enum):
-    """Supported KDTS engine types."""
+    """
+    KDTS engine types for target (KaiwuDB) configuration.
+
+    Usage:
+    - For target (KaiwuDB) configuration: Must specify either RELATIONAL or TIMESERIES
+      to indicate the target database engine type.
+    - For source configuration: Engine is auto-detected from source type.
+      RELATIONAL for RDBMS sources, TIMESERIES for all other sources.
+
+    Source Type -> Engine Mapping:
+    - RELATIONAL: MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse
+    - TIMESERIES: TDengine 2.x/3.x, InfluxDB 1.x/2.x, OpenTSDB, MongoDB, FTP, HDFS, KaiwuDB
+    """
     RELATIONAL = "RELATIONAL"
     TIMESERIES = "TIMESERIES"
-    DOCUMENT = "DOCUMENT"
-    FILE = "FILE"
-    BOTH = "BOTH"
 
 
 class SourceType(str, Enum):
@@ -48,10 +57,21 @@ class SourceType(str, Enum):
 
 
 class SourceCapability(str, Enum):
-    """Source capability levels."""
+    """
+    Source capability levels.
+
+    Based on KDTS SourceTypes.java implementation:
+    - FULL_MIGRATION: Supports complete migration including schema (DDL) and data.
+      Sources: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, TDENGINE3X
+    - META_AND_DATA: Supports both metadata reading and data migration,
+      but NOT full migration (no automatic DDL generation for data types).
+      Sources: SQLSERVER, INFLUXDB1X, INFLUXDB2X
+    - DATA_ONLY: Supports data migration only, no metadata reading.
+      Sources: KAIWUDB, TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS
+    """
     FULL_MIGRATION = "full_migration"
-    METADATA_ONLY = "metadata_only"
-    TABLE_LEVEL_ONLY = "table_level_only"
+    META_AND_DATA = "meta_and_data"
+    DATA_ONLY = "data_only"
 
 
 # Comprehensive source type registry
@@ -92,7 +112,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 1433,
         "jdbc_driver": "com.microsoft.sqlserver.jdbc.SQLServerDriver",
         "jdbc_url_template": "jdbc:sqlserver://{host}:{port};databaseName={db};encrypt=false",
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.META_AND_DATA,
         "supports_metadata": True,
         "supports_full": False,
         "jdbc_prefix": "jdbc:sqlserver://",
@@ -108,14 +128,16 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "jdbc_prefix": "jdbc:clickhouse://",
     },
     # KaiwuDB (source or target)
+    # Note: When KAIWUDB is used as source, it only supports data migration (no metadata).
+    # When used as target, engine must be explicitly specified (RELATIONAL or TIMESERIES).
     SourceType.KAIWUDB: {
-        "engine": Engine.BOTH,
+        "engine": None,  # Engine must be explicitly specified for KAIWUDB
         "default_port": 26257,
         "jdbc_driver": "com.kaiwudb.Driver",
         "jdbc_url_template": "jdbc:kaiwudb://{host}:{port}/{db}",
-        "capability": SourceCapability.FULL_MIGRATION,
-        "supports_metadata": True,
-        "supports_full": True,
+        "capability": SourceCapability.DATA_ONLY,  # KAIWUDB as source only supports data migration
+        "supports_metadata": False,  # KAIWUDB does NOT support metadata reading as source
+        "supports_full": False,
         "jdbc_prefix": "jdbc:kaiwudb://",
     },
     # Time-series databases
@@ -134,7 +156,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 6030,
         "jdbc_driver": "com.taosdata.jdbc.TSDBDriver",
         "jdbc_url_template": "jdbc:TAOS://{host}:{port}/{db}",
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.DATA_ONLY,
         "supports_metadata": False,
         "supports_full": False,
         "jdbc_prefix": "jdbc:TAOS://",
@@ -144,7 +166,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 8086,
         "jdbc_driver": None,  # HTTP protocol, no JDBC
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.META_AND_DATA,  # Supports metadata + data, but not full migration
         "supports_metadata": True,
         "supports_full": False,
         "jdbc_prefix": None,
@@ -154,8 +176,8 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 8086,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
-        "supports_metadata": False,
+        "capability": SourceCapability.META_AND_DATA,  # Supports metadata + data, but not full migration
+        "supports_metadata": True,
         "supports_full": False,
         "jdbc_prefix": None,
     },
@@ -164,39 +186,39 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 4242,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.DATA_ONLY,
         "supports_metadata": False,
         "supports_full": False,
         "jdbc_prefix": None,
     },
     # Document databases
     SourceType.MONGODB: {
-        "engine": Engine.DOCUMENT,
+        "engine": Engine.TIMESERIES,  # Use TIMESERIES for non-relational sources
         "default_port": 27017,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.DATA_ONLY,
         "supports_metadata": False,
         "supports_full": False,
         "jdbc_prefix": None,
     },
     # File-based sources
     SourceType.FTP: {
-        "engine": Engine.FILE,
+        "engine": Engine.TIMESERIES,  # Use TIMESERIES for file sources
         "default_port": 21,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.DATA_ONLY,
         "supports_metadata": False,
         "supports_full": False,
         "jdbc_prefix": None,
     },
     SourceType.HDFS: {
-        "engine": Engine.FILE,
+        "engine": Engine.TIMESERIES,  # Use TIMESERIES for file sources
         "default_port": 8020,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.TABLE_LEVEL_ONLY,
+        "capability": SourceCapability.DATA_ONLY,
         "supports_metadata": False,
         "supports_full": False,
         "jdbc_prefix": None,
@@ -223,7 +245,8 @@ class DataSourceManager:
 
     # ==================== Source Type Detection ====================
 
-    def detect_source_type(self, config: Dict[str, Any]) -> Optional[str]:
+    @staticmethod
+    def detect_source_type(config: Dict[str, Any]) -> Optional[str]:
         """
         Detect source type from configuration.
 
@@ -245,7 +268,8 @@ class DataSourceManager:
 
         return None
 
-    def get_engine(self, source_type: str) -> str:
+    @staticmethod
+    def get_engine(source_type: str) -> str:
         """
         Get engine type for a source type.
 
@@ -259,12 +283,13 @@ class DataSourceManager:
         if source_upper in SOURCE_TYPE_REGISTRY:
             engine = SOURCE_TYPE_REGISTRY[source_upper]["engine"]
             return engine.value if isinstance(engine, Engine) else engine
-        
+
         # Default fallback
         logger.warning(f"Unknown source type '{source_type}', defaulting to RELATIONAL")
         return Engine.RELATIONAL.value
 
-    def get_capability(self, source_type: str) -> Dict[str, Any]:
+    @staticmethod
+    def get_capability(source_type: str) -> Dict[str, Any]:
         """
         Get source capability information.
 
@@ -294,7 +319,8 @@ class DataSourceManager:
 
     # ==================== JDBC URL Construction ====================
 
-    def build_jdbc_url(self, source_type: str, host: str, port: int, db_name: str) -> Optional[str]:
+    @staticmethod
+    def build_jdbc_url(source_type: str, host: str, port: int, db_name: str) -> Optional[str]:
         """
         Build JDBC URL for relational databases.
 
@@ -320,9 +346,9 @@ class DataSourceManager:
 
     # ==================== Configuration Building ====================
 
+    @staticmethod
     def build_config(
-        self,
-        source_type: str,
+            source_type: str,
         host: str,
         port: Optional[int] = None,
         username: str = "",
@@ -350,12 +376,12 @@ class DataSourceManager:
             Complete data source configuration dict
         """
         source_upper = source_type.upper()
-        
+
         if source_upper not in SOURCE_TYPE_REGISTRY:
             raise ValueError(f"Unsupported source type: {source_type}")
 
         registry_info = SOURCE_TYPE_REGISTRY[source_upper]
-        
+
         config = {
             "engine": registry_info["engine"].value if isinstance(registry_info["engine"], Engine) else registry_info["engine"],
             "type": source_upper,
@@ -376,10 +402,8 @@ class DataSourceManager:
         config["username"] = username
         config["password"] = password
 
-        # Add db_name for database sources
-        engine = registry_info["engine"]
-        engine_value = engine.value if isinstance(engine, Engine) else engine
-        if db_name and engine_value != Engine.FILE.value:
+        # Add db_name for database sources (not for file sources like FTP, HDFS)
+        if db_name and source_upper not in [SourceType.FTP, SourceType.HDFS]:
             config["dbName"] = db_name
 
         # Mark as target if applicable
@@ -421,7 +445,7 @@ class DataSourceManager:
             Relational database configuration
         """
         registry_info = SOURCE_TYPE_REGISTRY.get(source_type.upper(), {})
-        
+
         url = None
         if use_jdbc_url and registry_info.get("jdbc_url_template"):
             url = self.build_jdbc_url(source_type, host, port or registry_info["default_port"], db_name)
@@ -620,7 +644,6 @@ class DataSourceManager:
     def test_connection(
         self,
         config: Dict[str, Any],
-        base_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Test connection to data source.
@@ -636,14 +659,18 @@ class DataSourceManager:
             # Use provided API client
             is_target = config.get("isTarget", False)
             return self.api_client.test_connection(config, is_target=is_target)
-        
+
         # Without API client, can only validate config format
         logger.warning("No API client available, performing config validation only")
         return self._validate_config_format(config)
 
-    def _validate_config_format(self, config: Dict[str, Any]) -> Dict[str, Any]:
+    @staticmethod
+    def _validate_config_format(config: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate configuration format without API call.
+        
+        Note: engine is NOT required for source config (auto-detected),
+        but IS required for target config (KaiwuDB).
 
         Args:
             config: Configuration to validate
@@ -651,7 +678,14 @@ class DataSourceManager:
         Returns:
             Validation result
         """
-        required = ["engine", "type", "host", "username", "password"]
+        # Check if this is a target config
+        is_target = config.get('isTarget', False) or config.get('type', '').upper() == 'KAIWUDB'
+        
+        # Required fields: engine only required for target config
+        required = ['type', 'host', 'username', 'password']
+        if is_target:
+            required.append('engine')  # engine required for target config
+        
         missing = [f for f in required if f not in config or not config[f]]
 
         if missing:
@@ -671,7 +705,6 @@ class DataSourceManager:
         self,
         source_config: Dict[str, Any],
         target_config: Dict[str, Any],
-        base_url: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Test both source and target connections.
@@ -684,8 +717,8 @@ class DataSourceManager:
         Returns:
             Combined test result
         """
-        source_result = self.test_connection(source_config, base_url)
-        target_result = self.test_connection(target_config, base_url)
+        source_result = self.test_connection(source_config)
+        target_result = self.test_connection(target_config)
 
         return {
             "source": source_result,
@@ -695,7 +728,8 @@ class DataSourceManager:
 
     # ==================== Template Generation ====================
 
-    def get_template(self, source_type: str) -> Dict[str, Any]:
+    @staticmethod
+    def get_template(source_type: str) -> Dict[str, Any]:
         """
         Get configuration template for a source type.
 
@@ -706,11 +740,11 @@ class DataSourceManager:
             Configuration template with placeholders
         """
         registry_info = SOURCE_TYPE_REGISTRY.get(source_type.upper(), {})
-        
+
         # Get and convert engine to string
         engine = registry_info.get("engine", Engine.RELATIONAL)
         engine_str = engine.value if isinstance(engine, Engine) else engine
-        
+
         template = {
             "engine": engine_str,
             "type": source_type.upper(),
@@ -720,8 +754,8 @@ class DataSourceManager:
             "password": "<password>",
         }
 
-        # Add dbName for database sources
-        if engine_str != Engine.FILE.value:
+        # Add dbName for database sources (not for file sources)
+        if source_type.upper() not in [SourceType.FTP, SourceType.HDFS]:
             template["dbName"] = "<database_name>"
 
         # Add JDBC URL hint for relational sources
@@ -746,7 +780,8 @@ class DataSourceManager:
 
     # ==================== Utility Methods ====================
 
-    def list_supported_types(self) -> List[str]:
+    @staticmethod
+    def list_supported_types() -> List[str]:
         """
         List all supported source types.
 
@@ -755,7 +790,8 @@ class DataSourceManager:
         """
         return sorted(SOURCE_TYPE_REGISTRY.keys())
 
-    def get_default_port(self, source_type: str) -> int:
+    @staticmethod
+    def get_default_port(source_type: str) -> int:
         """
         Get default port for a source type.
 
@@ -767,7 +803,8 @@ class DataSourceManager:
         """
         return SOURCE_TYPE_REGISTRY.get(source_type.upper(), {}).get("default_port", 0)
 
-    def get_source_type_registry(self) -> Dict[str, Dict[str, Any]]:
+    @staticmethod
+    def get_source_type_registry() -> Dict[str, Dict[str, Any]]:
         """
         Get complete source type registry.
 
@@ -776,7 +813,8 @@ class DataSourceManager:
         """
         return dict(SOURCE_TYPE_REGISTRY)
 
-    def is_full_migration_capable(self, source_type: str) -> bool:
+    @staticmethod
+    def is_full_migration_capable(source_type: str) -> bool:
         """
         Check if source supports full migration.
 
@@ -791,7 +829,8 @@ class DataSourceManager:
             return SOURCE_TYPE_REGISTRY[source_upper]["supports_full"]
         return False
 
-    def is_metadata_capable(self, source_type: str) -> bool:
+    @staticmethod
+    def is_metadata_capable(source_type: str) -> bool:
         """
         Check if source supports metadata reading.
 

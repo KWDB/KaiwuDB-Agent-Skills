@@ -13,14 +13,12 @@ Modules:
 - config.py: Multi-layer configuration management
 """
 
-from .api_client import KDTSClient, build_source_config, build_table_mapping
+from .api_client import KDTSClient, build_source_config, build_target_config, build_table_mapping
 from .data_source import (
     DataSourceManager,
     Engine,
     SourceType,
     SourceCapability,
-    build_source_config as ds_build_source_config,
-    build_target_config as ds_build_target_config,
 )
 from .migration_task import (
     MigrationWorkflowManager,
@@ -41,14 +39,13 @@ __all__ = [
     # api_client
     "KDTSClient",
     "build_source_config",
+    "build_target_config",
     "build_table_mapping",
     # data_source
     "DataSourceManager",
     "Engine",
     "SourceType",
     "SourceCapability",
-    "ds_build_source_config",
-    "ds_build_target_config",
     # migration_task
     "MigrationWorkflowManager",
     "MigrationWorkflow",
@@ -65,4 +62,4 @@ __all__ = [
     "get_environment_info",
 ]
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"

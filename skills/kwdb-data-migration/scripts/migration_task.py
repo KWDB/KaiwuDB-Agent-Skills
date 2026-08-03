@@ -20,6 +20,12 @@ from enum import Enum
 import time
 import logging
 
+# Import DataSourceManager for engine detection
+try:
+    from .data_source import DataSourceManager
+except ImportError:
+    from data_source import DataSourceManager
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -459,9 +465,15 @@ class MigrationWorkflowManager:
             source_db = meta_result.get("data", {})
 
             # Step 3: Preview DDL
+            # Determine if time series based on source type (auto-detect engine)
+            source_type = source_config.get("type", "")
+            is_time_series = (
+                source_config.get("engine") == "TIMESERIES" or
+                DataSourceManager.get_engine(source_type) == "TIMESERIES"
+            )
             ddl_preview = self.preview_ddl(
                 target_config, source_db, metadata_options,
-                is_time_series=(source_config.get("engine") == "TIMESERIES")
+                is_time_series=is_time_series
             )
             result["steps"].append(ddl_preview)
 
@@ -501,7 +513,7 @@ class MigrationWorkflowManager:
             # Get script names from response data
             script_data = build_result.get("data", {})
             script_names = script_data.get("scriptNames", []) if isinstance(script_data, dict) else script_data
-            
+
             if not script_names:
                 result["error"] = "No scripts generated"
                 result["end_time"] = time.time()
@@ -586,9 +598,15 @@ class MigrationWorkflowManager:
             source_db = meta_result.get("data", {})
 
             # Step 3: Preview DDL
+            # Determine if time series based on source type (auto-detect engine)
+            source_type = source_config.get("type", "")
+            is_time_series = (
+                source_config.get("engine") == "TIMESERIES" or
+                DataSourceManager.get_engine(source_type) == "TIMESERIES"
+            )
             ddl_preview = self.preview_ddl(
                 target_config, source_db, metadata_options,
-                is_time_series=(source_config.get("engine") == "TIMESERIES")
+                is_time_series=is_time_series
             )
             result["steps"].append(ddl_preview)
 
@@ -678,7 +696,7 @@ class MigrationWorkflowManager:
             # Get script names from response data
             script_data = build_result.get("data", {})
             script_names = script_data.get("scriptNames", []) if isinstance(script_data, dict) else script_data
-            
+
             if not script_names:
                 result["error"] = "No scripts generated"
                 result["end_time"] = time.time()
