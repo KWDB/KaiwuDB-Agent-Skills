@@ -109,11 +109,12 @@ Ready-to-use JSON templates for KDTS migration requests.
 
 ### 2.1 Full Database Migration (Relational)
 
-For sources that support full migration: MySQL, Oracle, PostgreSQL, KaiwuDB, ClickHouse.
+For sources that support full migration (auto-discovery): MySQL, Oracle, PostgreSQL, ClickHouse, KaiwuDB.
 
 ```json
 {
   "source": {
+    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -128,7 +129,8 @@ For sources that support full migration: MySQL, Oracle, PostgreSQL, KaiwuDB, Cli
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "target_database"
+    "dbName": "target_database",
+    "isTarget": true
   },
   "tables": [],
   "data": {
@@ -155,11 +157,12 @@ For sources that support full migration: MySQL, Oracle, PostgreSQL, KaiwuDB, Cli
 
 ### 2.2 Table-Level Migration
 
-For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxDB 2.x, MongoDB, FTP, HDFS.
+For sources that don't support full migration (no auto-discovery): SQL Server, TDengine 2.x, InfluxDB 1.x/2.x, MongoDB, FTP, HDFS.
 
 ```json
 {
   "source": {
+    "engine": "RELATIONAL",
     "type": "SQLSERVER",
     "host": "192.168.1.102",
     "port": 1433,
@@ -174,7 +177,8 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "target_database"
+    "dbName": "target_database",
+    "isTarget": true
   },
   "tables": [
     {
@@ -204,6 +208,7 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
+    "engine": "TIMESERIES",
     "type": "TDENGINE3X",
     "host": "192.168.1.103",
     "port": 6030,
@@ -218,7 +223,8 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "sensor_target"
+    "dbName": "sensor_target",
+    "isTarget": true
   },
   "tables": [
     {
@@ -250,6 +256,7 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
+    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -264,7 +271,8 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "target_db"
+    "dbName": "target_db",
+    "isTarget": true
   },
   "tables": [
     {
@@ -295,6 +303,7 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
 ```json
 {
   "source": {
+    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -309,7 +318,8 @@ For sources that don't support full migration: SQL Server, TDengine 2.x, InfluxD
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "target_db"
+    "dbName": "target_db",
+    "isTarget": true
   },
   "tables": [
     {
@@ -347,6 +357,7 @@ Skip DDL steps, go directly to build.
 ```json
 {
   "source": {
+    "engine": "RELATIONAL",
     "type": "MYSQL",
     "host": "192.168.1.100",
     "port": 3306,
@@ -361,7 +372,8 @@ Skip DDL steps, go directly to build.
     "port": 26257,
     "username": "root",
     "password": "kwdb_password",
-    "dbName": "target_db"
+    "dbName": "target_db",
+    "isTarget": true
   },
   "tables": [
     {
@@ -539,22 +551,22 @@ POST /kdts/api/v1/datax/control
 
 ## 6. Data Source Compatibility Matrix
 
-| Source Type | Full Migration | Metadata | Time Filter | Custom SQL | Notes                              |
-|-------------|----------------|----------|-------------|------------|------------------------------------|
-| MYSQL       | Yes            | Yes      | No          | Yes        | Full support                       |
-| ORACLE      | Yes            | Yes      | No          | Yes        | Full support                       |
-| POSTGRESQL  | Yes            | Yes      | No          | Yes        | Full support                       |
-| SQLSERVER   | No             | Yes      | No          | Yes        | Metadata + Data only               |
-| CLICKHOUSE  | Yes            | No       | No          | Yes        | Full migration, no metadata        |
-| KAIWUDB     | No             | No       | No          | Yes        | Data migration only (as source)    |
-| TDENGINE3X  | Yes            | Yes      | Yes         | No         | Full support                       |
-| TDENGINE2X  | No             | No       | Yes         | No         | Data migration only                |
-| INFLUXDB1X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration |
-| INFLUXDB2X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration |
-| OPENTSDB    | No             | No       | Yes         | No         | Data migration only                |
-| MONGODB     | No             | No       | No          | Yes        | Data migration only                |
-| FTP         | No             | No       | No          | No         | Data migration only                |
-| HDFS        | No             | No       | No          | No         | Data migration only                |
+| Source Type | Full Migration | Metadata | Time Filter | Custom SQL | Notes                                        |
+|-------------|----------------|----------|-------------|------------|----------------------------------------------|
+| MYSQL       | Yes            | Yes      | No          | Yes        | Full support                                 |
+| ORACLE      | Yes            | Yes      | No          | Yes        | Full support                                 |
+| POSTGRESQL  | Yes            | Yes      | No          | Yes        | Full support                                 |
+| SQLSERVER   | No             | Yes      | No          | Yes        | Metadata + Data, no full migration           |
+| CLICKHOUSE  | Yes            | No       | No          | Yes        | Auto-discovery, no metadata                  |
+| KAIWUDB     | Yes            | No       | No          | Yes        | Auto-discovery, no metadata, engine required |
+| TDENGINE3X  | Yes            | Yes      | Yes         | No         | Full support                                 |
+| TDENGINE2X  | No             | No       | Yes         | No         | Data-only migration                          |
+| INFLUXDB1X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration           |
+| INFLUXDB2X  | No             | Yes      | Yes         | No         | Metadata + Data, no full migration           |
+| OPENTSDB    | No             | No       | Yes         | No         | Data-only migration                          |
+| MONGODB     | No             | No       | No          | Yes        | Data-only migration                          |
+| FTP         | No             | No       | No          | No         | Data-only migration                          |
+| HDFS        | No             | No       | No          | No         | Data-only migration                          |
 
 ---
 

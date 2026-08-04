@@ -53,8 +53,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('test_migration.log')
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)

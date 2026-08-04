@@ -260,8 +260,8 @@
 3. **配置示例**:
    ```json
    {
-     "source": { "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
-     "target": { "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "engine": "TIMESERIES" },
+     "source": { "engine": "RELATIONAL", "type": "MYSQL", "host": "源主机", "port": 3306, "username": "用户", "password": "密码", "dbName": "源库" },
+     "target": { "engine": "TIMESERIES", "type": "KAIWUDB", "host": "目标主机", "port": 26257, "username": "root", "password": "密码", "dbName": "目标库", "isTarget": true },
      "tables": [],
      "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
    }
@@ -293,7 +293,7 @@
 
 ### 参数收集顺序
 
-1. KDTS 服务器地址（默认 localhost:8080）
+1. KDTS 服务器地址（默认 localhost:8989）
 2. 操作类型（迁移/查询/排查）
 3. 源端配置（类型、连接、数据库）
 4. 目标配置（连接、数据库、engine）

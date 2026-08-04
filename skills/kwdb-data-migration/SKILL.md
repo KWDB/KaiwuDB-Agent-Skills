@@ -292,7 +292,7 @@ workflow = MigrationWorkflowManager(api_client=client)
 
 All migration parameters **must** be collected from the user explicitly:
 
-- KDTS server address (default: http://localhost:8080)
+- KDTS server address (default: http://localhost:8989)
 - Source database: engine, type, host, port, username, password, database name
 - Target KWDB: engine, host, port, username, password, database name
 - Migration scope: full database or specific tables
@@ -419,9 +419,12 @@ All endpoints under `{base_url}/kdts/api/v1`:
 
 **When to use:** Source supports full migration:
 
-- MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, TDENGINE3X
+- MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, KAIWUDB, TDENGINE3X
 
-**Note:** KAIWUDB, SQLSERVER, INFLUXDB, and other time-series/NoSQL sources do NOT support full migration. Use Workflow 2 or 3 instead.
+**Note:** 
+- KAIWUDB and CLICKHOUSE support auto-discovery (Full Migration) but do NOT support metadata reading (DDL generation). You may need to pre-create target tables or use alternative DDL generation methods.
+- SQLSERVER, INFLUXDB1X/2X support metadata + data but NOT auto-discovery (use Workflow 2).
+- TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS only support data migration (use Workflow 3).
 
 ```
 1. Collect parameters (interactive)
@@ -631,7 +634,7 @@ When user intent is identified but parameters are missing, collect them step by 
 
 ```
 What is the KDTS server address?
-(default: http://localhost:8080)
+(default: http://localhost:8989)
 ```
 
 ### Step 2: Migration Type

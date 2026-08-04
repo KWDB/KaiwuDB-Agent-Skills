@@ -61,13 +61,14 @@ class SourceCapability(str, Enum):
     Source capability levels.
 
     Based on KDTS SourceTypes.java implementation:
-    - FULL_MIGRATION: Supports complete migration including schema (DDL) and data.
-      Sources: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, TDENGINE3X
+    - FULL_MIGRATION: Supports auto-discovery of all tables (checkSourceForAllData).
+      Sources: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, KAIWUDB, TDENGINE3X
+      Note: CLICKHOUSE and KAIWUDB do NOT support metadata reading (DDL generation).
     - META_AND_DATA: Supports both metadata reading and data migration,
-      but NOT full migration (no automatic DDL generation for data types).
+      but NOT full migration (no automatic table discovery).
       Sources: SQLSERVER, INFLUXDB1X, INFLUXDB2X
-    - DATA_ONLY: Supports data migration only, no metadata reading.
-      Sources: KAIWUDB, TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS
+    - DATA_ONLY: Supports data migration only, no metadata reading and no auto-discovery.
+      Sources: TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS
     """
     FULL_MIGRATION = "full_migration"
     META_AND_DATA = "meta_and_data"
@@ -128,16 +129,16 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "jdbc_prefix": "jdbc:clickhouse://",
     },
     # KaiwuDB (source or target)
-    # Note: When KAIWUDB is used as source, it only supports data migration (no metadata).
+    # Note: KAIWUDB supports Full Migration (auto-discovery) but NOT metadata reading.
     # When used as target, engine must be explicitly specified (RELATIONAL or TIMESERIES).
     SourceType.KAIWUDB: {
         "engine": None,  # Engine must be explicitly specified for KAIWUDB
         "default_port": 26257,
         "jdbc_driver": "com.kaiwudb.Driver",
         "jdbc_url_template": "jdbc:kaiwudb://{host}:{port}/{db}",
-        "capability": SourceCapability.DATA_ONLY,  # KAIWUDB as source only supports data migration
+        "capability": SourceCapability.FULL_MIGRATION,  # KAIWUDB supports auto-discovery
         "supports_metadata": False,  # KAIWUDB does NOT support metadata reading as source
-        "supports_full": False,
+        "supports_full": True,  # Supports full migration (auto-discovery)
         "jdbc_prefix": "jdbc:kaiwudb://",
     },
     # Time-series databases
@@ -310,7 +311,7 @@ class DataSourceManager:
                 "default_port": info["default_port"],
             }
         return {
-            "capability": SourceCapability.TABLE_LEVEL_ONLY.value,
+            "capability": SourceCapability.DATA_ONLY.value,
             "supports_full_migration": False,
             "supports_metadata": False,
             "engine": Engine.RELATIONAL.value,

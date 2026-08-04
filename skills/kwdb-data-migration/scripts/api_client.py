@@ -586,12 +586,13 @@ def main():
 
     # Quick example usage
     if action == "test_connection":
-        client = KDTSClient(base_url="http://localhost:8080")
-        # engine is optional - will be auto-detected from source_type
+        client = KDTSClient(base_url="http://localhost:8989")
+        # engine is REQUIRED for all source configs per KDTS API
         source = build_source_config(
             source_type="MYSQL",
             host="127.0.0.1", port=3306,
-            username="root", password="123456"
+            username="root", password="123456",
+            engine="RELATIONAL"
         )
         result = client.test_connection(source)
         print(json.dumps(result, indent=2))

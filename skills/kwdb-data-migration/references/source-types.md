@@ -17,28 +17,34 @@ Complete reference of all source types supported by KDTS, their capabilities, an
 
 ## Source Type Matrix
 
-| Source Type    | Full Migration | Metadata | Engine       | Notes                          |
-|----------------|----------------|----------|--------------|--------------------------------|
-| **MYSQL**      | [YES]          | [YES]    | RELATIONAL   | Most common source             |
-| **ORACLE**     | [YES]          | [YES]    | RELATIONAL   | Enterprise DB                  |
-| **POSTGRESQL** | [YES]          | [YES]    | RELATIONAL   | Open-source alternative        |
-| **SQLSERVER**  | [NO]           | [YES]    | RELATIONAL   | Metadata + Data only           |
-| **CLICKHOUSE** | [YES]          | [NO]     | RELATIONAL   | Analytics DB, no metadata      |
-| **KAIWUDB**    | [NO]           | [NO]     | *REQUIRED*   | Data migration only as source  |
-| **TDENGINE3X** | [YES]          | [YES]    | TIMESERIES   | Recommended TDengine version   |
-| **TDENGINE2X** | [NO]           | [NO]     | TIMESERIES   | Legacy version                 |
-| **INFLUXDB1X** | [NO]           | [YES]    | TIMESERIES   | Metadata + Data only           |
-| **INFLUXDB2X** | [NO]           | [YES]    | TIMESERIES   | Metadata + Data only           |
-| **OPENTSDB**   | [NO]           | [NO]     | TIMESERIES   | Time-series DB                 |
-| **MONGODB**    | [NO]           | [NO]     | TIMESERIES   | Document DB                    |
-| **FTP**        | [NO]           | [NO]     | TIMESERIES   | File transfer                  |
-| **HDFS**       | [NO]           | [NO]     | TIMESERIES   | Hadoop filesystem              |
+> **Based on KDTS SourceTypes.java implementation**:
+> - Full Migration = `checkSourceForAllData()`: Supports auto-discovery of all tables
+> - Metadata = `checkSourceForMetadata()`: Supports reading table structure for DDL generation
+> - Data Only = `checkSourceForData()`: Supports data migration only
+
+| Source Type    | Full Migration | Metadata | Engine     | Notes                                        |
+|----------------|----------------|----------|------------|----------------------------------------------|
+| **MYSQL**      | [YES]          | [YES]    | RELATIONAL | Most common source                           |
+| **ORACLE**     | [YES]          | [YES]    | RELATIONAL | Enterprise DB                                |
+| **POSTGRESQL** | [YES]          | [YES]    | RELATIONAL | Open-source alternative                      |
+| **SQLSERVER**  | [NO]           | [YES]    | RELATIONAL | Metadata + Data, no full migration           |
+| **CLICKHOUSE** | [YES]          | [NO]     | RELATIONAL | Analytics DB, auto-discovery, no metadata    |
+| **KAIWUDB**    | [YES]          | [NO]     | *REQUIRED* | Auto-discovery, no metadata, engine required |
+| **TDENGINE3X** | [YES]          | [YES]    | TIMESERIES | Recommended TDengine version                 |
+| **TDENGINE2X** | [NO]           | [NO]     | TIMESERIES | Legacy version                               |
+| **INFLUXDB1X** | [NO]           | [YES]    | TIMESERIES | Metadata + Data, no full migration           |
+| **INFLUXDB2X** | [NO]           | [YES]    | TIMESERIES | Metadata + Data, no full migration           |
+| **OPENTSDB**   | [NO]           | [NO]     | TIMESERIES | Time-series DB                               |
+| **MONGODB**    | [NO]           | [NO]     | TIMESERIES | Document DB                                  |
+| **FTP**        | [NO]           | [NO]     | TIMESERIES | File transfer                                |
+| **HDFS**       | [NO]           | [NO]     | TIMESERIES | Hadoop filesystem                            |
 
 **Notes:**
 - All source configurations require explicit `engine` field
-- For KAIWUDB as source, engine must be explicitly specified based on data type
-- SQLSERVER, INFLUXDB1X/2X support metadata + data migration, but NOT full migration
-- Full migration is only supported for: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, TDENGINE3X
+- For KAIWUDB as source, engine must be explicitly specified based on data type (RELATIONAL or TIMESERIES)
+- SQLSERVER, INFLUXDB1X/2X support metadata + data migration, but NOT full migration (no auto-discovery)
+- Full migration (auto-discovery) is supported for: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, KAIWUDB, TDENGINE3X
+- CLICKHOUSE and KAIWUDB support Full Migration (auto-discovery) but NOT Metadata reading (DDL generation)
 
 ---
 

@@ -565,7 +565,7 @@ sudo systemctl restart kdts  # or however KDTS is managed
 2. **Check KDTS version**:
 
     ```bash
-    curl http://localhost:8080/kdts/info/version
+    curl http://localhost:8989/kdts/info/version
     ```
 
 3. **Check system resources**:

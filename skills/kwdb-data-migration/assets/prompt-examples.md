@@ -260,8 +260,8 @@ This document shows natural language user requests and how the Skill processes t
 3. **Config Example**:
    ```json
    {
-     "source": { "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
-     "target": { "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "engine": "TIMESERIES" },
+     "source": { "engine": "RELATIONAL", "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
+     "target": { "engine": "TIMESERIES", "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "isTarget": true },
      "tables": [],
      "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
    }
@@ -293,7 +293,7 @@ This document shows natural language user requests and how the Skill processes t
 
 ### Parameter Collection Order
 
-1. KDTS server address (default: localhost:8080)
+1. KDTS server address (default: localhost:8989)
 2. Operation type (migrate/query/troubleshoot)
 3. Source config (type, connection, database)
 4. Target config (connection, database, engine)

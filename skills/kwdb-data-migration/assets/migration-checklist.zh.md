@@ -17,7 +17,7 @@ AI Agent 将使用与用户相同的语言进行回复。
 
 - [ ] KDTS Server 已启动并可访问
     - 访问 `http://{kdts_host}:{port}/kdts/api/v1/health` 确认状态
-    - 默认端口：8080
+    - 默认端口：8989
 - [ ] 源数据库可从 KDTS 服务器网络访问
     - 测试连通性：`ping {source_host}` 或 `telnet {source_host} {port}`
 - [ ] 目标 KaiwuDB 已安装并启动
@@ -72,17 +72,44 @@ AI Agent 将使用与用户相同的语言进行回复。
 ### 2.2 源端元数据
 
 - [ ] 列出源数据库
-  ```
+
   POST /kdts/api/v1/datasource/databases
-  { "source": "源配置对象" }
+
+  ```json
+  {
+    "engine": "RELATIONAL",
+    "type": "MYSQL",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "username": "user",
+    "password": "pass",
+    "dbName": null
+  }
   ```
+
 - [ ] 读取目标表元数据
 
   POST /kdts/api/v1/datasource/metadata
   ```json
   {
-    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "root", "password": "password", "dbName": "example_db" },
-    "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false }
+    "source": {
+      "engine": "RELATIONAL",
+      "type": "MYSQL",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "user",
+      "password": "pass",
+      "dbName": "example_db"
+    },
+    "metadata": {
+      "enable": true,
+      "autoDdl": false,
+      "primaryKey": true,
+      "constraint": true,
+      "comment": true,
+      "index": true,
+      "view": false
+    }
   }
   ```
 - [ ] 确认元数据完整性
@@ -110,12 +137,57 @@ AI Agent 将使用与用户相同的语言进行回复。
   POST /kdts/api/v1/metadata/preview
   ```json
   {
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
-    "sourceDb": { "tables": [{"name": "example_table", "columns": [{"name": "id", "type": "INT"}]}] },
-    "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "pass",
+      "dbName": "target_db",
+      "isTarget": true
+    },
+    "sourceDb": {
+      "type": "MYSQL",
+      "name": "source_db",
+      "encoding": "UTF-8",
+      "tableMap": {
+        "example_table": {
+          "tableName": "example_table",
+          "columns": [
+            {
+              "columnName": "id",
+              "columnType": "INT",
+              "nullAble": false,
+              "finalConvertDataType": "INT",
+              "isChecked": true
+            }
+          ],
+          "primaryKey": {
+            "tableName": "example_table",
+            "columns": [{"columnName": "id", "asc": true}]
+          },
+          "constraint": [],
+          "indexes": []
+        }
+      },
+      "viewMap": {}
+    },
+    "metadata": {
+      "enable": true,
+      "autoDdl": false,
+      "primaryKey": true,
+      "constraint": true,
+      "comment": true,
+      "index": true,
+      "view": false
+    },
     "isTimeSeries": false
   }
   ```
+
+  **注意**：`sourceDb` 字段必须是从 `/datasource/metadata` API 返回的完整 `Database` 对象。
+  不要传入简化结构，请使用完整的响应对象。
 - [ ] 检查生成的 DDL
     - 表名是否匹配
     - 列名和类型是否正确映射
@@ -132,13 +204,32 @@ AI Agent 将使用与用户相同的语言进行回复。
   POST /kdts/api/v1/metadata/execute
   ```json
   {
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
-    "ddlScript": { "createTableStatements": ["CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"] },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "pass",
+      "dbName": "target_db",
+      "isTarget": true
+    },
+    "ddlScript": {
+      "dbName": "SOURCE_DB",
+      "createDb": "CREATE DATABASE SOURCE_DB ENGINE=TIMESERIES",
+      "table": {
+        "example_table": "CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"
+      },
+      "view": {}
+    },
     "autoDdl": false
   }
   ```
+
+  **注意**：`ddlScript` 必须是从 `/metadata/preview` API 返回的完整 `DdlScript` 对象。
+  不要传入简单的 SQL 语句数组。
 - [ ] 验证 DDL 执行结果
-    - 检查表是否创建成功
+    - 检查是否创建成功
     - 检查列类型是否正确
 
 ### 3.3 仅数据迁移场景
@@ -156,15 +247,36 @@ AI Agent 将使用与用户相同的语言进行回复。
 ### 4.1 构建迁移脚本
 
 - [ ] 构建 DataX 迁移脚本
+
   POST /kdts/api/v1/datax/build
   ```json
   {
-    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "root", "password": "password", "dbName": "src_db" },
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "password", "engine": "TIMESERIES" },
+    "source": {
+      "engine": "RELATIONAL",
+      "type": "MYSQL",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "root",
+      "password": "password",
+      "dbName": "src_db"
+    },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "password",
+      "dbName": "tgt_db",
+      "isTarget": true
+    },
     "tables": [],
     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
   }
   ```
+
+  **注意**：空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源）。
+  对于表级迁移，需要显式指定表列表。
 - [ ] 记录返回的脚本文件名
     - 格式：`{SOURCE}2KAIWUDB_{timestamp}.json`
     - 记录文件名用于后续查询
@@ -347,5 +459,5 @@ AI Agent 将使用与用户相同的语言进行回复。
 ---
 
 **文档版本：** v1.0.0  
-**最后更新：** 2026-08-03  
+**最后更新：** 2026-08-04  
 **维护者：** KDTS 开发团队

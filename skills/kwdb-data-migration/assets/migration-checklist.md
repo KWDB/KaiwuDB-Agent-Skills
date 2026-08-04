@@ -17,7 +17,7 @@ The AI Agent will respond in the same language the user uses.
 
 - [ ] KDTS Server is running and accessible
     - Access `http://{kdts_host}:{port}/kdts/api/v1/health` to confirm status
-    - Default port: 8080
+    - Default port: 8989
 - [ ] Source database is network-accessible from KDTS Server
     - Test connectivity: `ping {source_host}` or `telnet {source_host} {port}`
 - [ ] Target KaiwuDB is installed and running
@@ -75,13 +75,41 @@ The AI Agent will respond in the same language the user uses.
 
   POST /kdts/api/v1/datasource/databases
 
+  ```json
+  {
+    "engine": "RELATIONAL",
+    "type": "MYSQL",
+    "host": "127.0.0.1",
+    "port": 3306,
+    "username": "user",
+    "password": "pass",
+    "dbName": null
+  }
+  ```
+
 - [ ] Read source table metadata
 
   POST /kdts/api/v1/datasource/metadata
   ```json
   {
-    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "user", "password": "pass", "dbName": "example_db" },
-    "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false }
+    "source": {
+      "engine": "RELATIONAL",
+      "type": "MYSQL",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "user",
+      "password": "pass",
+      "dbName": "example_db"
+    },
+    "metadata": {
+      "enable": true,
+      "autoDdl": false,
+      "primaryKey": true,
+      "constraint": true,
+      "comment": true,
+      "index": true,
+      "view": false
+    }
   }
   ```
 - [ ] Verify metadata completeness
@@ -111,12 +139,57 @@ The AI Agent will respond in the same language the user uses.
   POST /kdts/api/v1/metadata/preview
   ```json
   {
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
-    "sourceDb": { "tables": [{"name": "example_table", "columns": [{"name": "id", "type": "INT"}]}] },
-    "metadata": { "primaryKey": true, "constraint": true, "comment": true, "index": true, "view": false },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "pass",
+      "dbName": "target_db",
+      "isTarget": true
+    },
+    "sourceDb": {
+      "type": "MYSQL",
+      "name": "source_db",
+      "encoding": "UTF-8",
+      "tableMap": {
+        "example_table": {
+          "tableName": "example_table",
+          "columns": [
+            {
+              "columnName": "id",
+              "columnType": "INT",
+              "nullAble": false,
+              "finalConvertDataType": "INT",
+              "isChecked": true
+            }
+          ],
+          "primaryKey": {
+            "tableName": "example_table",
+            "columns": [{"columnName": "id", "asc": true}]
+          },
+          "constraint": [],
+          "indexes": []
+        }
+      },
+      "viewMap": {}
+    },
+    "metadata": {
+      "enable": true,
+      "autoDdl": false,
+      "primaryKey": true,
+      "constraint": true,
+      "comment": true,
+      "index": true,
+      "view": false
+    },
     "isTimeSeries": false
   }
   ```
+
+  **Note**: The `sourceDb` field must be a complete `Database` object returned from `/datasource/metadata` API.
+  Do NOT pass a simplified structure - use the full response object.
 - [ ] Review generated DDL
     - Table names match
     - Column names and types map correctly
@@ -140,12 +213,30 @@ The AI Agent will respond in the same language the user uses.
   POST /kdts/api/v1/metadata/execute
   ```json
   {
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
-    "ddlScript": { "createTableStatements": ["CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"] },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "pass",
+      "dbName": "target_db",
+      "isTarget": true
+    },
+    "ddlScript": {
+      "dbName": "SOURCE_DB",
+      "createDb": "CREATE DATABASE SOURCE_DB ENGINE=TIMESERIES",
+      "table": {
+        "example_table": "CREATE TABLE example_table (id INT PRIMARY KEY, name VARCHAR(100))"
+      },
+      "view": {}
+    },
     "autoDdl": false
   }
   ```
 
+  **Note**: The `ddlScript` must be a complete `DdlScript` object returned from `/metadata/preview` API.
+  Do NOT pass a simple array of SQL statements.
 
 - [ ] Verify DDL execution result
     - Check table creation success
@@ -170,12 +261,32 @@ The AI Agent will respond in the same language the user uses.
   POST /kdts/api/v1/datax/build
   ```json
   {
-    "source": { "type": "MYSQL", "host": "127.0.0.1", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
-    "target": { "type": "KAIWUDB", "host": "127.0.0.1", "port": 26257, "username": "root", "password": "pass", "engine": "TIMESERIES" },
+    "source": {
+      "engine": "RELATIONAL",
+      "type": "MYSQL",
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "user",
+      "password": "pass",
+      "dbName": "src_db"
+    },
+    "target": {
+      "engine": "RELATIONAL",
+      "type": "KAIWUDB",
+      "host": "127.0.0.1",
+      "port": 26257,
+      "username": "root",
+      "password": "pass",
+      "dbName": "tgt_db",
+      "isTarget": true
+    },
     "tables": [],
     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
   }
   ```
+
+  **Note**: Empty `tables` array means auto-discover all tables (for sources that support full migration).
+  For table-level migration, specify tables explicitly.
 
 - [ ] Record returned script filename
     - Format: `{SOURCE}2KAIWUDB_{timestamp}.json`

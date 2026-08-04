@@ -151,7 +151,7 @@ from scripts.data_source import DataSourceManager
 from scripts.migration_task import MigrationWorkflowManager
 
 # Initialize
-client = KDTSClient(base_url="http://localhost:8080")
+client = KDTSClient(base_url="http://localhost:8989")
 ds_manager = DataSourceManager(api_client=client)
 workflow = MigrationWorkflowManager(api_client=client)
 
@@ -186,7 +186,7 @@ print(f"Migration {'succeeded' if result['success'] else 'failed'}")
 ```python
 from scripts.api_client import KDTSClient, build_source_config
 
-client = KDTSClient(base_url="http://localhost:8080")
+client = KDTSClient(base_url="http://localhost:8989")
 
 # Test connection
 source = build_source_config(
@@ -196,6 +196,7 @@ source = build_source_config(
     username="root",
     password="123456",
     db_name="test_db",
+    engine="RELATIONAL"
 )
 result = client.test_connection(source)
 print(f"Connection: {result}")
