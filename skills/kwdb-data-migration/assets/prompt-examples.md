@@ -346,6 +346,6 @@ The following keywords trigger the migration Skill:
 
 ---
 
-**Document Version:** v2.0  
-**Last Updated:** 2024-01-15  
-**Applicable Skill Version:** kwdb-data-migration v2.0
+**Document Version:** v1.0.0  
+**Last Updated:** 2026-08-03  
+**Applicable Skill Version:** kwdb-data-migration v1.0.0

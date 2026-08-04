@@ -62,4 +62,4 @@ __all__ = [
     "get_environment_info",
 ]
 
-__version__ = "2.1.0"
+__version__ = "1.0.0"

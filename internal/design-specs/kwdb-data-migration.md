@@ -4,8 +4,8 @@
 
 This document defines the design specification for the KWDB heterogeneous database migration skill.
 
-**Status**: Phase 3-5 Completed  
-**Version**: 2.1.0  
+**Status**: First Release
+**Version**: 1.0.0  
 **Last Updated**: 2026-08-03
 
 ---
@@ -561,11 +561,9 @@ Can resume after interruption:
 
 ## Version History
 
-| Version | Date       | Changes                                                                                                                                 |
-|---------|------------|-----------------------------------------------------------------------------------------------------------------------------------------|
-| 2.1.0   | 2026-08-03 | Simplified Engine types (RELATIONAL/TIMESERIES only); Fixed InfluxDB 1.x/2.x full migration support; Updated documentation and examples |
-| 2.0.0   | 2025-07-30 | Complete rewrite: 5 modules, full workflow, AI agent integration                                                                        |
-| 1.0.0   | 2025-06-01 | Initial version: manual migration guide                                                                                                 |
+| Version | Date       | Changes                                                                |
+|---------|------------|------------------------------------------------------------------------|
+| 1.0.0   | 2026-08-03 | **First Release**: Initial stable version with full migration support. |
 
 ---
 

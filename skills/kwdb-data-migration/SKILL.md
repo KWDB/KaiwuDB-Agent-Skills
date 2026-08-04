@@ -10,7 +10,7 @@ description: |
   - Migration management: query task status, view migration progress, check logs, pause/resume/kill migration, export/import config
   - Data type mapping, table structure sync, DDL generation, schema validation
   Even if the user does not explicitly say "migration", trigger this skill when they ask to transfer or sync data between databases with different engines.
-version: 2.1.0
+version: 1.0.0
 ---
 
 # KWDB Data Migration Skill

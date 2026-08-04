@@ -358,6 +358,6 @@ The AI Agent will respond in the same language the user uses.
 
 ---
 
-**Document Version:** v2.0  
-**Last Updated:** 2024-01-15  
+**Document Version:** v1.0.0  
+**Last Updated:** 2026-08-03  
 **Maintainer:** KDTS Development Team

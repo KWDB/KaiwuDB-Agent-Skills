@@ -440,5 +440,5 @@ Control migration task (query or kill).
 
 ## 8. Version Information
 
-This API reference is based on KDTS Server v1.0.0 (kw-datax-utils latest).
+This API reference is based on KDTS Server v3.3.0 (kw-datax-utils latest).
 For API changes, update this document accordingly.
