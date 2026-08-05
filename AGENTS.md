@@ -31,7 +31,6 @@ The repository currently maintains these Ready Skills:
 The following skill directories are still planned:
 
 - `kwdb-data-migration`
-- `kwdb-nl2sql-mcp`
 
 ## Stack Baseline
 

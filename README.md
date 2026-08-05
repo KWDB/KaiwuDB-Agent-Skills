@@ -75,7 +75,6 @@ clawhub --dir ~/.codex/skills install <skill-slug>
 ## Planned Skills
 
 - `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
-- `kwdb-nl2sql-mcp`: Provide natural-language-to-SQL workflows through a KWDB MCP integration.
 
 ## Validate
 
