@@ -693,6 +693,267 @@ KaiwuDB: 127.0.0.1:26257, 用户名=root, 密码=kwdb, 数据库=metrics_archive
 
 ---
 
+## 场景 9: MySQL 到 KaiwuDB (TIMESERIES) - Tag 选择
+
+### 用户请求
+````
+我有一个 MySQL 表 sensor_data 存储 IoT 传感器读数:
+- id (BIGINT, 主键)
+- device_id (VARCHAR(50))
+- location (VARCHAR(100))
+- sensor_type (VARCHAR(30))
+- reading_time (DATETIME)
+- temperature (DECIMAL(10,2))
+- humidity (DECIMAL(10,2))
+
+我想将这个表迁移到 KaiwuDB 时序表，以便进行时序查询。
+````
+
+### 期望的 AI Agent 响应
+
+**步骤 1: 分析并提供 Tag 配置**
+````
+[成功] MySQL -> KaiwuDB (TIMESERIES) 迁移已识别
+
+[信息] 分析源表结构...
+表: sensor_data (7 列)
+- id (BIGINT, 主键)
+- device_id (VARCHAR(50))
+- location (VARCHAR(100))
+- sensor_type (VARCHAR(30))
+- reading_time (DATETIME)
+- temperature (DECIMAL(10,2))
+- humidity (DECIMAL(10,2))
+
+[信息] 对于时序表，您需要配置 tag 和 value 字段:
+
+[警告] TIMESERIES 表要求:
+- 至少有 1 个 PRIMARY TAG (最多 4 个)
+- 可以有 SECONDARY TAGS (可选)
+- 其余列成为 VALUE FIELDS
+- reading_time 自动选为 TIME 列 (必需)
+
+请为 sensor_data 表配置 tag:
+
+PRIMARY TAG 选择 (1-4 个必需, 最多 4 个):
+[ ] id (BIGINT)
+[ ] device_id (VARCHAR(50))
+[ ] location (VARCHAR(100))
+[ ] sensor_type (VARCHAR(30))
+
+[信息] 提示: Primary tags 用于索引和过滤
+[信息] 推荐: device_id, location, sensor_type (常用过滤列)
+
+SECONDARY TAG 选择 (可选, 总共最多 128 个 tag):
+[ ] id (BIGINT)
+[ ] device_id (VARCHAR(50))
+[ ] location (VARCHAR(100))
+[ ] sensor_type (VARCHAR(30))
+````
+
+**用户响应**
+````
+PRIMARY TAGS: device_id, location, sensor_type (选择 3 个)
+SECONDARY TAGS: (无)
+````
+
+**步骤 2: 显示带 Tag 配置的 DDL 预览**
+````
+[信息] 使用您的 tag 配置生成 DDL...
+
+[成功] Tag 配置已保存:
+- PRIMARY TAGS (3 个): device_id, location, sensor_type
+- SECONDARY TAGS: 无
+- VALUE FIELDS: id, temperature, humidity
+- TIME 列: reading_time
+
+[警告] DDL 预览:
+```sql
+CREATE TABLE sensor_data
+(
+    reading_time TIMESTAMPTZ NOT NULL,
+    id BIGINT,
+    temperature DECIMAL(10,2),
+    humidity DECIMAL(10,2)
+)
+TAGS
+(
+    device_id VARCHAR(50) NOT NULL,
+    location VARCHAR(100) NOT NULL,
+    sensor_type VARCHAR(30) NOT NULL
+)
+PRIMARY TAGS (device_id, location, sensor_type);
+```
+
+[信息] 统计:
+- 总列数: 4 个值列 + 3 个标签 = 7 个
+- Primary tags: 3 个 (限制: 4 个)
+- 预估 DDL 大小: ~1.5KB
+
+确认执行此 DDL? (是/否)
+````
+
+**用户响应**
+````
+是
+````
+
+**步骤 3: 执行并显示结果**
+````
+[信息] 正在执行 DDL...
+
+[系统内部调用]
+1. KDTSClient.execute_ddl(target_config, ddl)
+
+[成功] DDL 执行成功!
+  已创建表: sensor_data
+  耗时: 0.15 秒
+
+[信息] 下一步: 配置 DataX 进行数据迁移
+  是否使用默认或自定义配置?
+````
+
+---
+
+## 场景 10: InfluxDB 1.x 到 KaiwuDB (TIMESERIES) - 自动 Tag 映射
+
+### 用户请求
+````
+我需要将 InfluxDB 1.x 数据库迁移到 KaiwuDB TIMESERIES:
+- 数据库: metrics
+- 包含多个 measurements，部分有 5 个以上的 tags
+- 希望保留所有数据
+
+请检查是否可以迁移并处理 tag 问题。
+````
+
+### 期望的 AI Agent 响应
+
+**步骤 1: 分析 InfluxDB 结构**
+````
+[成功] InfluxDB 1.x -> KaiwuDB (TIMESERIES) 迁移已识别
+
+[信息] 注意: InfluxDB 时序源只能迁移到 KaiwuDB TIMESERIES
+  (不兼容 RELATIONAL 引擎 - KDTS 强制执行此限制)
+
+[信息] 分析源数据库结构...
+
+[系统内部调用]
+1. KDTSClient.read_metadata(source_config)
+
+[信息] 找到 5 个 measurements:
+- cpu_usage: tags(host, region, datacenter, service, priority), fields(usage, temperature)
+- memory_usage: tags(host, region), fields(used, free)
+- disk_io: tags(host, device, region), fields(read_bytes, write_bytes)
+- network: tags(host, interface, region, datacenter), fields(rx, tx)
+- request_log: tags(service, endpoint, method, status_code, region, datacenter), fields(latency)
+
+[警告] Tag 溢出检测:
+- cpu_usage: 5 个 tags (超过 PRIMARY 限制 4 个)
+- request_log: 6 个 tags (超过 PRIMARY 限制 4 个)
+
+[信息] KDTS 自动映射规则:
+- 前 4 个 tags -> PRIMARY TAGS
+- 剩余 tags -> SECONDARY TAGS
+
+cpu_usage 自动映射示例:
+- PRIMARY TAGS: host, region, datacenter, service
+- SECONDARY TAGS: priority
+- VALUE FIELDS: usage, temperature
+
+request_log 自动映射示例:
+- PRIMARY TAGS: service, endpoint, method, status_code
+- SECONDARY TAGS: region, datacenter
+- VALUE FIELDS: latency
+
+是否使用此自动映射或手动调整?
+````
+
+**用户响应**
+````
+使用自动映射，看起来不错
+````
+
+**步骤 2: 预览 DDL**
+````
+[信息] 使用自动映射的 tags 生成 DDL...
+
+[警告] DDL 预览 (5 个 measurements 中的 2 个):
+
+```sql
+-- cpu_usage (5 个 tags -> 4 个 PRIMARY + 1 个普通标签)
+CREATE TABLE cpu_usage
+(
+    time TIMESTAMPTZ NOT NULL,
+    usage DOUBLE,
+    temperature DOUBLE
+)
+TAGS
+(
+    host VARCHAR(100) NOT NULL,
+    region VARCHAR(50) NOT NULL,
+    datacenter VARCHAR(50) NOT NULL,
+    service VARCHAR(100) NOT NULL,
+    priority VARCHAR(20)
+)
+PRIMARY TAGS (host, region, datacenter, service);
+
+-- request_log (6 个 tags -> 4 个 PRIMARY + 2 个普通标签)
+CREATE TABLE request_log
+(
+    time TIMESTAMPTZ NOT NULL,
+    latency DOUBLE
+)
+TAGS
+(
+    service VARCHAR(100) NOT NULL,
+    endpoint VARCHAR(200) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INT NOT NULL,
+    region VARCHAR(50),
+    datacenter VARCHAR(50)
+)
+PRIMARY TAGS (service, endpoint, method, status_code);
+```
+
+[信息] 要创建的总表数: 5
+- 2 个表使用自动调整的标签 (最多 4 个 PRIMARY TAGS)
+- 3 个表使用标准 PRIMARY TAGS (<= 4 个 tags)
+
+确认对所有 5 个表执行 DDL? (是/否)
+````
+
+**用户响应**
+````
+是
+````
+
+**步骤 3: 执行并继续**
+````
+[信息] 正在对 5 个表执行 DDL...
+
+[系统内部调用]
+1. KDTSClient.execute_ddl(target_config, ddl_batch)
+
+[成功] 所有 5 个表创建成功!
+  - cpu_usage (SECONDARY TAG: priority)
+  - memory_usage
+  - disk_io
+  - network (SECONDARY TAG: datacenter)
+  - request_log (SECONDARY TAGS: region, datacenter)
+
+[信息] 准备进行数据迁移...
+
+重要提示: KaiwuDB 表已创建，包含:
+- PRIMARY TAGS: 用于高效索引和过滤
+- SECONDARY TAGS: 已索引但较少查询
+- VALUE FIELDS: 测量数据值
+
+下一步: 配置 DataX 参数进行数据迁移
+````
+
+---
+
 ## 标签说明
 
 | 标签     | 含义             |

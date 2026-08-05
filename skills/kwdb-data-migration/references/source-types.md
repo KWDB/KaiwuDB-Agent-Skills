@@ -48,6 +48,26 @@ Complete reference of all source types supported by KDTS, their capabilities, an
 
 ---
 
+## Source-Target Engine Compatibility (STRICT)
+
+**CRITICAL**: The following compatibility rules are ENFORCED by KDTS. Violating these rules will cause migration failure.
+
+| Source Type                                      | Source Engine            | Allowed Target Engines   | Notes                                            |
+|--------------------------------------------------|--------------------------|--------------------------|--------------------------------------------------|
+| MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE | RELATIONAL               | RELATIONAL, TIMESERIES   | Relational sources can migrate to either engine  |
+| KAIWUDB (source)                                 | RELATIONAL or TIMESERIES | RELATIONAL or TIMESERIES | KaiwuDB can be migrated between engines          |
+| TDENGINE2X, TDENGINE3X                           | TIMESERIES               | **ONLY TIMESERIES**      | Time series sources CANNOT migrate to RELATIONAL |
+| INFLUXDB1X, INFLUXDB2X                           | TIMESERIES               | **ONLY TIMESERIES**      | Time series sources CANNOT migrate to RELATIONAL |
+| OPENTSDB                                         | TIMESERIES               | **ONLY TIMESERIES**      | Time series sources CANNOT migrate to RELATIONAL |
+| MONGODB, FTP, HDFS                               | TIMESERIES               | TIMESERIES               | File/NoSQL sources are time series oriented      |
+
+**If Time Series Source → Relational Target is requested:**
+1. The migration will FAIL at the KDTS API level
+2. Recommend using native tools: Export data from source, transform as needed, import to KaiwuDB RELATIONAL
+3. For InfluxDB/TDengine: Use their built-in export (CSV, Line Protocol) then bulk load to KaiwuDB
+
+---
+
 ## Target Configuration
 
 **IMPORTANT**: Target is **ALWAYS** KaiwuDB with type = `KAIWUDB`.

@@ -693,6 +693,267 @@ Migration successful? It is recommended to run verification script to confirm be
 
 ---
 
+## Scenario 9: MySQL to KaiwuDB (TIMESERIES) - Tag Selection
+
+### User Request
+````
+I have a MySQL table sensor_data that stores IoT sensor readings:
+- id (BIGINT, PK)
+- device_id (VARCHAR(50))
+- location (VARCHAR(100))
+- sensor_type (VARCHAR(30))
+- reading_time (DATETIME)
+- temperature (DECIMAL(10,2))
+- humidity (DECIMAL(10,2))
+
+I want to migrate this to KaiwuDB as a time series table so I can perform time-series queries.
+````
+
+### Expected AI Agent Response
+
+**Step 1: Analyze and Offer Tag Configuration**
+````
+[OK] MySQL -> KaiwuDB (TIMESERIES) migration recognized
+
+[INFO] Analyzing source table structure...
+Table: sensor_data (7 columns)
+- id (BIGINT, PK)
+- device_id (VARCHAR(50))
+- location (VARCHAR(100))
+- sensor_type (VARCHAR(30))
+- reading_time (DATETIME)
+- temperature (DECIMAL(10,2))
+- humidity (DECIMAL(10,2))
+
+[INFO] For time series tables, you need to select tags and value fields:
+
+[WARNING] TIMESERIES Table Requirements:
+- Must have at least 1 PRIMARY TAG (max 4)
+- Can have SECONDARY TAGS (optional)
+- Remaining columns become VALUE FIELDS
+- reading_time is auto-selected as TIME column (required)
+
+Please configure tags for sensor_data table:
+
+PRIMARY TAG Selection (1-4 required, max 4):
+[ ] id (BIGINT)
+[ ] device_id (VARCHAR(50))
+[ ] location (VARCHAR(100))
+[ ] sensor_type (VARCHAR(30))
+
+[INFO] Tip: Primary tags are used for indexing and filtering
+[INFO] Recommended: device_id, location, sensor_type (common filter columns)
+
+SECONDARY TAG Selection (optional, max 128 total tags):
+[ ] id (BIGINT)
+[ ] device_id (VARCHAR(50))
+[ ] location (VARCHAR(100))
+[ ] sensor_type (VARCHAR(30))
+````
+
+**User Response**
+````
+PRIMARY TAGS: device_id, location, sensor_type (3 selected)
+SECONDARY TAGS: (none)
+````
+
+**Step 2: Show DDL Preview with Tag Configuration**
+````
+[INFO] Generating DDL with your tag configuration...
+
+[SUCCESS] Tag configuration saved:
+- PRIMARY TAGS (3): device_id, location, sensor_type
+- SECONDARY TAGS: None
+- VALUE FIELDS: id, temperature, humidity
+- TIME COLUMN: reading_time
+
+[WARNING] DDL Preview:
+```sql
+CREATE TABLE sensor_data
+(
+    reading_time TIMESTAMPTZ NOT NULL,
+    id BIGINT,
+    temperature DECIMAL(10,2),
+    humidity DECIMAL(10,2)
+)
+TAGS
+(
+    device_id VARCHAR(50) NOT NULL,
+    location VARCHAR(100) NOT NULL,
+    sensor_type VARCHAR(30) NOT NULL
+)
+PRIMARY TAGS (device_id, location, sensor_type);
+```
+
+[INFO] Statistics:
+- Total columns: 4 value + 3 tags = 7
+- Primary tags: 3 (limit: 4)
+- Estimated DDL size: ~1.5KB
+
+Confirm to execute this DDL? (yes/no)
+````
+
+**User Response**
+````
+yes
+````
+
+**Step 3: Execute and Show Result**
+````
+[INFO] Executing DDL...
+
+[System Internal Call]
+1. KDTSClient.execute_ddl(target_config, ddl)
+
+[SUCCESS] DDL executed successfully!
+  Table created: sensor_data
+  Time taken: 0.15 seconds
+
+[INFO] Next step: Configure DataX for data migration
+  Would you like to use default or custom configuration?
+````
+
+---
+
+## Scenario 10: InfluxDB 1.x to KaiwuDB (TIMESERIES) - Auto Tag Mapping
+
+### User Request
+````
+I need to migrate an InfluxDB 1.x database to KaiwuDB TIMESERIES:
+- Database: metrics
+- Has measurements with various tags (some have 5+ tags)
+- Want to preserve all data
+
+Check if migration is possible and handle any tag issues.
+````
+
+### Expected AI Agent Response
+
+**Step 1: Analyze InfluxDB Structure**
+````
+[OK] InfluxDB 1.x -> KaiwuDB (TIMESERIES) migration recognized
+
+[INFO] Note: InfluxDB time series sources can ONLY migrate to KaiwuDB TIMESERIES
+  (Not compatible with RELATIONAL engine - this is enforced by KDTS)
+
+[INFO] Analyzing source database structure...
+
+[System Internal Call]
+1. KDTSClient.read_metadata(source_config)
+
+[INFO] Found 5 measurements:
+- cpu_usage: tags(host, region, datacenter, service, priority), fields(usage, temperature)
+- memory_usage: tags(host, region), fields(used, free)
+- disk_io: tags(host, device, region), fields(read_bytes, write_bytes)
+- network: tags(host, interface, region, datacenter), fields(rx, tx)
+- request_log: tags(service, endpoint, method, status_code, region, datacenter), fields(latency)
+
+[WARNING] Tag Overflow Detection:
+- cpu_usage: 5 tags (exceeds PRIMARY limit of 4)
+- request_log: 6 tags (exceeds PRIMARY limit of 4)
+
+[INFO] KDTS Auto-Mapping Rules:
+- First 4 tags -> PRIMARY TAGS
+- Remaining tags -> SECONDARY TAGS
+
+Example auto-mapping for cpu_usage:
+- PRIMARY TAGS: host, region, datacenter, service
+- SECONDARY TAGS: priority
+- VALUE FIELDS: usage, temperature
+
+Example auto-mapping for request_log:
+- PRIMARY TAGS: service, endpoint, method, status_code
+- SECONDARY TAGS: region, datacenter
+- VALUE FIELDS: latency
+
+Would you like to use this auto-mapping or manually adjust?
+````
+
+**User Response**
+````
+Use auto-mapping, it looks good
+````
+
+**Step 2: Preview DDL**
+````
+[INFO] Generating DDL with auto-mapped tags...
+
+[WARNING] DDL Preview (2 of 5 measurements):
+
+```sql
+-- cpu_usage (5 tags -> 4 PRIMARY + 1 secondary)
+CREATE TABLE cpu_usage
+(
+    time TIMESTAMPTZ NOT NULL,
+    usage DOUBLE,
+    temperature DOUBLE
+)
+TAGS
+(
+    host VARCHAR(100) NOT NULL,
+    region VARCHAR(50) NOT NULL,
+    datacenter VARCHAR(50) NOT NULL,
+    service VARCHAR(100) NOT NULL,
+    priority VARCHAR(20)
+)
+PRIMARY TAGS (host, region, datacenter, service);
+
+-- request_log (6 tags -> 4 PRIMARY + 2 secondary)
+CREATE TABLE request_log
+(
+    time TIMESTAMPTZ NOT NULL,
+    latency DOUBLE
+)
+TAGS
+(
+    service VARCHAR(100) NOT NULL,
+    endpoint VARCHAR(200) NOT NULL,
+    method VARCHAR(10) NOT NULL,
+    status_code INT NOT NULL,
+    region VARCHAR(50),
+    datacenter VARCHAR(50)
+)
+PRIMARY TAGS (service, endpoint, method, status_code);
+```
+
+[INFO] Total tables to create: 5
+- 2 tables with auto-adjusted tags (max 4 PRIMARY TAGS)
+- 3 tables with standard PRIMARY TAGS (<= 4 tags)
+
+Confirm to execute DDL for all 5 tables? (yes/no)
+````
+
+**User Response**
+````
+yes
+````
+
+**Step 3: Execute and Continue**
+````
+[INFO] Executing DDL for 5 tables...
+
+[System Internal Call]
+1. KDTSClient.execute_ddl(target_config, ddl_batch)
+
+[SUCCESS] All 5 tables created successfully!
+  - cpu_usage (with SECONDARY TAG: priority)
+  - memory_usage
+  - disk_io
+  - network (with SECONDARY TAGS: datacenter)
+  - request_log (with SECONDARY TAGS: region, datacenter)
+
+[INFO] Ready for data migration...
+
+IMPORTANT: KaiwuDB tables created with:
+- PRIMARY TAGS: Used for efficient indexing and filtering
+- SECONDARY TAGS: Indexed but less frequently queried
+- VALUE FIELDS: Measured data values
+
+Next: Configure DataX parameters for data migration
+````
+
+---
+
 ## Summary
 
 These interaction scenarios validate that the AI Agent:

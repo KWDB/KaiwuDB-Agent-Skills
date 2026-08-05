@@ -235,14 +235,15 @@ class ConfigValidator:
 **Purpose**: Map error codes to user-friendly messages
 
 **Error Code Ranges**:
-| Range | Category | Examples |
-|-------|----------|----------|
-| 1xxx | Parameter | 1001, 1002, 1003 |
-| 2xxx | Connection | 2001, 2002 |
-| 3xxx | Metadata | 3001, 3004 |
-| 4xxx | DataX | 4001, 4002, 4003 |
-| 5xxx | Resource | 5001, 5002 |
-| 9xxx | System | 9999 |
+
+| Range | Category   | Examples         |
+|-------|------------|------------------|
+| 1xxx  | Parameter  | 1001, 1002, 1003 |
+| 2xxx  | Connection | 2001, 2002       |
+| 3xxx  | Metadata   | 3001, 3004       |
+| 4xxx  | DataX      | 4001, 4002, 4003 |
+| 5xxx  | Resource   | 5001, 5002       |
+| 9xxx  | System     | 9999             |
 
 **Key Methods**:
 
@@ -585,6 +586,318 @@ Can resume after interruption:
 3. **INFLUXDB1X/2X** - Full migration supported, but requires two steps (Schema + Data separately)
 4. **HDFS/FTP** - No metadata, no full migration, only table-level
 5. **MONGODB** - No metadata, no full migration, only table-level
+
+### Engine Compatibility Rules (STRICT)
+
+**IMPORTANT**: The following rules are ENFORCED by KDTS. Violating these will cause migration failure.
+
+| Source Category | Source Types                                     | Allowed Target Engines   | Restriction                  |
+|-----------------|--------------------------------------------------|--------------------------|------------------------------|
+| **Time Series** | TDENGINE, INFLUXDB, OPENTSDB                     | **ONLY TIMESERIES**      | Cannot migrate to RELATIONAL |
+| **Relational**  | MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE | RELATIONAL or TIMESERIES | Can migrate to either        |
+| **File/NoSQL**  | MONGODB, FTP, HDFS                               | TIMESERIES               | Time series oriented only    |
+
+**Handling Invalid Combinations**:
+- If user requests Time Series Source → RELATIONAL Target:
+  1. Explain the restriction
+  2. Suggest using native tools or custom scripts
+  3. Show alternative: export from source → import to KaiwuDB
+
+### Configuration Rules (Corrected)
+
+**Note**: The following rules update the previous configuration constraints.
+
+1. **`setting.speed` can use `channel`, `byte`, and `record` simultaneously** - They are NOT mutually exclusive
+2. **`setting.errorLimit.record` and `setting.errorLimit.percentage` can be configured together** - KDTS will use the more restrictive limit
+3. **Mutually exclusive parameters**:
+   - `where` and `querySql` - Cannot use both simultaneously
+   - `splitPk` and `querySql` - Not recommended (splitPk requires table structure)
+   - `column` (string) and `columns` (array) - Choose one format
+
+---
+
+## KaiwuDB DDL Requirements
+
+**IMPORTANT**: This section summarizes critical DDL rules for migration. For complete syntax, examples, and KDTS auto-mapping implementation details, refer to `references/ddl-syntax.md`.
+
+### Time Series Table DDL Syntax
+
+**Complete Syntax**:
+```sql
+CREATE TABLE <table_name> (
+    <timestamp_col> TIMESTAMPTZ NOT NULL,
+    <value_col_1> <data_type> [DEFAULT <value>],
+    <value_col_2> <data_type> [DEFAULT <value>],
+    ...
+)
+[TAGS | ATTRIBUTES] (
+    <tag_col_1> <data_type> NOT NULL,
+    <tag_col_2> <data_type>,
+    ...
+)
+PRIMARY [TAGS | ATTRIBUTES] (<tag_col_1>, <tag_col_2>, ...)
+[RETENTIONS <keep_duration>]
+[ACTIVETIME <active_duration>]
+[PARTITION INTERVAL <interval>]
+[DICT ENCODING];
+```
+
+**Mandatory Rules (Violation Causes Migration Failure)**:
+1. **First column MUST be** `TIMESTAMP` or `TIMESTAMPTZ` with `NOT NULL`
+2. **At least 1 PRIMARY TAG required** (Error 3006 if missing)
+3. **Max 4 PRIMARY TAGS** per table (Error 3004 if exceeded)
+4. **Max 128 TAGS** per table
+5. **Max 4096 columns** total (data + tags)
+6. **PRIMARY TAGS must be** in TAGS list with `NOT NULL`
+7. **PRIMARY TAGS cannot be** (from KDTS TypeMapping.FLOAT_TYPE_NAMES):
+   - FLOAT, FLOAT4, FLOAT8, DOUBLE, REAL, BINARY_FLOAT, BINARY_DOUBLE, DECIMAL, NUMERIC (all classified as float types)
+   - Variable-length types except VARCHAR (e.g., TEXT, NVARCHAR, NCHAR, CLOB, BLOB, BYTES, VARBYTES, JSON, ARRAY, MAP, INET, INTERVAL, UUID)
+   - VARCHAR length: Default 64 bytes, Max 128 bytes
+8. **TAGS cannot be**: TIMESTAMP, TIMESTAMPTZ, NVARCHAR, GEOMETRY, JSON
+9. **Table/column/tag names**: Max 128 bytes
+
+**Optional Table Parameters**:
+
+| Parameter          | Default             | Description                                    |
+|--------------------|---------------------|------------------------------------------------|
+| RETENTIONS         | `0d` (never expire) | Data retention period                          |
+| ACTIVETIME         | `1d`                | Time before compression (`0` = no compression) |
+| PARTITION INTERVAL | System default      | Time partition interval                        |
+| DICT ENCODING      | Disabled            | Dictionary encoding for compression            |
+
+**Supported Time Units**: S/SECOND, M/MINUTE, H/HOUR, D/DAY, W/WEEK, MON/MONTH, Y/YEAR (Max 1000 years)
+
+**Example**:
+```sql
+CREATE TABLE sensor_readings (
+    ts TIMESTAMPTZ NOT NULL,
+    temperature DOUBLE,
+    humidity DOUBLE,
+    pressure DOUBLE
+)
+TAGS (
+    sensor_id BIGINT NOT NULL,
+    location VARCHAR(100),
+    device_type VARCHAR(50)
+)
+PRIMARY TAGS (sensor_id)
+RETENTIONS '30d'
+ACTIVETIME '7d';
+```
+
+### Relational Table DDL Syntax
+
+**Syntax**:
+```sql
+CREATE TABLE <table_name> (
+    <col_1> <data_type> [constraints],
+    <col_2> <data_type> [constraints],
+    ...
+    [PRIMARY KEY (col_1, col_2, ...)],
+    [FOREIGN KEY (col_x) REFERENCES other_table(col_y)],
+    [UNIQUE (col_a, col_b, ...)]
+);
+```
+
+**Supported Data Types**:
+
+| Category  | Types                                             |
+|-----------|---------------------------------------------------|
+| Integer   | TINYINT, SMALLINT, INT, BIGINT, SERIAL, BIGSERIAL |
+| Float     | REAL, DOUBLE                                      |
+| Decimal   | DECIMAL(p,s), NUMERIC(p,s)                        |
+| String    | CHAR(n), VARCHAR(n) [max 65535 bytes], TEXT       |
+| Date/Time | DATE, TIME, TIMESTAMP, TIMESTAMPTZ, INTERVAL      |
+| Boolean   | BOOLEAN                                           |
+| Binary    | BINARY(n), VARBINARY(n), BLOB                     |
+| JSON      | JSON, JSONB                                       |
+
+**Example**:
+```sql
+CREATE TABLE orders (
+    id BIGSERIAL PRIMARY KEY,
+    order_no VARCHAR(50) UNIQUE NOT NULL,
+    customer_id BIGINT NOT NULL,
+    total_amount DECIMAL(15,2),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    FOREIGN KEY (customer_id) REFERENCES customers(id)
+);
+```
+
+### Error Codes for DDL Generation
+
+| Error Code | Description                 | Migration Impact | Solution                                         |
+|------------|-----------------------------|------------------|--------------------------------------------------|
+| 3004       | Tag limit exceeded          | BLOCKED          | Reduce tags to max 128, primary tags to max 4    |
+| 3005       | Name too long               | BLOCKED          | Shorten names to max 128 bytes                   |
+| 3006       | No primary tag              | BLOCKED          | Add at least 1 PRIMARY TAG                       |
+| 3007       | Invalid tag type            | BLOCKED          | Remove unsupported types from tags               |
+| 3008       | Primary tag not in tag list | BLOCKED          | Add tag to TAGS clause first                     |
+| 3009       | First column not timestamp  | BLOCKED          | Make first column TIMESTAMP/TIMESTAMPTZ NOT NULL |
+
+### Tag Handling for Migration
+
+#### Scenario 1: Relational Source → Time Series Target (MOST COMPLEX)
+
+**Problem**: KDTS API's `preview_ddl` has NO tag specification parameter. The SKILL must handle this case.
+
+**Workflow**:
+```
+1. Read source metadata
+   - Get all columns, their types, primary keys
+   
+2. Identify candidate columns
+   - EXCLUDE: timestamp/datetime columns (reserved for time column)
+   - EXCLUDE: very long text columns (not suitable for tags)
+   - INCLUDE: ID columns, category columns, status columns (good tag candidates)
+   
+3. Present to user for selection:
+   a. Select PRIMARY TAGS (1-4, REQUIRED)
+      - Show suitable candidates with types
+      - Warn about FLOAT/DOUBLE/DECIMAL/NUMERIC not allowed (classified as float by KDTS)
+      - Warn about VARCHAR length limits (primary tag: max 128B, default 64B)
+   
+   b. Select additional TAGS (optional, max 128 total)
+      - Show remaining suitable columns
+   
+   c. Auto-select time column
+      - Choose first timestamp/datetime column as time column
+   
+4. Generate DDL (SKILL-GENERATED, not KDTS-generated)
+   - Apply type conversions (MySQL DATETIME → TIMESTAMPTZ)
+   - Validate tag types against KaiwuDB restrictions
+   - Format according to KaiwuDB syntax
+   
+5. Validate DDL
+   - Check first column is TIMESTAMPTZ NOT NULL
+   - Check PRIMARY TAGS count (1-4)
+   - Check tag type compatibility
+   
+6. Execute DDL directly on KaiwuDB (via JDBC/ODBC, NOT KDTS API)
+   
+7. Continue with DATA-ONLY migration (KDTS API)
+```
+
+**Validation Checklist for DDL Generation**:
+- [ ] First column is TIMESTAMPTZ NOT NULL
+- [ ] PRIMARY TAGS count: 1-4
+- [ ] PRIMARY TAGS are in TAGS list
+- [ ] PRIMARY TAGS have NOT NULL constraint
+- [ ] PRIMARY TAGS types: No FLOAT/DOUBLE/DECIMAL/NUMERIC (float types), No TEXT/NVARCHAR (variable-length)
+- [ ] TAGS types: No TIMESTAMP, TIMESTAMPTZ, NVARCHAR, GEOMETRY
+- [ ] Total columns: ≤ 4096
+- [ ] Total tags: ≤ 128
+- [ ] Name lengths: ≤ 128 bytes
+
+**Example (MySQL → KaiwuDB Time Series)**:
+```sql
+-- MySQL Source
+CREATE TABLE sensor_data (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    device_id BIGINT NOT NULL,
+    location VARCHAR(100),
+    reading_time DATETIME NOT NULL,
+    temperature DECIMAL(10,2),
+    humidity DECIMAL(10,2)
+);
+
+-- Generated KaiwuDB DDL
+CREATE TABLE sensor_data (
+    reading_time TIMESTAMPTZ NOT NULL,
+    id BIGINT,
+    temperature DECIMAL(10,2),
+    humidity DECIMAL(10,2)
+)
+TAGS (
+    device_id BIGINT NOT NULL,
+    location VARCHAR(100)
+)
+PRIMARY TAGS (device_id);
+```
+
+#### Scenario 2: Time Series Source → Time Series Target (AUTO-MAPPED)
+
+**Supported Sources**: TDengine 2.x/3.x, InfluxDB 1.x/2.x, OpenTSDB
+
+**KDTS Auto-Mapping Behavior** (from source code analysis):
+```
+Source Tags → Filter invalid (FLOAT/DECIMAL/NUMERIC/NULL) → 
+              First 4 eligible → PRIMARY TAGS + Remaining → TAGS
+Source Fields → Data columns
+Source Timestamp → Time column (converted to TIMESTAMPTZ)
+```
+
+**Workflow**:
+```
+1. Call KDTS preview_ddl(isTimeSeries=true)
+   
+2. KDTS auto-generates DDL based on source metadata
+   - Filters invalid primary tags (FLOAT, DOUBLE, DECIMAL, NUMERIC, NULL)
+   - Maps first 4 eligible source tags to PRIMARY TAGS
+   - Maps remaining tags to TAGS (up to 128)
+   - Maps source fields to data columns
+   
+3. Validate generated DDL
+   - Check tag type compatibility (convert if needed)
+   - Check PRIMARY TAGS count
+   
+4. Present to user for confirmation
+   - Show tag mapping (source tag → target tag)
+   - Show any type conversions made
+   
+5. Execute DDL via KDTS API
+   
+6. Continue with FULL migration (KDTS handles data)
+```
+
+**Auto-Mapping Rules**:
+
+| Source Type | PRIMARY TAGS Source          | Additional TAGS Source | Data Columns Source |
+|-------------|------------------------------|------------------------|---------------------|
+| TDengine    | First 4 eligible TAG columns | Remaining TAG columns  | Regular columns     |
+| InfluxDB    | First 4 eligible tags        | Remaining tags         | All fields          |
+| OpenTSDB    | First 4 eligible tags        | Remaining tags         | Metric values       |
+
+**Eligibility Criteria for Primary Tags**:
+- NOT NULL / NOT NULLABLE
+- NOT FLOAT/DOUBLE/DECIMAL/NUMERIC type (classified as float by KDTS)
+- NOT over-length (VARCHAR > 128 bytes)
+
+**Overflow Handling**:
+
+| Scenario                           | Behavior                                       |
+|------------------------------------|------------------------------------------------|
+| 0 tags in source                   | ERROR: 3006 - NO_PRIMARY_TAG                   |
+| All tags are FLOAT/DECIMAL/NUMERIC | ERROR: 3006 - NO_PRIMARY_TAG (all demoted)     |
+| 1-4 eligible tags                  | All become PRIMARY TAGS                        |
+| 5+ eligible tags                   | First 4 → PRIMARY TAGS, rest → Additional TAGS |
+| Total tags > 132                   | ERROR: 3004 - TAG_LIMIT_EXCEEDED               |
+
+#### Scenario 3: Time Series Source → Relational Target (NOT SUPPORTED)
+
+**Restriction**: Time series sources (TDengine, InfluxDB, OpenTSDB) CANNOT migrate to RELATIONAL engine.
+
+**Handling**:
+1. Explain the restriction to user
+2. Suggest alternatives:
+   - Export from time series source (CSV, JSON)
+   - Import to KaiwuDB relational using COPY or INSERT
+   - Use custom ETL tools
+3. Show supported path: Migrate to TIMESERIES engine instead
+
+### Database Creation
+
+**Time Series Database**:
+```sql
+CREATE TS DATABASE <db_name> [RETENTIONS <duration>] [PARTITION INTERVAL <interval>];
+```
+
+**Relational Database**:
+```sql
+CREATE DATABASE <db_name>;
+```
+
+**Detailed Reference**: See `references/ddl-syntax.md` (Complete syntax, examples, type compatibility tables, and KDTS auto-mapping implementation details)
 
 ---
 

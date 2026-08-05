@@ -932,7 +932,27 @@ POST /kdts/api/v1/datax/control
 
 ---
 
-## 7. KaiwuDB Time-Series Table Constraints
+## 7. Source-Target Engine Compatibility (STRICT)
+
+**CRITICAL**: The following compatibility rules are enforced by KDTS:
+
+| Source Type                                      | Source Engine            | Allowed Target Engines   | Restriction                                 |
+|--------------------------------------------------|--------------------------|--------------------------|---------------------------------------------|
+| MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE | RELATIONAL               | RELATIONAL, TIMESERIES   | Relational sources have flexibility         |
+| KAIWUDB (source)                                 | RELATIONAL or TIMESERIES | RELATIONAL or TIMESERIES | KaiwuDB can be migrated between engines     |
+| TDENGINE2X, TDENGINE3X                           | TIMESERIES               | **ONLY TIMESERIES**      | Cannot migrate to RELATIONAL                |
+| INFLUXDB1X, INFLUXDB2X                           | TIMESERIES               | **ONLY TIMESERIES**      | Cannot migrate to RELATIONAL                |
+| OPENTSDB                                         | TIMESERIES               | **ONLY TIMESERIES**      | Cannot migrate to RELATIONAL                |
+| MONGODB, FTP, HDFS                               | TIMESERIES               | TIMESERIES               | File/NoSQL sources are time series oriented |
+
+**If Time Series Source → Relational Target is requested:**
+1. The migration will FAIL at the KDTS API level
+2. Alternative: Export data from source, transform as needed, import to KaiwuDB RELATIONAL
+3. For InfluxDB/TDengine: Use built-in export (CSV, Line Protocol) then bulk load
+
+---
+
+## 8. KaiwuDB Time-Series Table Constraints
 
 When migrating to KaiwuDB with TIMESERIES engine, the following constraints apply:
 
@@ -955,17 +975,33 @@ When migrating to KaiwuDB with TIMESERIES engine, the following constraints appl
 ```sql
 CREATE TABLE sensor_data
 (
-    ts         TIMESTAMP,
-    device_id  INT,          -- Primary tag
-    metric     VARCHAR(32),  -- Primary tag
-    value      DOUBLE,       -- Value field
-    quality    INT           -- Secondary tag
-) TAGS(quality);
+    ts TIMESTAMPTZ NOT NULL,
+    value DOUBLE
+)
+TAGS
+(
+    device_id INT NOT NULL,
+    metric VARCHAR(32) NOT NULL,
+    quality INT
+)
+PRIMARY TAGS (device_id, metric);
 ```
+
+**Note**: For complete DDL syntax and KDTS auto-mapping details, see `references/ddl-syntax.md`
+
+### Auto-Mapping for Time Series Sources
+
+| Source Type | PRIMARY TAG Source  | Additional Tags | VALUE FIELD Source |
+|-------------|---------------------|-----------------|--------------------|
+| InfluxDB    | First 4 tags        | Tags 5+         | All fields         |
+| TDengine    | First 4 TAG columns | TAG columns 5+  | Regular columns    |
+| OpenTSDB    | First 4 tags        | Tags 5+         | Metric value       |
+
+**Note**: For InfluxDB/TDengine with > 4 tags, KDTS auto-assigns first 4 as PRIMARY TAGS, rest as regular tags
 
 ---
 
-## 8. Performance Tips
+## 9. Performance Tips
 
 ### Large Data Sets
 

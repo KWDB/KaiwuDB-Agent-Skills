@@ -174,37 +174,142 @@ Data type mapping between source databases and KaiwuDB.
 | TIMESTAMP  | TIMESTAMP  |       |
 | JSON       | TEXT       |       |
 
-**Special Handling**:
+**Auto-Mapping Rules for Time Series Sources**:
 
-- TDengine super tables → KaiwuDB tables with TAGS
-- TDengine child tables → identified by tag values
-- Device ID/name → primary tag
-- Timestamp → TIME column (automatic in KWDB time series)
+### TDengine → KaiwuDB (TIMESERIES)
 
-### InfluxDB → KaiwuDB
+| TDengine Concept | KaiwuDB Concept          | Mapping Rule                           |
+|------------------|--------------------------|----------------------------------------|
+| Super Table      | KaiwuDB Table            | 1:1 mapping                            |
+| Child Table      | Identified by Tag Values | Auto-resolved via tag lookup           |
+| TAG Column       | PRIMARY TAG              | Auto-assigned as primary tag (first 4) |
+| TAG Column (5+)  | SECONDARY TAG            | Extra tags become secondary            |
+| Regular Column   | VALUE FIELD              | Stored as regular value column         |
+| TIMESTAMP Column | TIME Column              | Used as time index                     |
 
-| InfluxDB  | KaiwuDB    | Notes |
-|-----------|------------|-------|
-| integer   | BIGINT     |       |
-| float     | DOUBLE     |       |
-| boolean   | TINYINT    | 0/1   |
-| string    | VARCHAR(n) |       |
-| timestamp | TIMESTAMP  |       |
+**Example TDengine Schema → KaiwuDB Schema**:
 
-**Special Handling**:
+TDengine Source:
+```sql
+CREATE STABLE sensor_data (
+    ts TIMESTAMP,
+    temperature DOUBLE,
+    humidity DOUBLE,
+    voltage FLOAT
+) TAGS (
+    device_id INT,
+    location VARCHAR(50),
+    sensor_type VARCHAR(30)
+);
 
-- InfluxDB measurement → KaiwuDB table
-- InfluxDB tags → KaiwuDB primary/secondary TAGS
-- InfluxDB fields → KaiwuDB value columns
-- Timestamp → TIME column
+CREATE TABLE device_001 USING sensor_data TAGS (1, 'Building A', 'Temp');
+CREATE TABLE device_002 USING sensor_data TAGS (2, 'Building B', 'Humidity');
+```
 
-### OpenTSDB → KaiwuDB
+Auto-Generated KaiwuDB Schema:
+```sql
+CREATE TABLE sensor_data
+(
+    ts TIMESTAMPTZ NOT NULL,
+    temperature DOUBLE,
+    humidity DOUBLE,
+    voltage FLOAT
+)
+TAGS
+(
+    device_id INT NOT NULL,
+    location VARCHAR(50) NOT NULL,
+    sensor_type VARCHAR(30) NOT NULL
+)
+PRIMARY TAGS (device_id, location, sensor_type);
 
-| OpenTSDB  | KaiwuDB    | Notes                               |
-|-----------|------------|-------------------------------------|
-| numeric   | DOUBLE     | OpenTSDB stores everything as float |
-| string    | VARCHAR(n) |                                     |
-| timestamp | TIMESTAMP  |                                     |
+-- Note: device_id, location, sensor_type are auto-mapped as PRIMARY TAGS
+-- Child table data is merged into single KaiwuDB table with tag values
+```
+
+### InfluxDB → KaiwuDB (TIMESERIES)
+
+| InfluxDB Concept | KaiwuDB Concept | Mapping Rule                   |
+|------------------|-----------------|--------------------------------|
+| Measurement      | KaiwuDB Table   | 1:1 mapping                    |
+| Tag (1-4)        | PRIMARY TAG     | Auto-assigned as primary tag   |
+| Tag (5+)         | SECONDARY TAG   | Extra tags become secondary    |
+| Field            | VALUE FIELD     | Stored as regular value column |
+| _time            | TIME Column     | Used as time index             |
+
+**Example InfluxDB Schema → KaiwuDB Schema**:
+
+InfluxDB Source:
+```
+Measurement: cpu_usage
+Tags: host, region, datacenter, service, priority (5 tags)
+Fields: usage, temperature, load_average
+Time: _time
+```
+
+Auto-Generated KaiwuDB Schema:
+```sql
+CREATE TABLE cpu_usage
+(
+    _time TIMESTAMPTZ NOT NULL,
+    usage DOUBLE,
+    temperature DOUBLE,
+    load_average DOUBLE
+)
+TAGS
+(
+    host VARCHAR(100) NOT NULL,
+    region VARCHAR(50) NOT NULL,
+    datacenter VARCHAR(50) NOT NULL,
+    service VARCHAR(100) NOT NULL,
+    priority VARCHAR(20)
+)
+PRIMARY TAGS (host, region, datacenter, service);
+
+-- Note: First 4 tags become PRIMARY TAGS (host, region, datacenter, service)
+-- Extra tag (priority) becomes non-primary tag
+```
+
+### OpenTSDB → KaiwuDB (TIMESERIES)
+
+| OpenTSDB Concept | KaiwuDB Concept | Mapping Rule                 |
+|------------------|-----------------|------------------------------|
+| Metric Name      | KaiwuDB Table   | 1:1 mapping                  |
+| Tag (1-4)        | PRIMARY TAG     | Auto-assigned as primary tag |
+| Tag (5+)         | SECONDARY TAG   | Extra tags become secondary  |
+| Metric Value     | VALUE FIELD     | Stored as DOUBLE column      |
+| Timestamp        | TIME Column     | Used as time index           |
+
+---
+
+## Overflow Handling for Tags
+
+When source has more than 4 tags (max primary tags), the following happens:
+
+| Scenario                             | KDTS Behavior                                        |
+|--------------------------------------|------------------------------------------------------|
+| InfluxDB with 5+ tags                | First 4 → PRIMARY TAGS, rest → SECONDARY TAGS (auto) |
+| TDengine with 5+ TAG columns         | First 4 → PRIMARY TAGS, rest → SECONDARY TAGS (auto) |
+| Source with 0 tags                   | ERROR: 3006 (NO_PRIMARY_TAG) - Migration blocked     |
+| Source with > 4 tags, all as PRIMARY | ERROR: 3004 (TAG_LIMIT_EXCEEDED) - Migration blocked |
+
+**Resolution Options for Overflow**:
+1. Keep most important 4 as PRIMARY, rest become SECONDARY (KDTS default)
+2. Merge some tags into composite values (e.g., host-region)
+3. Split into multiple migrations if data can be partitioned
+4. If KDTS blocks, manually create target table with appropriate SECONDARY TAGS
+
+---
+
+## Summary: Tag Mapping Reference
+
+| Source Type                   | PRIMARY TAG Source    | SECONDARY TAG Source  | VALUE FIELD Source |
+|-------------------------------|-----------------------|-----------------------|--------------------|
+| **InfluxDB**                  | First 4 tags          | Tags 5+               | All fields         |
+| **TDengine**                  | First 4 TAG columns   | TAG columns 5+        | Regular columns    |
+| **OpenTSDB**                  | First 4 tags          | Tags 5+               | Metric value       |
+| **MySQL (TIMESERIES target)** | User-selected columns | User-selected columns | All other columns  |
+| **KaiwuDB (source)**          | User-selected or auto | User-selected or auto | All other columns  |
 
 ---
 
@@ -317,8 +422,7 @@ Some conversions require runtime handling:
 
 ```sql
 -- Source
-description
-VARCHAR(100000)
+description VARCHAR(100000)
 
 -- Target
 description TEXT

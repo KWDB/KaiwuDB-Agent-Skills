@@ -351,6 +351,21 @@ Script naming: <SOURCE>2<TARGET>_<timestamp>.json
 Example: MYSQL2KAIWUDB_1719290000000.json
 ```
 
+### 7. Engine Compatibility Rules (STRICT)
+
+**CRITICAL**: Certain source types are STRICTLY limited to specific target engines. Do NOT attempt to bypass these restrictions.
+
+| Source Category | Source Types                                               | Allowed Target Engines   | Restriction                                             |
+|-----------------|------------------------------------------------------------|--------------------------|---------------------------------------------------------|
+| **Time Series** | TDengine 2.x/3.x, InfluxDB 1.x/2.x, OpenTSDB               | **ONLY TIMESERIES**      | Time series sources CANNOT migrate to RELATIONAL engine |
+| **Relational**  | MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse, KaiwuDB | RELATIONAL or TIMESERIES | Relational sources have flexibility                     |
+| **File/NoSQL**  | MongoDB, FTP, HDFS                                         | TIMESERIES               | File-based sources are time series oriented             |
+
+**Violation Handling**: If user requests invalid combination (e.g., TDengine → RELATIONAL):
+1. Explain the restriction clearly
+2. Suggest alternative: Use native ETL tools or custom scripts for cross-engine migration
+3. Show supported alternatives: Migrate TDengine → TIMESERIES, or export data manually then import to RELATIONAL
+
 ---
 
 ## Supported Data Sources
@@ -383,14 +398,39 @@ Refer to `references/source-types.md` for complete capability matrix.
 
 When migrating to KaiwuDB with TIMESERIES engine, the following constraints apply:
 
-| Constraint                       | Limit     | Error Code                |
-|----------------------------------|-----------|---------------------------|
-| Maximum columns per table        | 128       | 3004 (TAG_LIMIT_EXCEEDED) |
-| Maximum primary tags             | 4         | 3004 (TAG_LIMIT_EXCEEDED) |
-| Maximum tag/column name length   | 128 bytes | 3005 (TAG_NAME_TOO_LONG)  |
-| Must have at least 1 primary tag | 1         | 3006 (NO_PRIMARY_TAG)     |
+| Constraint                                | Limit                      | Error Code                | KDTS Behavior            |
+|-------------------------------------------|----------------------------|---------------------------|--------------------------|
+| Maximum total columns (data + tags)       | 4096                       | -                         | -                        |
+| Maximum source tags                       | 132 (128 tags + 4 primary) | 3004 (TAG_LIMIT_EXCEEDED) | ERROR if exceeded        |
+| Maximum primary tags                      | 4                          | 3004 (TAG_LIMIT_EXCEEDED) | Auto-demote from last    |
+| Maximum tag/column name length            | 128 bytes                  | 3005 (TAG_NAME_TOO_LONG)  | ERROR if exceeded        |
+| Must have at least 1 primary tag          | 1                          | 3006 (NO_PRIMARY_TAG)     | ERROR if no eligible     |
+| Primary tags must be in tag list          | -                          | -                         | Auto-demote              |
+| Primary tags must be NOT NULL             | -                          | -                         | Auto-demote with warning |
+| First column must be TIMESTAMPTZ NOT NULL | -                          | -                         | KDTS ensures in DDL      |
+
+**Primary Tag Type Rules (from KDTS source - TypeMapping.FLOAT_TYPE_NAMES)**:
+- **NOT eligible (float types)**: FLOAT, FLOAT4, FLOAT8, DOUBLE, REAL, BINARY_FLOAT, BINARY_DOUBLE, DECIMAL, NUMERIC → Auto-demoted to ordinary tags
+  - **Note**: DECIMAL and NUMERIC are classified as float types by KDTS and cannot be primary tags
+- **NOT eligible**: NULL/Nullable columns → Auto-demoted to ordinary tags
+- **Auto-converted**: NVARCHAR, NCHAR, TEXT, CLOB, BLOB, BYTES, VARBYTES, JSON, ARRAY, MAP, INET, INTERVAL, UUID → Converted to VARCHAR(128)
+- **VARCHAR handling**: Default 64 bytes, max 128 bytes (auto-truncated if exceeded)
+
+**Tag Type Rules (from KDTS source)**:
+- **Auto-converted**: TIMESTAMP, TIMESTAMPTZ, NVARCHAR, GEOMETRY → Converted to VARCHAR
+
+**KDTS Auto-Mapping Algorithm**:
+1. Collect all source tags
+2. Validate count <= 132
+3. Demote invalid primary tags (FLOAT, DOUBLE, DECIMAL, NUMERIC, NULL)
+4. Identify eligible primary tags (NOT NULL, NOT FLOAT/DECIMAL/NUMERIC, NOT over-length)
+5. If 0 eligible → ERROR 3006
+6. Select first N eligible as PRIMARY TAGS (max 4)
+7. Auto-convert invalid types to supported types
 
 **Recommendation**: When source has many columns, consider splitting into multiple tables or migrations.
+
+**Note**: For complete DDL syntax and auto-mapping details, see `references/ddl-syntax.md`
 
 ---
 
@@ -445,14 +485,149 @@ All endpoints under `{base_url}/kdts/api/v1`:
 5. Read source metadata → read_metadata()
    Show table count, columns per table, PK/constraint info
 
-6. Preview DDL → preview_ddl()
+6. **Configure Tags for Time-Series Target** (ONLY for TIMESERIES target with RELATIONAL source)
+   
+   **Trigger Condition**: Target engine is TIMESERIES AND source type is RELATIONAL (MySQL, Oracle, etc.)
+   
+   **Interaction Flow**:
+   
+   6.1 Show all columns for each table:
+   ```
+   Table: orders
+   Columns:
+   - id (BIGINT, PK)
+   - customer_id (BIGINT)
+   - product_id (BIGINT)
+   - order_time (TIMESTAMP)
+   - status (VARCHAR(50))
+   - total_amount (DECIMAL(15,2))
+   ```
+   
+   6.2 Ask user to select primary tags (1-4 columns, REQUIRED):
+   ```
+   Primary Tag Selection (1-4 required, max 4):
+   [ ] id
+   [ ] customer_id
+   [ ] product_id
+   [ ] order_time
+   [ ] status
+   [ ] total_amount
+   
+   Note: Primary tags are used for indexing and filtering in time-series queries
+   Recommended: Select unique identifiers like device_id, sensor_id, etc.
+   ```
+   
+   6.3 Ask user to select secondary tags (optional):
+   ```
+   Secondary Tag Selection (optional):
+   [ ] id
+   [ ] customer_id
+   [ ] product_id
+   [ ] order_time
+   [ ] status
+   [ ] total_amount
+   
+   Note: Secondary tags are additional indexed columns
+   Recommended: Select commonly filtered columns like status, type, etc.
+   ```
+   
+   6.4 Show summary and confirm:
+   ```
+   Tag Configuration Summary for orders table:
+   - PRIMARY TAGS: customer_id, product_id
+   - SECONDARY TAGS: status
+   - VALUE FIELDS: id, order_time, total_amount
+   
+   Note: This configuration will be shown in the DDL preview.
+   KDTS will generate appropriate time-series DDL based on this selection.
+   ```
+   
+   **For Time-Series Sources (InfluxDB, TDengine, OpenTSDB)**:
+   - Tags are AUTO-MAPPED from source to KaiwuDB:
+     - InfluxDB tags → PRIMARY TAGS (first 4, rest become SECONDARY)
+     - InfluxDB fields → VALUE columns
+     - TDengine TAG columns → PRIMARY TAGS
+     - TDengine regular columns → VALUE columns
+   - No user interaction needed, but show the mapping in DDL preview for confirmation
+   
+   **Constraints**:
+   - Maximum 4 PRIMARY TAGS per table (Error 3004 if exceeded)
+   - At least 1 PRIMARY TAG required (Error 3006 if missing)
+   - Maximum 128 columns total (tags + values)
+   - Column names max 128 bytes
+   
+   **Implementation Note**: 
+   - KDTS `preview_ddl` API has NO tag-specification parameters (only `isTimeSeries: bool`)
+   - For RELATIONAL → TIMESERIES: The skill generates DDL based on user's tag selection and executes directly on KaiwuDB (bypassing KDTS for schema)
+   - After DDL execution, use **Data-Only Migration** (Workflow 3) for data transfer
+   - For TIMESERIES → TIMESERIES: KDTS handles automatic tag mapping internally
+
+7. Preview DDL → preview_ddl() or Skill-Generated DDL
    Show generated DDL for each table
+   
+   **For RELATIONAL → TIMESERIES (Skill-Generated DDL)**:
+   - DDL is generated based on user's tag selection from Step 6
+   - Display with clear tag annotations (PRIMARY TAG, SECONDARY TAG, VALUE FIELD)
+   - User confirms before execution
+   
+   Example DDL for RELATIONAL → TIMESERIES:
+   ```sql
+   CREATE TABLE orders
+   (
+       order_time TIMESTAMPTZ NOT NULL,
+       id BIGINT,
+       total_amount DECIMAL(15,2)
+   )
+   TAGS
+   (
+       customer_id BIGINT NOT NULL,
+       product_id BIGINT NOT NULL,
+       status VARCHAR(50)
+   )
+   PRIMARY TAGS (customer_id, product_id);
+   ```
+   
+   **Note**: For complete DDL syntax and KDTS auto-mapping details, see `references/ddl-syntax.md`
+   - TIMESTAMPTZ is preferred over TIMESTAMP for timezone support
+   - First column MUST be TIMESTAMPTZ NOT NULL
+   - PRIMARY TAGS must be in the TAGS list and NOT NULL
+   - Max 4 PRIMARY TAGS per table
+   - KDTS auto-converts/demotes invalid tag types (see Section 3 in ddl-syntax.md)
+
+   **For TIMESERIES → TIMESERIES (KDTS Auto-Generated)**:
+   - Call `preview_ddl(isTimeSeries=true)` to get KDTS-generated DDL
+   - KDTS auto-selects first 4 ELIGIBLE tags as PRIMARY TAGS (not simply first 4)
+   - Ineligible tags (FLOAT, NULL, over-length) are auto-demoted to ordinary tags
+   - Invalid types (NVARCHAR, TEXT, etc.) are auto-converted to VARCHAR
+   - Show the mapped DDL for user confirmation with warnings about conversions
+   
+   Example DDL for TIMESERIES → TIMESERIES (InfluxDB auto-mapped):
+   ```sql
+   CREATE TABLE cpu_usage
+   (
+       time TIMESTAMPTZ NOT NULL,
+       usage DOUBLE,
+       temperature DOUBLE
+   )
+   TAGS
+   (
+       host VARCHAR(100) NOT NULL,
+       region VARCHAR(50) NOT NULL
+   )
+   PRIMARY TAGS (host, region);
+   ```
+   
    Ask user to confirm before execution
 
-7. Execute DDL → execute_ddl()
-   Report success with SQL file path
+8. Execute DDL → execute_ddl() or Direct DDL Execution
+   **For RELATIONAL → TIMESERIES**: Execute generated DDL directly on KaiwuDB using JDBC/ODBC connection
+   **For TIMESERIES → TIMESERIES**: Use KDTS `execute_ddl()` API
+   
+   Report success with table count
 
-8. **Configure DataX Parameters** (REQUIRED for data migration)
+9. **Switch to Data-Only Migration (RELATIONAL → TIMESERIES only)**
+   Since DDL was executed directly, continue with **Workflow 3: Data-Only Migration**
+   Use `build_migration()` with `dataMode="data"` (skip schema)
    IMPORTANT: DataX configuration with `core` and `setting` is REQUIRED for successful data migration!
    
    Ask user: "Use default DataX configuration or customize?"
@@ -588,18 +763,18 @@ All endpoints under `{base_url}/kdts/api/v1`:
    
    For complete configuration reference, see `references/api-reference.md` Chapter 11.
 
-9. Build migration script → build_migration_script(data_config=user_config)
-   Show generated script name(s)
-   For full migration, tables can be empty (auto-discover)
+10. Build migration script → build_migration_script(data_config=user_config)
+    Show generated script name(s)
+    For full migration, tables can be empty (auto-discover)
 
-10. Execute migration → execute_migration()
+11. Execute migration → execute_migration()
     Return log file paths
 
-11. Monitor progress → query_task_status() (polling every 2s)
+12. Monitor progress → query_task_status() (polling every 2s)
     Show status: SUBMITTED → RUNNING → SUCCEEDED/FAILED
     Report final status
 
-12. Verify (manual step for user)
+13. Verify (manual step for user)
     Remind to compare row counts between source and target
 ````
 
@@ -608,7 +783,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
 **When to use:** Only need table structure, no data transfer
 
 ````
-Steps 1-7 from Workflow 1, then STOP.
+Steps 1-8 from Workflow 1, then STOP.
 Report DDL execution result.
 ````
 

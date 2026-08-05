@@ -354,13 +354,19 @@ KaiwuDB:    jdbc:mysql://host:9092/dbname (MySQL protocol compatibility)
 ```sql
 CREATE TABLE sensor_data
 (
-    ts        TIMESTAMP,
-    device_id INT,         -- Primary tag
-    metric    VARCHAR(32), -- Primary tag
-    value DOUBLE,          -- Value field
-    quality   INT          -- Secondary tag
-) TAGS(quality);
+    ts TIMESTAMPTZ NOT NULL,
+    value DOUBLE
+)
+TAGS
+(
+    device_id INT NOT NULL,
+    metric VARCHAR(32) NOT NULL,
+    quality INT
+)
+PRIMARY TAGS (device_id, metric);
 ```
+
+**Note**: For complete DDL syntax and KDTS auto-mapping details, see `references/ddl-syntax.md`
 
 ---
 
