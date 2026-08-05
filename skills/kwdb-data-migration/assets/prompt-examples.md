@@ -260,10 +260,49 @@ This document shows natural language user requests and how the Skill processes t
 3. **Config Example**:
    ```json
    {
-     "source": { "engine": "RELATIONAL", "type": "MYSQL", "host": "source-host", "port": 3306, "username": "user", "password": "pass", "dbName": "src_db" },
-     "target": { "engine": "TIMESERIES", "type": "KAIWUDB", "host": "target-host", "port": 26257, "username": "root", "password": "pass", "dbName": "tgt_db", "isTarget": true },
+     "source": {
+       "engine": "RELATIONAL",
+       "type": "MYSQL",
+       "host": "source-host",
+       "port": 3306,
+       "username": "user",
+       "password": "pass",
+       "dbName": "source_db"
+     },
+     "target": {
+       "engine": "TIMESERIES",
+       "type": "KAIWUDB",
+       "host": "target-host",
+       "port": 26257,
+       "username": "root",
+       "password": "pass",
+       "dbName": "target_db",
+       "isTarget": true
+     },
      "tables": [],
-     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
+     "data": {
+       "batchSize": 1000,
+       "core": {
+         "transport": {
+           "channel": {
+             "speed": {
+               "byte": 1048576,
+               "record": 1000
+             }
+           }
+         }
+       },
+       "enable": true,
+       "fetchSize": 1000,
+       "setting": {
+         "errorLimit": {
+           "percentage": 0.02
+         },
+         "speed": {
+           "channel": 4
+         }
+       }
+     }
    }
    ```
 

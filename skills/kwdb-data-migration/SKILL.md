@@ -29,7 +29,7 @@ version: 1.0.0
 
 ### Correct Usage Pattern (Natural Language)
 
-```
+````
 User: Help me migrate MySQL database to KaiwuDB
 
 AI Agent:
@@ -41,7 +41,7 @@ AI Agent:
    - Migration mode (full/schema-only/data-only)
 3. Calls the Python scripts in `scripts/` as backend tools
 4. Reports progress and results to user in natural language
-```
+````
 
 ### What AI Agent Does
 
@@ -64,7 +64,7 @@ User only needs to:
 
 ### Example Conversation
 
-```
+````
 User: Help me migrate MySQL sales database to KaiwuDB time series
 
 AI Agent:
@@ -101,7 +101,7 @@ AI Agent:
   [Shows DDL content]
   
   [WARNING] About to execute DDL to create tables. Continue? (yes/no)
-```
+````
 
 ### Python Scripts Purpose
 
@@ -426,7 +426,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
 - SQLSERVER, INFLUXDB1X/2X support metadata + data but NOT auto-discovery (use Workflow 2).
 - TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS only support data migration (use Workflow 3).
 
-```
+````
 1. Collect parameters (interactive)
    +-- KDTS base URL
    +-- Source config (engine, type, host, port, user, password, db)
@@ -452,29 +452,165 @@ All endpoints under `{base_url}/kdts/api/v1`:
 7. Execute DDL → execute_ddl()
    Report success with SQL file path
 
-8. Build migration script → build_migration_script()
+8. **Configure DataX Parameters** (REQUIRED for data migration)
+   IMPORTANT: DataX configuration with `core` and `setting` is REQUIRED for successful data migration!
+   
+   Ask user: "Use default DataX configuration or customize?"
+   
+   Default DataX Configuration (Fixed Channel Count):
+   ```json
+   {
+     "batchSize": 1000,
+     "core": {
+       "transport": {
+         "channel": {
+           "speed": {
+             "byte": 1048576,
+             "record": 1000
+           }
+         }
+       }
+     },
+     "enable": true,
+     "fetchSize": 1000,
+     "setting": {
+       "errorLimit": {
+         "percentage": 0.02
+       },
+       "speed": {
+         "channel": 4
+       }
+     }
+   }
+   ```
+   Optional Configuration (Byte and Record Rate Limiting, Auto-Calculate Channel Count):
+   ```json
+   {
+     "enable": true,
+     "fetchSize": 1000,
+     "batchSize": 1000,
+     "core": {
+       "transport": {
+         "channel": {
+           "speed": {
+             "byte": 10485760,
+             "record": 5000
+           }
+         }
+       }
+     },
+     "setting": {
+       "speed": {
+         "byte": 52428800,
+         "record": 40000
+       },
+       "errorLimit": {
+         "percentage": 0.02
+       }
+     }
+   }
+   ```
+   Note: The above configuration will auto-calculate channel count = min(52428800/10485760, 40000/5000) = min(5, 8) = 5
+   
+   If user wants to customize, explain the configuration based on KDTS source annotations:
+   
+   **UserData Top-Level Configuration**:
+   | Field | Type | Default | Description |
+   |---|---|---|---|
+   | enable | boolean | false | Whether to enable user data migration |
+   | fetchSize | int | 1000 | Number of records fetched per pull from source |
+   | batchSize | int | 1000 | Number of records submitted per push to target |
+   | core | Object | - | DataX core config (required) |
+   | setting | Object | - | DataX setting config (required) |
+   
+   **core.transport.channel.speed Configuration** (Map<String, Object> - Per-Channel Level):
+   `byte` and `record` can be configured simultaneously; they are different dimensions of rate limiting and **NOT mutually exclusive**!
+   | Key | Type | Description |
+   |---|---|---|
+   | byte | Long | Per-channel byte rate limit (bytes/second), e.g., 1048576 means 1MB/s/channel |
+   | record | Long | Per-channel record rate limit (records/second), e.g., 1000 means 1000 records/s/channel |
+   
+   **setting.speed Configuration** (Map<String, Object> - Global Level):
+   The following parameters can be combined to implement flexible rate limiting strategies:
+   | Key | Type | Description |
+   |---|---|---|
+   | channel | Integer | Fixed channel count. If configured, channel count is fixed and does not participate in auto-calculation |
+   | byte | Long | Global byte rate limit, must be used with core.transport.channel.speed.byte |
+   | record | Long | Global record rate limit, must be used with core.transport.channel.speed.record |
+   
+   **Configuration Combination Examples**:
+   | Configuration Method | setting.speed Configuration | core.transport.channel.speed Configuration | Description |
+   |---|---|---|---|
+   | Fixed Channel Count + Global Rate Limit | channel=4, byte=52428800, record=40000 | byte=1048576, record=1000 | Fixed 4 channels, global rate limit distributed to each channel |
+   | Byte-Only Rate Limit | byte=52428800 | byte=1048576 | Channel count auto-calculated = 52428800 ÷ 1048576 = 5 |
+   | Record-Only Rate Limit | record=40000 | record=1000 | Channel count auto-calculated = 40000 ÷ 1000 = 40 |
+   | Combined Byte and Record Rate Limit | byte=52428800, record=40000 | byte=1048576, record=1000 | Calculate channel count separately, take the larger value max(5, 40) = 40 |
+   
+   **Configuration Rules**:
+   - If `setting.speed.byte` is configured, `core.transport.channel.speed.byte` **must** also be configured
+   - If `setting.speed.record` is configured, `core.transport.channel.speed.record` **must** also be configured
+   - channel only: Fixed channel count, per-channel rate limit controlled by core.transport.channel.speed
+   - byte or record only: Auto-calculate channel count = global rate limit / per-channel rate limit
+   - byte and record together: Calculate required channel count separately, take the larger value
+   - channel and byte/record together: Channel count fixed, byte/record serve as global rate limits
+   
+   **setting.errorLimit Configuration** (Map<String, Object>):
+   | Key | Type | Description |
+   |---|---|---|
+   | record | Integer | Maximum allowed number of error records |
+   | percentage | Float | Maximum allowed error percentage, e.g., 0.02 means 2% |
+   
+   **Source-Specific Options (When Configuring Table Mapping)**:
+   
+   *RDBMS Sources (MySQL, Oracle, PostgreSQL, etc.):*
+   - splitPk: Split primary key; when enabled, DataX uses concurrent fetching (primary key type must be numeric or string)
+   - where: Filter condition, appended to SQL WHERE clause (mutually exclusive with querySql)
+   - querySql: Custom query SQL array (mutually exclusive with where)
+   
+   *KaiwuDB Target:*
+   - writeMode: Write mode, insert (default) or upsert
+   - preSql/postSql: SQL executed before/after writing
+   
+   *Time-Series Sources:*
+   - beginDateTime/endDateTime: Time range filter
+   - splitIntervalS: Time window split (seconds) for concurrent fetching
+   - tsColumn: Timestamp column name (required when using time range)
+   
+   **Configuration Rules**:
+   - byte and record in `core.transport.channel.speed` can be configured simultaneously (different dimensions of rate limiting)
+   - channel, byte, and record in `setting.speed` can be used in combination
+   - If `setting.speed.byte` is configured, `core.transport.channel.speed.byte` must also be configured
+   - If `setting.speed.record` is configured, `core.transport.channel.speed.record` must also be configured
+   - where and querySql are mutually exclusive and cannot be used simultaneously
+   - splitPk and querySql are not recommended to be used simultaneously (splitPk requires original table structure, querySql may have no table)
+   
+   **CRITICAL**: Do NOT skip this step! Missing core/setting config causes migration failures.
+   
+   For complete configuration reference, see `references/api-reference.md` Chapter 11.
+
+9. Build migration script → build_migration_script(data_config=user_config)
    Show generated script name(s)
    For full migration, tables can be empty (auto-discover)
 
-9. Execute migration → execute_migration()
-   Return log file paths
+10. Execute migration → execute_migration()
+    Return log file paths
 
-10. Monitor progress → query_task_status() (polling every 2s)
+11. Monitor progress → query_task_status() (polling every 2s)
     Show status: SUBMITTED → RUNNING → SUCCEEDED/FAILED
     Report final status
 
-11. Verify (manual step for user)
+12. Verify (manual step for user)
     Remind to compare row counts between source and target
-```
+````
 
 ### Workflow 2: Schema-Only Migration
 
 **When to use:** Only need table structure, no data transfer
 
-```
+````
 Steps 1-7 from Workflow 1, then STOP.
 Report DDL execution result.
-```
+````
 
 ### Workflow 3: Data-Only Migration
 
@@ -483,28 +619,49 @@ Report DDL execution result.
 - Target tables already exist, only need data sync
 - For InfluxDB 1.x/2.x: Use this after Schema migration (Workflow 1 steps 1-7)
 
-```
+````
 1. Collect parameters (interactive)
+   +-- KDTS base URL
+   +-- Source config
+   +-- Target config
+   +-- Table mappings (tables MUST be provided)
+
 2. Validate source type
+
 3. Test connections × 2
-4. Build migration script → tables MUST be provided (table-level mapping)
-5. Execute migration
-6. Monitor progress
-```
+
+4. **Configure DataX Parameters** (REQUIRED - see Workflow 1 step 8 for details)
+   Show default config and ask user to confirm or customize
+
+5. Build migration script with explicit tables field
+   → build_migration(tables=table_mappings, data_config=user_config)
+
+6. Execute migration
+
+7. Monitor progress
+````
 
 ### Workflow 4: Table-Level Migration (Restricted Sources)
 
 **When to use:** Source does NOT support full migration (SQL Server, TDengine 2.x, OpenTSDB, MongoDB, FTP, HDFS)
 
-```
+````
 1. Collect ALL table mappings explicitly:
    Source: table name, columns
    Target: table name, columns, write mode (insert/upsert)
 
-2. Build migration script with explicit tables field
+2. Validate source type
 
-3. Execute and monitor
-```
+3. Test connections × 2
+
+4. **Configure DataX Parameters** (REQUIRED - see Workflow 1 step 8 for details)
+   Show default config and ask user to confirm or customize
+
+5. Build migration script with explicit tables field
+   → build_migration(tables=all_mappings, data_config=user_config)
+
+6. Execute and monitor
+````
 
 ---
 
@@ -632,23 +789,23 @@ When user intent is identified but parameters are missing, collect them step by 
 
 ### Step 1: KDTS Server
 
-```
+````
 What is the KDTS server address?
 (default: http://localhost:8989)
-```
+````
 
 ### Step 2: Migration Type
 
-```
+````
 Select migration type:
 1. Full Migration (schema + data)
 2. Schema-Only Migration (DDL only)
 3. Data-Only Migration (tables must exist)
-```
+````
 
 ### Step 3: Source Configuration
 
-```
+````
 Source database type?
 [MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse, TDengine 2.x/3.x, 
  InfluxDB 1.x/2.x, OpenTSDB, MongoDB, FTP, HDFS, KaiwuDB]
@@ -659,11 +816,11 @@ Port: (show default based on type, e.g., MySQL=3306)
 Username: 
 Password: 
 Database:
-```
+````
 
 ### Step 4: Target Configuration
 
-```
+````
 Target KaiwuDB connection:
 Engine: [RELATIONAL, TIMESERIES]
 Host: (default: 127.0.0.1)
@@ -671,11 +828,11 @@ Port: (default: 26257)
 Username: (default: root)
 Password: 
 Database:
-```
+````
 
 ### Step 5: Migration Scope
 
-```
+````
 Migration scope:
 1. Full database (all tables)
 2. Specific tables only
@@ -683,17 +840,17 @@ Migration scope:
 If specific tables:
 - Table name(s):
 - Columns (optional):
-```
+````
 
 ### Step 6: Data Configuration (Optional)
 
-```
+````
 Data migration settings:
 Fetch size (rows per fetch, default 1000): 
 Batch size (rows per write, default 1000):
 Error tolerance (% allowed, default 0.02):
 Concurrency (channels, default 1):
-```
+````
 
 ---
 
@@ -709,7 +866,7 @@ Concurrency (channels, default 1):
     - Existing tables will be overwritten (if `auto_ddl=true`)
     - Data loss if target already has data
 4. Ask for explicit confirmation:
-   ```
+   ````
    [WARNING] DDL Execution Preview
    ===============================
    Database: [db_name]
@@ -721,7 +878,7 @@ Concurrency (channels, default 1):
    [WARNING] Existing tables with the same name will be overwritten.
    
    Do you want to proceed? (yes/no)
-   ```
+   ````
 5. If user says NO, save the DDL preview and offer to show it later
 
 ### Gate 2: KILL Operation Confirmation
@@ -730,7 +887,7 @@ Concurrency (channels, default 1):
 
 1. Show current task status and progress
 2. Explain the consequence:
-   ```
+   ````
    [WARNING] Task Termination Warning
    ===============================
    Task: [script_name]
@@ -746,7 +903,7 @@ Concurrency (channels, default 1):
    
    Are you absolutely sure you want to kill this task? 
    (Type "YES" to confirm)
-   ```
+   ````
 3. Only proceed if user explicitly types "YES"
 
 ### Gate 3: Source with Limited Capability
@@ -754,7 +911,7 @@ Concurrency (channels, default 1):
 **When source doesn't support full migration**, you MUST:
 
 1. Explain the limitation clearly:
-   ```
+   ````
    [WARNING] Source Type Limitation
    ===============================
    Source type: SQLSERVER
@@ -767,7 +924,7 @@ Concurrency (channels, default 1):
    - Table-level migration (you must specify each table)
    
    Please provide table mappings:
-   ```
+   ````
 2. Help user build explicit table mappings
 
 ---
@@ -797,7 +954,7 @@ Concurrency (channels, default 1):
 
 1. Check which tables failed vs succeeded
 2. Show summary:
-   ```
+   ````
    Migration Summary
    =================
    Total tables: 10
@@ -808,7 +965,7 @@ Concurrency (channels, default 1):
    - table_a: [error message]
    - table_b: [error message]
    - table_c: [error message]
-   ```
+   ````
 3. Offer options:
     - **Retry failed tables only** (recommended)
     - **Restart entire migration** (cleanup first)
@@ -915,7 +1072,7 @@ Concurrency (channels, default 1):
 **Handling**:
 
 1. Show problematic columns:
-   ```
+   ````
    [WARNING] Unsupported Type Detected
    ===============================
    Table: users
@@ -928,8 +1085,8 @@ Concurrency (channels, default 1):
    - LOB (for large objects)
    
    Please select target type:
-   ```
-2. Map to closest compatible type
+   ````
+2. Map to the closest compatible type
 3. Note: May need to split or convert large objects
 
 ---
@@ -940,19 +1097,19 @@ Concurrency (channels, default 1):
 
 Track migration progress with these states:
 
-```
+````
 INIT → COLLECTING_PARAMS → VALIDATING → TESTING_CONNECTIONS 
     → READING_METADATA → PREVIEWING_DDL → WAITING_CONFIRMATION 
     → EXECUTING_DDL → BUILDING_SCRIPT → EXECUTING_MIGRATION 
     → MONITORING → COMPLETED | FAILED | KILLED
-```
+````
 
 ### Resume After Interruption
 
 If conversation is interrupted:
 
 1. When user returns, ask:
-   ```
+   ````
    Welcome back! I found your previous migration session:
    
    Source: MySQL @ 192.168.1.100:3306/users_db
@@ -963,7 +1120,7 @@ If conversation is interrupted:
    1. Continue monitoring current migration
    2. Check current status
    3. Start a new migration
-   ```
+   ````
 2. If continuing, query task status immediately
 3. Show latest progress
 

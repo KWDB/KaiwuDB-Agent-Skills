@@ -254,7 +254,73 @@ The AI Agent will respond in the same language the user uses.
 
 ## Phase 4: Data Migration
 
-### 4.1 Build Migration Script
+### 4.1 Configure DataX Parameters (REQUIRED)
+
+**IMPORTANT**: DataX configuration with `core` and `setting` fields is REQUIRED for successful data migration. Missing these fields will cause migration failures!
+
+**Three Configuration Methods (Mutually Exclusive):**
+- Method 1: Fixed channel count (simple, recommended for most cases)
+- Method 2: By byte limit (precise bandwidth control)
+- Method 3: By record limit (precise QPS control)
+
+- [ ] Review default DataX configuration (Method 1: Fixed channel count)
+
+  Default DataX Configuration:
+  ```json
+  {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 1000,
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
+  }
+  ```
+
+- [ ] Confirm or customize DataX parameters:
+  
+  **Common parameters (for all methods):**
+  - `fetchSize`: Records fetched per request from source (default: 1000)
+  - `batchSize`: Records per batch written to target (default: 1000)
+  - `setting.errorLimit.percentage`: Acceptable error percentage (default: 0.02 = 2%)
+  
+  **Method 1: Fixed channel count**
+  - `setting.speed.channel`: Number of parallel channels (default: 4)
+  - `core.transport.channel.speed.byte`: Optional byte limit per channel (default: 1048576 = 1MB/s)
+  - `core.transport.channel.speed.record`: Optional record limit per channel (default: 1000 records/s)
+  
+  **Method 2: By byte limit**
+  - `setting.speed.byte`: Global byte limit (e.g., 52428800 = 50MB/s)
+  - `core.transport.channel.speed.byte`: REQUIRED byte limit per channel (e.g., 10485760 = 10MB/s)
+  - Channel count auto-calculated: global byte / per-channel byte
+  
+  **Method 3: By record limit**
+  - `setting.speed.record`: Global record limit (e.g., 40000 = 40000 records/s)
+  - `core.transport.channel.speed.record`: REQUIRED record limit per channel (e.g., 1000 = 1000 records/s)
+  - Channel count auto-calculated: global record / per-channel record
+
+- [ ] Verify configuration constraints:
+  - Method 1 and Method 2/3 are MUTUALLY EXCLUSIVE (cannot mix)
+  - If using Method 2, `core.transport.channel.speed.byte` MUST be configured
+  - If using Method 3, `core.transport.channel.speed.record` MUST be configured
+  - Do NOT configure `channel` in `core.transport.channel.speed` (only in `setting.speed`)
+
+### 4.2 Build Migration Script
 
 - [ ] Build DataX migration script
 
@@ -268,7 +334,7 @@ The AI Agent will respond in the same language the user uses.
       "port": 3306,
       "username": "user",
       "password": "pass",
-      "dbName": "src_db"
+      "dbName": "source_db"
     },
     "target": {
       "engine": "RELATIONAL",
@@ -277,22 +343,46 @@ The AI Agent will respond in the same language the user uses.
       "port": 26257,
       "username": "root",
       "password": "pass",
-      "dbName": "tgt_db",
+      "dbName": "target_db",
       "isTarget": true
     },
     "tables": [],
-    "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
+    "data": {
+      "batchSize": 1000,
+      "core": {
+        "transport": {
+          "channel": {
+            "speed": {
+              "byte": 1048576,
+              "record": 1000
+            }
+          }
+        }
+      },
+      "enable": true,
+      "fetchSize": 1000,
+      "setting": {
+        "errorLimit": {
+          "percentage": 0.02
+        },
+        "speed": {
+          "channel": 4
+        }
+      }
+    }
   }
   ```
 
-  **Note**: Empty `tables` array means auto-discover all tables (for sources that support full migration).
-  For table-level migration, specify tables explicitly.
+  **Note**: 
+  - Empty `tables` array means auto-discover all tables (for sources that support full migration).
+    For table-level migration, specify tables explicitly.
+  - **CRITICAL**: Both `core` and `setting` fields in `data` are REQUIRED for successful DataX execution.
 
 - [ ] Record returned script filename
     - Format: `{SOURCE}2KAIWUDB_{timestamp}.json`
     - Note filename for later queries
 
-### 4.2 Execute Migration
+### 4.3 Execute Migration
 
 - [ ] Start migration
 

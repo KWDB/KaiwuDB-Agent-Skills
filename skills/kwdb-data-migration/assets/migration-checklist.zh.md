@@ -244,7 +244,73 @@ AI Agent 将使用与用户相同的语言进行回复。
 
 ## 阶段四：数据迁移
 
-### 4.1 构建迁移脚本
+### 4.1 配置 DataX 参数（必需）
+
+**重要提示**：包含 `core` 和 `setting` 字段的 DataX 配置对于成功执行数据迁移是必需的！缺少这些字段会导致迁移失败！
+
+**三种配置方式（互斥）：**
+- 方式一：固定通道数（简单，推荐用于大多数场景）
+- 方式二：按字节限速（精确控制带宽）
+- 方式三：按记录数限速（精确控制 QPS）
+
+- [ ] 查看默认 DataX 配置（方式一：固定通道数）
+
+  默认 DataX 配置：
+  ```json
+  {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 1000,
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
+  }
+  ```
+
+- [ ] 确认或自定义 DataX 参数：
+  
+  **通用参数（所有方式）：**
+  - `fetchSize`: 从源数据库每次获取的记录数（默认：1000）
+  - `batchSize`: 写入目标数据库的批次记录数（默认：1000）
+  - `setting.errorLimit.percentage`: 可接受的错误百分比（默认：0.02 = 2%）
+  
+  **方式一：固定通道数**
+  - `setting.speed.channel`: 并行通道数（默认：4）
+  - `core.transport.channel.speed.byte`: 可选的单通道字节限速（默认：1048576 = 1MB/秒）
+  - `core.transport.channel.speed.record`: 可选的单通道记录限速（默认：1000 记录/秒）
+  
+  **方式二：按字节限速**
+  - `setting.speed.byte`: 全局字节限速（如：52428800 = 50MB/秒）
+  - `core.transport.channel.speed.byte`: 必需的单通道字节限速（如：10485760 = 10MB/秒）
+  - 通道数自动计算：全局限速 ÷ 单通道限速
+  
+  **方式三：按记录数限速**
+  - `setting.speed.record`: 全局记录限速（如：40000 = 40000 记录/秒）
+  - `core.transport.channel.speed.record`: 必需的单通道记录限速（如：1000 = 1000 记录/秒）
+  - 通道数自动计算：全局限速 ÷ 单通道限速
+
+- [ ] 验证配置约束：
+  - 方式一与方式二/三**互斥**（不能混用）
+  - 使用方式二时，必须配置 `core.transport.channel.speed.byte`
+  - 使用方式三时，必须配置 `core.transport.channel.speed.record`
+  - 不要在 `core.transport.channel.speed` 中配置 `channel`（只能在 `setting.speed` 中配置）
+
+### 4.2 构建迁移脚本
 
 - [ ] 构建 DataX 迁移脚本
 
@@ -256,9 +322,9 @@ AI Agent 将使用与用户相同的语言进行回复。
       "type": "MYSQL",
       "host": "127.0.0.1",
       "port": 3306,
-      "username": "root",
-      "password": "password",
-      "dbName": "src_db"
+      "username": "user",
+      "password": "pass",
+      "dbName": "source_db"
     },
     "target": {
       "engine": "RELATIONAL",
@@ -266,22 +332,47 @@ AI Agent 将使用与用户相同的语言进行回复。
       "host": "127.0.0.1",
       "port": 26257,
       "username": "root",
-      "password": "password",
-      "dbName": "tgt_db",
+      "password": "pass",
+      "dbName": "target_db",
       "isTarget": true
     },
     "tables": [],
-    "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
+    "data": {
+      "batchSize": 1000,
+      "core": {
+        "transport": {
+          "channel": {
+            "speed": {
+              "byte": 1048576,
+              "record": 1000
+            }
+          }
+        }
+      },
+      "enable": true,
+      "fetchSize": 1000,
+      "setting": {
+        "errorLimit": {
+          "percentage": 0.02
+        },
+        "speed": {
+          "channel": 4
+        }
+      }
+    }
   }
   ```
 
-  **注意**：空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源）。
-  对于表级迁移，需要显式指定表列表。
+  **注意**：
+  - 空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源）。
+    对于表级迁移，需要显式指定表列表。
+  - **关键提示**：`data` 中的 `core` 和 `setting` 字段对于成功执行 DataX 是必需的。
+
 - [ ] 记录返回的脚本文件名
     - 格式：`{SOURCE}2KAIWUDB_{timestamp}.json`
     - 记录文件名用于后续查询
 
-### 4.2 执行迁移
+### 4.3 执行迁移
 
 - [ ] 启动迁移
 
@@ -459,5 +550,5 @@ AI Agent 将使用与用户相同的语言进行回复。
 ---
 
 **文档版本：** v1.0.0  
-**最后更新：** 2026-08-04  
+**最后更新：** 2026-08-03  
 **维护者：** KDTS 开发团队

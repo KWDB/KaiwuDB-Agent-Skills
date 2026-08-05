@@ -383,6 +383,135 @@ User Request
 }
 ```
 
+**DataX Configuration** (for data migration, passed to `build_migration` as `data_config`):
+
+**IMPORTANT**: DataX configuration with `core` and `setting` fields is REQUIRED for successful data migration. These fields control the speed, resource usage, and error handling of the migration process.
+
+**Default Configuration**:
+
+```json
+{
+  "batchSize": 1000,
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 1048576,
+          "record": 1000
+        }
+      }
+    }
+  },
+  "enable": true,
+  "fetchSize": 1000,
+  "setting": {
+    "errorLimit": {
+      "percentage": 0.02
+    },
+    "speed": {
+      "channel": 4
+    }
+  }
+}
+```
+
+**Configuration Structure**:
+
+| Field                                 | Type    | Required | Description                                             |
+|---------------------------------------|---------|----------|---------------------------------------------------------|
+| `enable`                              | boolean | Yes      | Enable DataX execution (default: true)                  |
+| `fetchSize`                           | integer | No       | Records fetched per request from source (default: 1000) |
+| `batchSize`                           | integer | No       | Records per batch written to target (default: 1000)     |
+| `core`                                | object  | Yes      | Core transport configuration                            |
+| `core.transport.channel.speed.byte`   | integer | No       | Byte limit per channel (default: 1048576 = 1MB/s)       |
+| `core.transport.channel.speed.record` | integer | No       | Record limit per channel (default: 1000 records/s)      |
+| `setting`                             | object  | Yes      | Global setting configuration                            |
+| `setting.errorLimit.percentage`       | float   | No       | Acceptable error percentage (default: 0.02 = 2%)        |
+| `setting.speed`                       | object  | Yes      | Global speed configuration                              |
+
+**Three Configuration Methods (Mutually Exclusive)**:
+
+| Method                        | `setting.speed` Field | Description                        |
+|-------------------------------|-----------------------|------------------------------------|
+| Method 1: Fixed channel count | `channel` (integer)   | Simple, recommended for most cases |
+| Method 2: By byte limit       | `byte` (integer)      | Precise bandwidth control          |
+| Method 3: By record limit     | `record` (integer)    | Precise QPS control                |
+
+**Method 1: Fixed Channel Count** (Default, Recommended)
+
+```json
+{
+  "setting": {
+    "speed": {
+      "channel": 4
+    }
+  }
+}
+```
+
+- Set `setting.speed.channel` to the desired number of parallel channels
+- `core.transport.channel.speed.byte` and `core.transport.channel.speed.record` are optional per-channel limits
+
+**Method 2: By Byte Limit**
+
+```json
+{
+  "setting": {
+    "speed": {
+      "byte": 52428800
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 10485760
+        }
+      }
+    }
+  }
+}
+```
+
+- Set `setting.speed.byte` to the global byte limit (e.g., 52428800 = 50MB/s)
+- `core.transport.channel.speed.byte` is REQUIRED (per-channel byte limit)
+- Channel count auto-calculated: global byte / per-channel byte
+
+**Method 3: By Record Limit**
+
+```json
+{
+  "setting": {
+    "speed": {
+      "record": 40000
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "record": 1000
+        }
+      }
+    }
+  }
+}
+```
+
+- Set `setting.speed.record` to the global record limit (e.g., 40000 = 40000 records/s)
+- `core.transport.channel.speed.record` is REQUIRED (per-channel record limit)
+- Channel count auto-calculated: global record / per-channel record
+
+**Configuration Constraints**:
+
+1. **Method Exclusivity**: Methods 1 and 2/3 are mutually exclusive - cannot mix `setting.speed.channel` with `setting.speed.byte` or `setting.speed.record`
+2. **Core Field Restriction**: Do NOT configure `channel` in `core.transport.channel.speed` (only in `setting.speed`)
+3. **Mutually Exclusive Parameters**:
+   - `where` and `querySql` cannot be used simultaneously
+   - `splitPk` and `querySql` cannot be used simultaneously
+   - `column` (string) and `columns` (array) cannot be used simultaneously
+   - `setting.errorLimit.record` and `setting.errorLimit.percentage` are mutually exclusive
+
 ---
 
 ## Interaction Design

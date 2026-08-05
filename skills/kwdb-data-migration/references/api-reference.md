@@ -731,10 +731,19 @@ Build DataX migration job script.
     "enable": true,
     "fetchSize": 1000,
     "batchSize": 1000,
-    "core": null,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "setting": {
       "speed": {
-        "channel": 1
+        "channel": 4
       },
       "errorLimit": {
         "percentage": 0.02
@@ -744,23 +753,35 @@ Build DataX migration job script.
 }
 ```
 
-| Field          | Type    | Required | Description                                                                                  |
-|----------------|---------|----------|----------------------------------------------------------------------------------------------|
-| source         | Object  | Yes      | DataSourceRequest for source database                                                        |
-| target         | Object  | Yes      | DataSourceRequest for target (must be KAIWUDB type)                                          |
-| tables         | Array   | No       | TableMapping array (empty = full database auto-migration)                                    |
-| tables.source  | Object  | Yes*     | Source configuration (RDBMS, INFLUXDB, etc.)                                                 |
-| tables.target  | Object  | No       | Target configuration (KAIWUDB). Auto-derived if missing                                      |
-| data           | Object  | No       | Data migration settings (defaults: fetchSize=1000, batchSize=1000, 1 channel, 2% error rate) |
-| data.enable    | Boolean | No       | Enable data migration (default: false)                                                       |
-| data.fetchSize | Integer | No       | Records per fetch from source (default: 1000)                                                |
-| data.batchSize | Integer | No       | Records per batch to target (default: 1000)                                                  |
+| Field                                    | Type    | Required | Description                                                                               |
+|------------------------------------------|---------|----------|-------------------------------------------------------------------------------------------|
+| source                                   | Object  | Yes      | DataSourceRequest for source database                                                     |
+| target                                   | Object  | Yes      | DataSourceRequest for target (must be KAIWUDB type)                                       |
+| tables                                   | Array   | No       | TableMapping array (empty = full database auto-migration)                                 |
+| tables.source                            | Object  | Yes*     | Source configuration (RDBMS, INFLUXDB, etc.)                                              |
+| tables.target                            | Object  | No       | Target configuration (KAIWUDB). Auto-derived if missing                                   |
+| data                                     | Object  | **Yes**  | **Data migration settings. Both core and setting are REQUIRED for successful migration!** |
+| data.enable                              | Boolean | Yes      | Enable data migration (default: true)                                                     |
+| data.fetchSize                           | Integer | Yes      | Records per fetch from source (default: 1000)                                             |
+| data.batchSize                           | Integer | Yes      | Records per batch to target (default: 1000)                                               |
+| data.core                                | Object  | **Yes**  | **DataX core configuration. REQUIRED for migration!**                                     |
+| data.core.transport                      | Object  | Yes      | DataX transport configuration                                                             |
+| data.core.transport.channel              | Object  | Yes      | DataX channel configuration                                                               |
+| data.core.transport.channel.speed        | Object  | Yes      | Speed configuration with byte and record limits                                           |
+| data.core.transport.channel.speed.byte   | Integer | Yes      | Byte-level speed limit in bytes/sec (default: 1048576 = 1MB/s)                            |
+| data.core.transport.channel.speed.record | Integer | Yes      | Record-level speed limit in records/sec (default: 1000)                                   |
+| data.setting                             | Object  | **Yes**  | **DataX setting configuration. REQUIRED for migration!**                                  |
+| data.setting.speed                       | Object  | Yes      | Global speed configuration                                                                |
+| data.setting.speed.channel               | Integer | Yes      | Number of parallel channels (default: 4)                                                  |
+| data.setting.errorLimit                  | Object  | Yes      | Error tolerance configuration                                                             |
+| data.setting.errorLimit.percentage       | Float   | Yes      | Acceptable error percentage (default: 0.02 = 2%)                                          |
 
 **Key Notes**:
 
 - Empty `tables` array = full database migration (auto-discover all tables)
 - Non-empty `tables` = table-level migration (only specified tables)
 - Target `source.sourceType` must be "KAIWUDB"
+- **CRITICAL**: The `data` object with `core` and `setting` fields is REQUIRED. Missing these fields will cause migration failures!
 
 **Response**: List of generated script filenames
 
@@ -956,8 +977,8 @@ curl -X POST http://localhost:8989/kdts/api/v1/metadata/preview \
       "password": "kwdb_password",
       "isTarget": true
     },
-    "sourceDb": { /* Database object from Step 3 */ },
-    "metadata": { /* MetaData config */ },
+    "sourceDb": {},
+    "metadata": {},
     "isTimeSeries": false
   }'
 ```
@@ -967,8 +988,8 @@ curl -X POST http://localhost:8989/kdts/api/v1/metadata/preview \
 ```bash
 curl -X POST http://localhost:8989/kdts/api/v1/metadata/execute \
   -d '{
-    "target": { /* KaiwuDB target config */ },
-    "ddlScript": { /* DdlScript from Step 4 */ },
+    "target": {},
+    "ddlScript": {},
     "autoDdl": true
   }'
 ```
@@ -978,16 +999,37 @@ curl -X POST http://localhost:8989/kdts/api/v1/metadata/execute \
 ```bash
 curl -X POST http://localhost:8989/kdts/api/v1/datax/build \
   -d '{
-    "source": { /* Source config */ },
-    "target": { /* KaiwuDB target config */ },
+    "source": {},
+    "target": {},
     "tables": [],
     "data": {
       "enable": true,
       "fetchSize": 1000,
-      "batchSize": 1000
+      "batchSize": 1000,
+      "core": {
+        "transport": {
+          "channel": {
+            "speed": {
+              "byte": 1048576,
+              "record": 1000
+            }
+          }
+        }
+      },
+      "setting": {
+        "speed": {
+          "channel": 4
+        },
+        "errorLimit": {
+          "percentage": 0.02
+        }
+      }
     }
   }'
 ```
+
+**Note**: The `data` object with `core` and `setting` fields is REQUIRED for successful DataX execution.
+Without these fields, the migration will fail.
 
 ### Step 7: Execute Migration
 
@@ -1103,7 +1145,7 @@ curl -X GET "http://localhost:8989/kdts/api/v1/datax/status?scriptName=MYSQL2KAI
 ## 10. Version Information
 
 This API reference is based on KDTS Server source code in `kw-datax-utils`.
-Last updated: 2026-08-04
+Last updated: 2026-08-03
 
 Source packages:
 
@@ -1111,3 +1153,461 @@ Source packages:
 - DTO: `com.kaiwudb.migration.dto`
 - Service: `com.kaiwudb.migration.service`
 - Constants: `com.kaiwudb.migration.constant`
+
+---
+
+## 11. DataX Configuration Reference
+
+This section documents the complete DataX configuration based on KDTS source code and DataX official documentation.
+
+**DataX Three-Tier Rate Limiting Model** (Source: [DataX Parameter Tuning Guide](https://blog.csdn.net/weixin_44893236/article/details/149827940)):
+```
+Tier 1: setting.speed.channel - Number of channels (fixed channel count)
+Tier 2: setting.speed.byte/record - Global rate limit (can be combined with channel)
+Tier 3: core.transport.channel.speed.byte/record - Per-channel rate limit
+```
+
+**Important: channel, byte, and record can be combined to implement flexible rate limiting strategies!**
+
+Source classes:
+- `com.kaiwudb.migration.dto.config.UserData`
+- `com.kaiwudb.migration.dto.datax.Core`
+- `com.kaiwudb.migration.dto.datax.Setting`
+
+---
+
+### 11.1 UserData Configuration Structure
+
+**Example 1: Fixed Channel Count + Global Rate Limit** (recommended for most scenarios)
+```json
+{
+  "data": {
+    "enable": true,
+    "fetchSize": 1000,
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
+    "setting": {
+      "speed": {
+        "channel": 4,
+        "byte": 52428800,
+        "record": 40000
+      },
+      "errorLimit": {
+        "record": 50000,
+        "percentage": 0.02
+      }
+    }
+  }
+}
+```
+**Note:** Fixed 4 channels, global rate limit of 50MB/s and 40,000 records/s, per-channel rate limit of 12.5MB/s and 10,000 records/s
+
+**Example 2: Byte-Only and Record-Only Rate Limiting (Auto-Calculate Channel Count)**
+```json
+{
+  "data": {
+    "enable": true,
+    "fetchSize": 1000,
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 10485760,
+            "record": 5000
+          }
+        }
+      }
+    },
+    "setting": {
+      "speed": {
+        "byte": 52428800,
+        "record": 40000
+      },
+      "errorLimit": {
+        "record": 50000,
+        "percentage": 0.02
+      }
+    }
+  }
+}
+```
+**Note:** Rate limiting by both bytes and records, channel count calculated separately: 52428800 ÷ 10485760 = 5, 40000 ÷ 5000 = 8, take the larger value of 8 channels
+
+---
+
+### 11.2 UserData Field Reference
+
+| Field Name | Type             | Default | Description                                    |
+|------------|------------------|---------|------------------------------------------------|
+| enable     | boolean          | false   | Whether to enable user data migration          |
+| fetchSize  | int              | 1000    | Number of records fetched per pull from source |
+| batchSize  | int              | 1000    | Number of records submitted per push to target |
+| core       | Core (Object)    | null    | DataX core configuration (per-channel level)   |
+| setting    | Setting (Object) | null    | DataX setting configuration (global level)     |
+
+---
+
+### 11.3 Core Configuration Structure (Per-Channel Level)
+
+`core.transport.channel.speed` is a **per-channel level** rate limiting configuration that controls the transmission speed of each independent channel.
+
+```json
+{
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 1048576,
+          "record": 1000
+        }
+      }
+    }
+  }
+}
+```
+
+#### Core Field Reference
+
+| Field     | Type               | Default | Description            |
+|-----------|--------------------|---------|------------------------|
+| transport | Transport (Object) | null    | DataX transport config |
+
+#### Core.Transport Field Reference
+
+| Field   | Type             | Default | Description           |
+|---------|------------------|---------|-----------------------|
+| channel | Channel (Object) | null    | DataX channel config  |
+
+#### Core.Transport.Channel Field Reference
+
+| Field | Type                  | Default | Description                                                                   |
+|-------|-----------------------|---------|-------------------------------------------------------------------------------|
+| speed | Map\<String, Object\> | null    | Per-channel rate limit config<br>Example: `{"byte": 1048576, "record": 1000}` |
+
+**Available Keys for speed Map (can be configured simultaneously):**
+
+| Key    | Type | Default | Description                                                                             |
+|--------|------|---------|-----------------------------------------------------------------------------------------|
+| byte   | Long | null    | Per-channel byte rate limit (bytes/second), e.g., 1048576 means 1MB/s/channel           |
+| record | Long | null    | Per-channel record rate limit (records/second), e.g., 1000 means 1000 records/s/channel |
+
+**Notes:**
+- `byte` and `record` are **two independent rate limiting dimensions** and can be set simultaneously
+- If only one is configured, rate limiting is applied only to that dimension
+- If neither is configured, the channel has no rate limit
+
+---
+
+### 11.4 Setting Configuration Structure (Global Level)
+
+`setting.speed` is a **global level** rate limiting configuration that controls the transmission speed of the entire task.
+
+**Configuration Options:**
+
+| Parameter | Type    | Description                                                                                             |
+|-----------|---------|---------------------------------------------------------------------------------------------------------|
+| channel   | Integer | Fixed channel count. If configured, channel count is fixed and does not participate in auto-calculation |
+| byte      | Long    | Global byte rate limit, must be used with core.transport.channel.speed.byte                             |
+| record    | Long    | Global record rate limit, must be used with core.transport.channel.speed.record                         |
+
+**Configuration Rules:**
+- channel only: Fixed channel count, per-channel rate limit controlled by core.transport.channel.speed
+- byte or record only: Auto-calculate channel count = global rate limit / per-channel rate limit
+- byte and record together: Calculate required channel count separately, take the larger value
+- channel and byte/record together: Channel count fixed, byte/record serve as global rate limits
+
+#### Setting Field Reference
+
+| Field      | Type                  | Default | Description                                                        |
+|------------|-----------------------|---------|--------------------------------------------------------------------|
+| speed      | Map\<String, Object\> | null    | Global rate limit config, channel/byte/record can be used together |
+| errorLimit | Map\<String, Object\> | null    | Error tolerance config                                             |
+
+#### Available Keys for "setting.speed" Map
+
+| Key     | Type    | Default | Description                                                                  |
+|---------|---------|---------|------------------------------------------------------------------------------|
+| channel | Integer | null    | Fixed channel count, e.g., 4 means 4 parallel channels                       |
+| byte    | Long    | null    | Global byte rate limit (bytes/second), total rate limit across all channels  |
+| record  | Long    | null    | Global record rate limit (records/second), total records across all channels |
+
+#### Available Keys for setting.errorLimit Map (can be configured simultaneously)
+
+| Key        | Type  | Default | Description                                           |
+|------------|-------|---------|-------------------------------------------------------|
+| record     | Long  | null    | Maximum allowed number of error records               |
+| percentage | Float | 0.02    | Maximum allowed error percentage, e.g., 0.02 means 2% |
+
+---
+
+### 11.5 Configuration Examples
+
+#### 11.5.1 Fixed Channel Count + Global Rate Limit
+
+```json
+{
+  "setting": {
+    "speed": {
+      "channel": 4,
+      "byte": 52428800,
+      "record": 40000
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 1048576,
+          "record": 1000
+        }
+      }
+    }
+  }
+}
+```
+- Fixed 4 channels
+- Global rate limit of 50MB/s and 40,000 records/s
+- Per-channel rate limit of 12.5MB/s and 10,000 records/s
+
+#### 11.5.2 Byte-Only Rate Limiting (Auto-Calculate Channel Count)
+
+```json
+{
+  "setting": {
+    "speed": {
+      "byte": 52428800
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 10485760
+        }
+      }
+    }
+  }
+}
+```
+- Channel count auto-calculated: `52428800 ÷ 10485760 = 5` channels
+
+#### 11.5.3 Record-Only Rate Limiting (Auto-Calculate Channel Count)
+
+```json
+{
+  "setting": {
+    "speed": {
+      "record": 40000
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "record": 1000
+        }
+      }
+    }
+  }
+}
+```
+- Channel count auto-calculated: `40000 ÷ 1000 = 40` channels
+
+#### 11.5.4 Combined Byte and Record Rate Limiting
+
+```json
+{
+  "setting": {
+    "speed": {
+      "byte": 52428800,
+      "record": 40000
+    }
+  },
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 10485760,
+          "record": 5000
+        }
+      }
+    }
+  }
+}
+```
+- Channel count auto-calculated: max(`52428800 ÷ 10485760`, `40000 ÷ 5000`) = max(5, 8) = 8 channels
+
+#### 11.5.5 Important Constraints
+
+| Constraint                           | Description                                                                                                                                                                           |
+|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Must be configured in pairs**      | If `setting.speed.byte` is configured, `core.transport.channel.speed.byte` must also be configured                                                                                    |
+| **Must be configured in pairs**      | If `setting.speed.record` is configured, `core.transport.channel.speed.record` must also be configured                                                                                |
+| **Cannot configure channel in core** | The `channel` parameter can only be configured in `setting.speed`, not in `core.transport.channel.speed`                                                                              |
+| **Priority**                         | If both channel and byte/record are configured, channel takes effect and byte/record serve as global rate limits; if only byte/record is configured, channel count is auto-calculated |
+
+---
+
+### 11.6 Configuration Examples
+
+#### Example 1: Recommended Configuration (Auto-Calculate Channel Count)
+
+```json
+{
+  "data": {
+    "enable": true,
+    "fetchSize": 1000,
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 10485760,
+            "record": 5000
+          }
+        }
+      }
+    },
+    "setting": {
+      "speed": {
+        "byte": 52428800,
+        "record": 40000
+      },
+      "errorLimit": {
+        "percentage": 0.02
+      }
+    }
+  }
+}
+```
+
+**Configuration Note:**
+- Each channel: 10MB/s or 5000 records/s
+- Global max: 50MB/s or 40,000 records/s
+- Channel count auto-calculated as 5 (50MB/s ÷ 10MB/s = 5)
+- 2% error tolerance
+
+#### Example 2: Fixed Channel Count Configuration
+
+```json
+{
+  "data": {
+    "enable": true,
+    "fetchSize": 1000,
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 10485760
+          }
+        }
+      }
+    },
+    "setting": {
+      "speed": {
+        "channel": 4
+      },
+      "errorLimit": {
+        "percentage": 0.02
+      }
+    }
+  }
+}
+```
+
+**Configuration Note:**
+- Each channel: 10MB/s
+- Fixed 4 channels
+- Global theoretical rate limit = 10MB/s × 4 = 40MB/s
+
+#### Example 3: High Concurrency Configuration (for 16-core CPU, recommended)
+
+```json
+{
+  "data": {
+    "enable": true,
+    "fetchSize": 2000,
+    "batchSize": 2000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 5242880,
+            "record": 10000
+          }
+        }
+      }
+    },
+    "setting": {
+      "speed": {
+        "byte": 78643200,
+        "record": 100000
+      },
+      "errorLimit": {
+        "record": 100000
+      }
+    }
+  }
+}
+```
+
+**Configuration Note:**
+- Suitable for 16-core CPU
+- Each channel: 5MB/s or 10,000 records/s
+- Global: 75MB/s or 100,000 records/s
+- Channel count auto-calculated: min(78643200 ÷ 5242880, 100000 ÷ 10000) = min(15, 10) = 10 channels
+- Maximum 100,000 errors allowed
+
+---
+
+### 11.7 References
+
+For more detailed information about DataX rate limiting configuration, please refer to:
+
+1. [DataX Parameter Tuning Guide - CSDN](https://blog.csdn.net/weixin_44893236/article/details/149827940)
+2. [DataX Job Allocation](https://zhmin.github.io/posts/datax-job/)
+3. [DataX Channel Principle](https://zhmin.github.io/posts/datax-channel/)
+
+---
+
+## 12. Source Class Hierarchy
+
+The following class hierarchy is based on KDTS source code:
+
+```
+Source (Interface)
+├── RDBMS (for MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE)
+├── KaiwuDB (for KAIWUDB source/target)
+├── InfluxDB (for INFLUXDB1X, INFLUXDB2X)
+├── TDengine (for TDENGINE2X, TDENGINE3X)
+├── OpenTSDB (for OPENTSDB)
+├── MongoDB (for MONGODB)
+├── Ftp (for FTP)
+└── Hdfs (for HDFS)
+```
+
+**Source Type Mapping in TableMapping**:
+
+| KDTS Source Type                                 | sourceType Value | Implementation Class |
+|--------------------------------------------------|------------------|----------------------|
+| MYSQL, ORACLE, POSTGRESQL, SQLSERVER, CLICKHOUSE | RDBMS            | `RDBMS`              |
+| KAIWUDB                                          | KAIWUDB          | `KaiwuDB`            |
+| TDENGINE2X, TDENGINE3X                           | TDENGINE         | `TDengine`           |
+| INFLUXDB1X, INFLUXDB2X                           | INFLUXDB         | `InfluxDB`           |
+| MONGODB                                          | MONGODB          | `MongoDB`            |
+| OPENTSDB                                         | OPENTSDB         | `OpenTSDB`           |
+| FTP                                              | FTP              | `Ftp`                |
+| HDFS                                             | HDFS             | `Hdfs`               |
+
+**Note**: The `sourceType` field is used by Jackson polymorphism to deserialize the correct Source implementation.

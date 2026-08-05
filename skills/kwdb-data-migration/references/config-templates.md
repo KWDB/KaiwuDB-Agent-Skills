@@ -1,6 +1,270 @@
-﻿# Configuration Templates
+# Configuration Templates
 
 Ready-to-use JSON templates for KDTS migration requests.
+
+---
+
+## Important Configuration Notes
+
+### 1. DataX Configuration Requirements
+
+All data migration requests must include the `data` field, where `core` and `setting` are required configuration items.
+
+Default DataX Configuration (based on KDTS source code):
+```json
+{
+  "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 1000,
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
+  }
+}
+```
+
+### 2. Configuration Field Reference
+
+#### UserData Fields
+
+| Field     | Type    | Default | Description                                    |
+|-----------|---------|---------|------------------------------------------------|
+| enable    | boolean | false   | Whether to enable user data migration          |
+| fetchSize | int     | 1000    | Number of records fetched per pull from source |
+| batchSize | int     | 1000    | Number of records submitted per push to target |
+| core      | Object  | -       | DataX core config (required)                   |
+| setting   | Object  | -       | DataX setting config (required)                |
+
+#### core.transport.channel.speed (Map<String, Object>)
+**Note: byte and record can be configured simultaneously (different dimensions of rate limiting), but channel cannot be configured here!**
+
+| Key    | Type    | Description                                                                           |
+|--------|---------|---------------------------------------------------------------------------------------|
+| byte   | Integer | Per-channel byte-level rate limit (bytes/second), e.g., 1048576 means 1MB/s           |
+| record | Integer | Per-channel record-level rate limit (records/second), e.g., 1000 means 1000 records/s |
+
+#### setting.speed (Map<String, Object>)
+**Note: The following parameters can be combined to implement flexible rate limiting strategies!**
+
+| Parameter | Type    | Description                                                                                                           |
+|-----------|---------|-----------------------------------------------------------------------------------------------------------------------|
+| channel   | Integer | Fixed number of parallel channels. If configured, channel count is fixed and does not participate in auto-calculation |
+| byte      | Long    | Global byte-level rate limit, must be used with core.transport.channel.speed.byte                                     |
+| record    | Long    | Global record-level rate limit, must be used with core.transport.channel.speed.record                                 |
+
+**Configuration Constraints and Calculation Rules:**
+- channel only: Fixed channel count, byte/record as global rate limits distributed to each channel
+- byte or record only: Auto-calculate channel count = global rate limit / per-channel rate limit
+- byte and record together: Calculate required channel count separately, take the larger value
+- channel and byte/record together: Channel count fixed, byte/record as global rate limits
+- If byte is configured, core.transport.channel.speed.byte must also be configured
+- If record is configured, core.transport.channel.speed.record must also be configured
+
+**Example 1: Fixed Channel Count + Global Rate Limit (Recommended)**
+```json
+{
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 1048576,
+          "record": 1000
+        }
+      }
+    }
+  },
+  "setting": {
+    "speed": {
+      "channel": 4,
+      "byte": 52428800,
+      "record": 40000
+    }
+  }
+}
+```
+**Note:** Fixed 4 channels, global rate limit of 50MB/s and 40,000 records/s, per-channel rate limit of 12.5MB/s and 10,000 records/s
+
+**Example 2: Byte-Only Rate Limiting (Auto-Calculate Channel Count)**
+```json
+{
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "byte": 10485760
+        }
+      }
+    }
+  },
+  "setting": {
+    "speed": {
+      "byte": 52428800
+    }
+  }
+}
+```
+**Note:** Global 50MB/s rate limit, per-channel 10MB/s, channel count auto-calculated as 5
+
+**Example 3: Record-Only Rate Limiting (Auto-Calculate Channel Count)**
+```json
+{
+  "core": {
+    "transport": {
+      "channel": {
+        "speed": {
+          "record": 10000
+        }
+      }
+    }
+  },
+  "setting": {
+    "speed": {
+      "record": 40000
+    }
+  }
+}
+```
+**Note:** Global 40,000 records/s rate limit, per-channel 10,000 records/s, channel count auto-calculated as 4
+
+#### setting.errorLimit (Map<String, Object>)
+**Note: record and percentage can be configured simultaneously; DataX will apply the stricter limit!**
+
+| Key        | Type    | Description                                           |
+|------------|---------|-------------------------------------------------------|
+| record     | Integer | Maximum allowed number of error records               |
+| percentage | Float   | Maximum allowed error percentage, e.g., 0.02 means 2% |
+
+### 3. Mutually Exclusive Parameters and Notes
+
+The following parameters cannot be used simultaneously:
+
+| Parameter A | Parameter B | Description                          |
+|-------------|-------------|--------------------------------------|
+| where       | querySql    | Choose WHERE condition or custom SQL |
+
+The following parameters are not recommended to be used simultaneously:
+
+| Parameter A     | Parameter B     | Description                                                           |
+|-----------------|-----------------|-----------------------------------------------------------------------|
+| splitPk         | querySql        | splitPk requires original table structure, incompatible with querySql |
+| column (string) | columns (array) | Choose simple column names or structured definitions                  |
+
+### 4. Combinable Configurations
+
+The following parameters can be used in combination:
+
+| Parameter Combination                      | Description                                                                                                       |
+|--------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| setting.speed.channel + byte + record      | Fixed channel count with global byte and record rate limits                                                       |
+| setting.speed.byte + record                | Global byte and record rate limits, DataX calculates required channel count separately and takes the larger value |
+| core.transport.channel.speed.byte + record | Per-channel byte and record rate limits (different dimensions)                                                    |
+| setting.errorLimit.record + percentage     | Maximum error records and percentage, DataX applies the stricter limit                                            |
+
+### 5. Common Configuration Examples
+
+#### Example 1: Basic Configuration (Recommended)
+```json
+{
+  "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 1000,
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
+  }
+}
+```
+**Note:** Basic configuration with 4 parallel channels, per-channel limit of 1MB/s and 1000 records/s
+
+#### Example 2: Auto-Calculate Channel Count by Bytes
+```json
+{
+  "data": {
+    "batchSize": 2000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 10485760
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 2000,
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.01
+      },
+      "speed": {
+        "byte": 52428800
+      }
+    }
+  }
+}
+```
+**Note:** Global 50MB/s, per-channel 10MB/s, channel count auto-calculated as 5
+
+#### Example 3: Auto-Calculate Channel Count by Records
+```json
+{
+  "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "record": 10000
+          }
+        }
+      }
+    },
+    "enable": true,
+    "fetchSize": 1000,
+    "setting": {
+      "errorLimit": {
+        "record": 1000
+      },
+      "speed": {
+        "record": 40000
+      }
+    }
+  }
+}
+```
+**Note:** Global 40,000 records/s, per-channel 10,000 records/s, channel count auto-calculated as 4
 
 ---
 
@@ -134,15 +398,25 @@ For sources that support full migration (auto-discovery): MySQL, Oracle, Postgre
   },
   "tables": [],
   "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 1000,
-    "batchSize": 1000,
     "setting": {
-      "speed": {
-        "channel": 2
-      },
       "errorLimit": {
         "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
       }
     }
   }
@@ -152,8 +426,11 @@ For sources that support full migration (auto-discovery): MySQL, Oracle, Postgre
 **Key Points**:
 
 - Empty `tables` array = auto-discover all tables
-- `speed.channel` = parallel read/write threads
-- `errorLimit.percentage` = % of rows that can fail before stopping
+- `setting.speed.channel` = parallel read/write threads
+- `setting.errorLimit.percentage` = % of rows that can fail before stopping
+- `core.transport.channel.speed.byte` = byte-level speed limit per channel (default: 1048576 = 1MB/s)
+- `core.transport.channel.speed.record` = record-level speed limit per channel (default: 1000 records/s)
+- **CRITICAL**: Both `core` and `setting` fields are REQUIRED for successful DataX execution
 
 ### 2.2 Table-Level Migration
 
@@ -196,9 +473,27 @@ For sources that don't support full migration (no auto-discovery): SQL Server, T
     }
   ],
   "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 1000,
-    "batchSize": 1000
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
   }
 }
 ```
@@ -244,9 +539,27 @@ For sources that don't support full migration (no auto-discovery): SQL Server, T
     }
   ],
   "data": {
+    "batchSize": 5000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 5000,
-    "batchSize": 5000
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
   }
 }
 ```
@@ -291,9 +604,27 @@ For sources that don't support full migration (no auto-discovery): SQL Server, T
     }
   ],
   "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 1000,
-    "batchSize": 1000
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
   }
 }
 ```
@@ -338,10 +669,23 @@ For sources that don't support full migration (no auto-discovery): SQL Server, T
     }
   ],
   "data": {
+    "batchSize": 5000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 5000,
-    "batchSize": 5000,
     "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
       "speed": {
         "channel": 8
       }
@@ -391,9 +735,27 @@ Skip DDL steps, go directly to build.
     }
   ],
   "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 1000,
-    "batchSize": 1000
+    "setting": {
+      "errorLimit": {
+        "percentage": 0.02
+      },
+      "speed": {
+        "channel": 4
+      }
+    }
   }
 }
 ```
@@ -610,16 +972,25 @@ CREATE TABLE sensor_data
 ```json
 {
   "data": {
+    "batchSize": 5000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 10485760,
+            "record": 10000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 5000,
-    "batchSize": 5000,
     "setting": {
-      "speed": {
-        "channel": 4,
-        "record": -1
-      },
       "errorLimit": {
         "percentage": 0.01
+      },
+      "speed": {
+        "channel": 4
       }
     }
   }
@@ -655,16 +1026,25 @@ CREATE TABLE sensor_data
 ```json
 {
   "data": {
+    "batchSize": 1000,
+    "core": {
+      "transport": {
+        "channel": {
+          "speed": {
+            "byte": 1048576,
+            "record": 1000
+          }
+        }
+      }
+    },
     "enable": true,
     "fetchSize": 1000,
-    "batchSize": 1000,
     "setting": {
+      "errorLimit": {
+        "percentage": 5.0
+      },
       "speed": {
         "channel": 1
-      },
-      "errorLimit": {
-        "percentage": 5.0,
-        "record": 1000
       }
     }
   }

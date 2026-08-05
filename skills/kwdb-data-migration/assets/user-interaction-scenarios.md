@@ -12,14 +12,14 @@ Both versions contain the same 8 scenarios with dialogue in their respective lan
 ## Scenario 1: MySQL to KaiwuDB (Relational) - Full Migration
 
 ### User Request
-```
+````
 Help me migrate MySQL order_system database to KaiwuDB relational database
-```
+````
 
 ### Expected AI Agent Response
 
 **Step 1: Recognize Migration Intent**
-```
+````
 [OK] Migration intent recognized: MySQL (order_system) -> KaiwuDB (RELATIONAL)
 
 Please provide the following information to start migration:
@@ -38,18 +38,18 @@ Please provide the following information to start migration:
    - Target database name (default order_system):
 
 [IMPORTANT] Security reminder: Please ensure you have backed up both source and target databases before migration!
-```
+````
 
 **User Response**
-```
+````
 KDTS at http://192.168.1.100:8989
 MySQL: 192.168.1.50:3306, user=root, password=mysql123
 KaiwuDB: 127.0.0.1:26257, user=root, password=kwdb_secret
 Target database name: order_system
-```
+````
 
 **Step 2: Parameter Validation**
-```
+````
 [OK] Parameters collected, starting validation...
 
 [System Internal Call]
@@ -58,10 +58,10 @@ Target database name: order_system
 3. Source capability check: MySQL supports full migration [OK]
 
 [OK] Parameter validation passed
-```
+````
 
 **Step 3: Connection Test**
-```
+````
 [INFO] Testing database connections...
 
 [System Internal Call]
@@ -70,10 +70,10 @@ Target database name: order_system
 
 [OK] MySQL connection successful (192.168.1.50:3306)
 [OK] KaiwuDB connection successful (127.0.0.1:26257)
-```
+````
 
 **Step 4: Read Metadata**
-```
+````
 [INFO] Reading MySQL metadata...
 
 [System Internal Call]
@@ -88,10 +88,10 @@ Target database name: order_system
    - inventory (7 columns)
 
    Estimated total data volume: ~50,000 rows
-```
+````
 
 **Step 5: Preview DDL**
-```
+````
 [INFO] Generating KaiwuDB DDL...
 
 [System Internal Call]
@@ -105,8 +105,7 @@ CREATE TABLE orders (
     customer_id INT8,
     order_time TIMESTAMP,
     total_amount DECIMAL(15,2),
-    status VARCHAR(50),
-    -- ... more columns
+    status VARCHAR(50)
 );
 
 -- order_items table
@@ -115,8 +114,7 @@ CREATE TABLE order_items (
     order_id INT8,
     product_id INT8,
     quantity INT,
-    price DECIMAL(10,2),
-    -- ... more columns
+    price DECIMAL(10,2)
 );
 ```
 
@@ -124,15 +122,15 @@ CREATE TABLE order_items (
 [WARNING] Existing target tables will be overwritten
 
 Confirm execution? (yes/no)
-```
+````
 
 **User Response**
-```
+````
 yes
-```
+````
 
 **Step 6: Execute DDL**
-```
+````
 [OK] Executing DDL...
 
 [System Internal Call]
@@ -142,10 +140,10 @@ yes
    SQL file saved to: /opt/kdts/data/sql/order_system_ddl.sql
    Tables created: 6
    Time taken: 0.8 seconds
-```
+````
 
 **Step 7: Build & Execute Migration**
-```
+````
 [INFO] Building migration task...
 
 [System Internal Call]
@@ -160,10 +158,10 @@ yes
 1. KDTSClient.execute_migration(script_names)
 
 [INFO] Migration task started, monitoring progress...
-```
+````
 
 **Step 8: Monitor Progress**
-```
+````
 [INFO] Migration progress:
    |████████████████████████████████████████| 100%
    
@@ -185,21 +183,21 @@ yes
    - Error rows: 0
 
 [TIP] Recommendation: Please verify data integrity by comparing row counts between source and target databases
-```
+````
 
 ---
 
 ## Scenario 2: InfluxDB to KaiwuDB (Time Series) - Two-Step Migration
 
 ### User Request
-```
+````
 I want to migrate InfluxDB metrics bucket to KaiwuDB time series database
-```
+````
 
 ### Expected AI Agent Response
 
 **Step 1: Recognize Migration Intent**
-```
+````
 [OK] Migration intent recognized: InfluxDB (metrics bucket) -> KaiwuDB (TIMESERIES)
 
 [INFO] InfluxDB Note: Full migration (Schema + Data) requires two steps:
@@ -226,18 +224,18 @@ Please provide the following information:
    - Target database name (default metrics):
 
 [IMPORTANT] Security reminder: Please ensure you have backed up both source data and target database before migration!
-```
+````
 
 **User Response**
-```
+````
 KDTS: http://192.168.1.100:8989
 InfluxDB 2.x: 192.168.1.60:8086, token=my-influxdb-token, bucket=metrics
 KaiwuDB: 127.0.0.1:26257, user=root, password=kwdb_secret
 Target database name: metrics_ts
-```
+````
 
 **Step 2: Step 1 - Schema Migration**
-```
+````
 [INFO] Step 1: Migrating table structure (Schema)
 
 [INFO] Reading InfluxDB metadata...
@@ -266,23 +264,23 @@ CREATE TABLE cpu_usage (
 [WARNING] About to execute DDL to create 3 time series tables
 
 Confirm execution? (yes/no)
-```
+````
 
 **User Response**
-```
+````
 yes
-```
+````
 
-```
+````
 [OK] DDL execution successful!
    Tables created: 3
    Time taken: 0.5 seconds
 
 [INFO] Step 2: Starting data migration...
-```
+````
 
 **Step 3: Step 2 - Data Migration**
-```
+````
 [INFO] Building data migration task...
 
 [System Internal Call]
@@ -292,10 +290,10 @@ yes
    Task name: INFLUXDB2X2KAIWUDB_1720000000000.json
 
 [INFO] Migrating data...
-```
+````
 
 **Step 4: Monitor & Complete**
-```
+````
 [INFO] Migration progress:
    |████████████████████████████████████████| 100%
 
@@ -314,19 +312,19 @@ yes
    - Error rows: 0
 
 [TIP] Recommendation: Please verify data integrity, especially timestamps and tags for time series data
-```
+````
 
 ---
 
 ## Scenario 3: Error Handling - Connection Failure
 
 ### User Request
-```
+````
 Help me migrate data
-```
+````
 
 ### Expected AI Agent Response
-```
+````
 [OK] Please provide more information so I can help you migrate data:
 
 1. Source database type (MySQL, Oracle, PostgreSQL, InfluxDB, etc.)
@@ -334,17 +332,17 @@ Help me migrate data
 3. KDTS server address
 4. Source database connection info
 5. Target KaiwuDB connection info
-```
+````
 
 **User Response**
-```
+````
 Source: MySQL at 192.168.1.50:3306, user=root, password=wrong
 Target: KaiwuDB RELATIONAL
 KDTS: http://192.168.1.100:8989
-```
+````
 
 **Expected AI Agent Response**
-```
+````
 [INFO] Testing connection...
 
 [ERROR] MySQL connection failed!
@@ -361,19 +359,19 @@ KDTS: http://192.168.1.100:8989
    - Retry with correct password
 
 Please provide correct MySQL connection information.
-```
+````
 
 ---
 
 ## Scenario 4: Non-Supported Source Type
 
 ### User Request
-```
+````
 Help me migrate Redis data to KaiwuDB
-```
+````
 
 ### Expected AI Agent Response
-```
+````
 [WARNING] Sorry, Redis is not currently supported as a source database.
 
 Currently supported source database types:
@@ -386,19 +384,19 @@ Currently supported source database types:
 2. First migrate Redis data to a supported database, then migrate to KaiwuDB
 
 Would you like to know the specific operation method?
-```
+````
 
 ---
 
 ## Scenario 5: Ambiguous Request Clarification
 
 ### User Request
-```
+````
 I want to migrate my data to KaiwuDB
-```
+````
 
 ### Expected AI Agent Response
-```
+````
 Okay! Please tell me the following information first:
 
 1. What is the source database type?
@@ -413,19 +411,19 @@ Okay! Please tell me the following information first:
 3. What is the KDTS server address? (Default http://127.0.0.1:8989)
 
 After providing this information, I will guide you through the complete migration process.
-```
+````
 
 ---
 
 ## Scenario 6: Configuration Query
 
 ### User Request
-```
+````
 How should I configure the KDTS service address?
-```
+````
 
 ### Expected AI Agent Response
-```
+````
 KDTS server address supports multiple configuration methods (in priority order):
 
 ### Method 1: Environment Variables (Recommended for CI/CD)
@@ -455,19 +453,19 @@ If not configured, the default address will be used: http://127.0.0.1:8989
 Do you need me to check your current KDTS configuration?
 
 [TIP] Note: When you start migration, if I find the KDTS address is unavailable, I will proactively ask you.
-```
+````
 
 ---
 
 ## Scenario 7: Migration Status Check
 
 ### User Request
-```
+````
 I previously started a migration task, help me check if it's completed?
-```
+````
 
 ### Expected AI Agent Response
-```
+````
 Okay, please provide the migration task name, for example:
 - MYSQL2KAIWUDB_1720000000000
 - INFLUXDB2X2KAIWUDB_1720000000000
@@ -477,16 +475,16 @@ If you don't remember the task name, you can provide:
 2. Migration time range (e.g., migration at 10 AM today)
 
 I can help you query the recent migration task status.
-```
+````
 
 **User Response**
-```
+````
 Task name is MYSQL2KAIWUDB_1720000000000
 KDTS at http://192.168.1.100:8989
-```
+````
 
 **Expected AI Agent Response**
-```
+````
 [INFO] Querying task status...
 
 [System Internal Call]
@@ -506,25 +504,25 @@ KDTS at http://192.168.1.100:8989
    Error rows: 0
 
 [OK] Migration task completed successfully!
-```
+````
 
 ---
 
 ## Scenario 8: InfluxDB 2.x Complex Migration with Boundary Conditions
 
 ### User Request
-```
+````
 I have a complex InfluxDB 2.x database migration requirement:
 - bucket: production_metrics (contains 50 measurements, over 100 million records)
 - Need to preserve original tag and field structure
 - Target KaiwuDB time series database name: metrics_archive
 - Migration time range: 2024-01-01 to 2024-12-31
-```
+````
 
 ### Expected AI Agent Response
 
 **Step 1: Recognize Complex Migration Need**
-```
+````
 [OK] Complex migration requirement recognized: InfluxDB 2.x (production_metrics) -> KaiwuDB (TIMESERIES)
 
 [WARNING] Detected high complexity migration scenario:
@@ -560,10 +558,10 @@ Migration parameters:
   - Please back up the source bucket before migration!
   - Large data migration is recommended during business off-peak hours
   - Migration may take several hours to complete
-```
+````
 
 **User Response**
-```
+````
 KDTS: http://10.0.0.100:8989
 InfluxDB: 192.168.1.60:8086, org=myorg, token=secret-token, bucket=production_metrics
 KaiwuDB: 127.0.0.1:26257, user=root, password=kwdb, db=metrics_archive
@@ -571,10 +569,10 @@ Time range: 2024-01-01 ~ 2024-12-31
 Batch strategy: By month
 Concurrency: 16
 Include all tags/fields: Yes
-```
+````
 
 **Step 2: Validate and Plan Migration**
-```
+````
 [INFO] Validating connection...
   [OK] InfluxDB 2.x connection successful
   [OK] KaiwuDB connection successful
@@ -608,15 +606,15 @@ Include all tags/fields: Yes
   - Auto-retry failed batches? (default: Yes, up to 3 times)
 
 Start executing migration plan? (yes/no)
-```
+````
 
 **User Response**
-```
+````
 Confirm to start, skip empty measurements, ignore errors, auto-retry
-```
+````
 
 **Step 3: Execute Migration - Schema Phase**
-```
+````
 [INFO] Step 1/2: Schema Migration (all measurements)...
 
 [INFO] Generating DDL (50 measurements):
@@ -640,15 +638,15 @@ Confirm to start, skip empty measurements, ignore errors, auto-retry
 [WARNING] Estimated storage: 127M records x ~200 bytes = 24 GB
 
 Confirm DDL execution? (yes/no)
-```
+````
 
 **User Response**
-```
+````
 yes
-```
+````
 
 **Step 4: Execute Migration - Data Phase**
-```
+````
 [OK] DDL execution successful! Tables created: 50
 
 [INFO] Step 2/2: Data Migration (12 batches)...
@@ -691,7 +689,7 @@ yes
   4. Run key queries to verify performance
 
 Migration successful? It is recommended to run verification script to confirm before deleting source data.
-```
+````
 
 ---
 
@@ -722,13 +720,13 @@ These scenarios can be used for:
 
 ## Key to Tags
 
-| Tag | Meaning |
-|-----|---------|
-| [OK] | Operation completed successfully |
-| [INFO] | Providing information or progress updates |
-| [WARNING] | Requires user attention or has potential risks |
-| [ERROR] | An error occurred that needs handling |
-| [TIP] | Providing suggestions or best practices |
-| [IMPORTANT] | Critical security or configuration information |
-| [REPORT] | Migration results or statistics report |
+| Tag           | Meaning                                                     |
+|---------------|-------------------------------------------------------------|
+| [OK]          | Operation completed successfully                            |
+| [INFO]        | Providing information or progress updates                   |
+| [WARNING]     | Requires user attention or has potential risks              |
+| [ERROR]       | An error occurred that needs handling                       |
+| [TIP]         | Providing suggestions or best practices                     |
+| [IMPORTANT]   | Critical security or configuration information              |
+| [REPORT]      | Migration results or statistics report                      |
 | [ALTERNATIVE] | Alternative solution when the primary option is unavailable |

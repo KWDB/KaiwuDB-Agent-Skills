@@ -346,6 +346,31 @@ class KDTSClient:
 
     # ==================== DataX API ====================
 
+    # Default DataX configuration for data migration
+    DEFAULT_DATAX_CONFIG = {
+        "batchSize": 1000,
+        "core": {
+            "transport": {
+                "channel": {
+                    "speed": {
+                        "byte": 1048576,
+                        "record": 1000
+                    }
+                }
+            }
+        },
+        "enable": True,
+        "fetchSize": 1000,
+        "setting": {
+            "errorLimit": {
+                "percentage": 0.02
+            },
+            "speed": {
+                "channel": 4
+            }
+        }
+    }
+
     def build_migration(self, source: Dict, target: Dict,
                         tables: Optional[List[Dict]] = None,
                         data_config: Optional[Dict] = None) -> Dict[str, Any]:
@@ -358,22 +383,195 @@ class KDTSClient:
             tables: Optional list of TableMapping dicts.
                 Empty or None = auto-discover all tables (full migration)
                 Each mapping has 'source' and 'target' keys.
-            data_config: Optional data migration settings dict with keys:
+            data_config: Optional data migration settings dict.
+                If not provided, uses DEFAULT_DATAX_CONFIG with:
                 - enable (bool): Enable data migration (default: True)
-                - fetchSize (int): Rows per fetch (default: 1000)
-                - batchSize (int): Rows per batch (default: 1000)
-                - setting (dict): speed and errorLimit settings
+                - fetchSize (int): Rows per fetch from source (default: 1000)
+                - batchSize (int): Rows per batch to target (default: 1000)
+                - core.transport.channel.speed.byte: Bytes per second (default: 1048576 = 1MB)
+                - core.transport.channel.speed.record: Records per second (default: 1000)
+                - setting.speed.channel: Number of parallel channels (default: 4)
+                - setting.errorLimit.percentage: Error tolerance percentage (default: 0.02 = 2%)
 
         Returns:
             Response with data containing list of generated script file names.
+
+        Note: The complete data config structure is required for successful DataX execution.
+        Missing core or setting fields will cause migration failures.
         """
         request = {
             "source": source,
             "target": target,
             "tables": tables or [],
-            "data": data_config or {"enable": True}
+            "data": data_config or self.DEFAULT_DATAX_CONFIG
         }
+        
+        # Validate the configuration before sending
+        errors = self.validate_migration_config(request)
+        if errors:
+            raise ValueError(f"Invalid migration configuration: {'; '.join(errors)}")
+        
         return self._request('POST', '/datax/build', data=request)
+    
+    @classmethod
+    def validate_migration_config(cls, config: Dict[str, Any]) -> List[str]:
+        """
+        Validate migration configuration for common errors.
+        
+        Args:
+            config: Full migration request configuration with source, target, tables, data fields
+            
+        Returns:
+            List of error messages (empty if configuration is valid)
+            
+        Common validation checks:
+        - DataX speed configuration constraints (based on DataX official documentation)
+        - Mutual exclusion of where and querySql
+        - Mutual exclusion of column and columns
+        - Recommended: splitPk should not be used with querySql
+        - Required fields in data configuration (core and setting)
+        
+        DataX Speed Configuration Rules:
+        1. core.transport.channel.speed (single channel level):
+           - Can have 'byte' and/or 'record' (not mutually exclusive!)
+           - Should NOT have 'channel' (only in setting.speed)
+        
+        2. setting.speed (global level):
+           - 'byte' and 'record' can be configured simultaneously
+           - If 'byte' is configured, core.transport.channel.speed.byte MUST be configured
+           - If 'record' is configured, core.transport.channel.speed.record MUST be configured
+           - If 'byte' or 'record' is configured, 'channel' is IGNORED (auto-calculated)
+           - If only 'channel' is configured, it's used directly
+        """
+        errors = []
+        
+        # Validate data configuration
+        data = config.get('data', {})
+        if not data:
+            errors.append("Missing 'data' configuration")
+            return errors
+        
+        # Check enable field
+        if 'enable' not in data:
+            errors.append("Missing 'data.enable' field")
+        
+        # Check core configuration (REQUIRED)
+        core = data.get('core', {})
+        if not core:
+            errors.append("Missing 'data.core' configuration (REQUIRED for DataX)")
+            return errors
+        
+        # Check core.transport.channel.speed
+        transport = core.get('transport', {})
+        channel = transport.get('channel', {})
+        core_speed = channel.get('speed', {})
+        
+        if not core_speed:
+            errors.append("Missing 'data.core.transport.channel.speed' configuration")
+        else:
+            # core.transport.channel.speed can have 'byte' and/or 'record' (not mutually exclusive)
+            # But should NOT have 'channel' parameter
+            if 'channel' in core_speed:
+                errors.append(
+                    "'core.transport.channel.speed' should NOT have 'channel' parameter. "
+                    "'channel' should only be configured in 'setting.speed'."
+                )
+        
+        # Check setting configuration (REQUIRED)
+        setting = data.get('setting', {})
+        if not setting:
+            errors.append("Missing 'data.setting' configuration (REQUIRED for DataX)")
+            return errors
+        
+        setting_speed = setting.get('speed', {})
+        
+        if setting_speed:
+            # Get core speed values for cross-validation
+            core_byte = core_speed.get('byte') if core_speed else None
+            core_record = core_speed.get('record') if core_speed else None
+            
+            setting_byte = setting_speed.get('byte')
+            setting_record = setting_speed.get('record')
+            setting_channel = setting_speed.get('channel')
+            
+            # Validate: if setting.speed.byte is configured, core.transport.channel.speed.byte MUST be configured
+            if setting_byte is not None:
+                if core_byte is None:
+                    errors.append(
+                        "If 'setting.speed.byte' is configured, 'core.transport.channel.speed.byte' "
+                        "MUST also be configured (required for channel count calculation)."
+                    )
+                elif core_byte <= 0:
+                    errors.append(
+                        "'core.transport.channel.speed.byte' must be > 0 when 'setting.speed.byte' is configured."
+                    )
+            
+            # Validate: if setting.speed.record is configured, core.transport.channel.speed.record MUST be configured
+            if setting_record is not None:
+                if core_record is None:
+                    errors.append(
+                        "If 'setting.speed.record' is configured, 'core.transport.channel.speed.record' "
+                        "MUST also be configured (required for channel count calculation)."
+                    )
+                elif core_record <= 0:
+                    errors.append(
+                        "'core.transport.channel.speed.record' must be > 0 when 'setting.speed.record' is configured."
+                    )
+            
+            # Validate: if channel is auto-calculated from byte/record, warn about 'channel' being ignored
+            if (setting_byte is not None or setting_record is not None) and setting_channel is not None:
+                errors.append(
+                    "'setting.speed.channel' will be IGNORED when 'setting.speed.byte' or 'setting.speed.record' "
+                    "is configured. Channel count is auto-calculated. Remove 'setting.speed.channel' to avoid confusion."
+                )
+        
+        # Validate table configurations
+        tables = config.get('tables', [])
+        for i, table in enumerate(tables):
+            source_table = table.get('source', {})
+            if source_table:
+                # Validate mutual exclusion of where and querySql
+                has_where = 'where' in source_table and source_table.get('where')
+                has_query_sql = 'querySql' in source_table and source_table.get('querySql')
+                
+                if has_where and has_query_sql:
+                    errors.append(
+                        f"Table {i + 1}: 'where' and 'querySql' are MUTUALLY EXCLUSIVE - "
+                        f"use only one"
+                    )
+                
+                # Validate mutual exclusion of column and columns
+                has_column = 'column' in source_table and source_table.get('column')
+                has_columns = 'columns' in source_table and source_table.get('columns')
+                
+                if has_column and has_columns:
+                    errors.append(
+                        f"Table {i + 1}: 'column' and 'columns' are MUTUALLY EXCLUSIVE - "
+                        f"use only one"
+                    )
+                
+                # Validate splitPk should not be used with querySql (warning)
+                has_split_pk = 'splitPk' in source_table and source_table.get('splitPk')
+                if has_split_pk and has_query_sql:
+                    errors.append(
+                        f"Table {i + 1}: 'splitPk' and 'querySql' should not be used together "
+                        f"(splitPk requires table structure which querySql may not have)"
+                    )
+        
+        return errors
+    
+    @classmethod
+    def validate_data_config(cls, data_config: Dict[str, Any]) -> List[str]:
+        """
+        Validate only the data configuration section.
+        
+        Args:
+            data_config: The 'data' section of migration configuration
+            
+        Returns:
+            List of error messages (empty if valid)
+        """
+        return cls.validate_migration_config({'data': data_config})
 
     def execute_migration(self, script_names: List[str]) -> Dict[str, Any]:
         """

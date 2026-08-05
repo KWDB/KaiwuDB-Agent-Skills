@@ -260,10 +260,49 @@
 3. **配置示例**:
    ```json
    {
-     "source": { "engine": "RELATIONAL", "type": "MYSQL", "host": "源主机", "port": 3306, "username": "用户", "password": "密码", "dbName": "源库" },
-     "target": { "engine": "TIMESERIES", "type": "KAIWUDB", "host": "目标主机", "port": 26257, "username": "root", "password": "密码", "dbName": "目标库", "isTarget": true },
+     "source": {
+       "engine": "RELATIONAL",
+       "type": "MYSQL",
+       "host": "127.0.0.1",
+       "port": 3306,
+       "username": "user",
+       "password": "pass",
+       "dbName": "source_db"
+     },
+     "target": {
+       "engine": "TIMESERIES",
+       "type": "KAIWUDB",
+       "host": "127.0.0.1",
+       "port": 26257,
+       "username": "root",
+       "password": "pass",
+       "dbName": "target_db",
+       "isTarget": true
+     },
      "tables": [],
-     "data": { "enable": true, "fetchSize": 1000, "batchSize": 1000 }
+     "data": {
+       "batchSize": 1000,
+       "core": {
+         "transport": {
+           "channel": {
+             "speed": {
+               "byte": 1048576,
+               "record": 1000
+             }
+           }
+         }
+       },
+       "enable": true,
+       "fetchSize": 1000,
+       "setting": {
+         "errorLimit": {
+           "percentage": 0.02
+         },
+         "speed": {
+           "channel": 4
+         }
+       }
+     }
    }
    ```
 
