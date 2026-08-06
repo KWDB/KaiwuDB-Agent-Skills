@@ -13,7 +13,8 @@ Modules:
 - config.py: Multi-layer configuration management
 """
 
-from .api_client import KDTSClient, build_source_config, build_target_config, build_table_mapping
+from .api_client import (KDTSClient, build_source_config, build_target_config,
+                         build_table_mapping, mark_time_series_columns)
 from .data_source import (
     DataSourceManager,
     Engine,
@@ -41,6 +42,7 @@ __all__ = [
     "build_source_config",
     "build_target_config",
     "build_table_mapping",
+    "mark_time_series_columns",
     # data_source
     "DataSourceManager",
     "Engine",

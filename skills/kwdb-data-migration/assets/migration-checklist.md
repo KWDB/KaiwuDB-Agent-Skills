@@ -66,6 +66,8 @@ The AI Agent will respond in the same language the user uses.
   }
   ```
     - Expected response: `{"code": 0, "data": "SUCCEED"}`
+    - NOTE: KDTS may return code=0 even for FAILED validation, with the failure
+      text in `data` — success requires `data == "SUCCEED"`
 - [ ] Target KaiwuDB connection test passed
     - Set `isTarget: true`
 

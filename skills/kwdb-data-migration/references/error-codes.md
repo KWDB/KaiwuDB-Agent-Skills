@@ -341,13 +341,21 @@ KaiwuDB:    jdbc:mysql://host:9092/dbname (MySQL protocol compatibility)
 
 **Symptoms**: Time-series migration cannot identify primary tag
 
-**Cause**: No column suitable for primary key in source
+**Cause**: No column suitable for primary key in source. Common reasons
+(verified in practice):
+- All candidate columns are FLOAT/DOUBLE/DECIMAL/NUMERIC (classified as float, demoted)
+- Selected primary tag columns are **nullable in the column definition** — KDTS demotes
+  nullable primary tags to ordinary tags (3006 if none remain). Fix: set `nullAble=false`
+  on the primary tag columns in the metadata (`mark_time_series_columns()` does this
+  automatically), after confirming the source DATA has no NULL values
 
 **Solutions**:
 
 1. Identify unique, non-null column (device ID, sensor ID)
 2. Add a primary key column to source
 3. If source has auto-increment ID, use that
+4. For nullable source columns: verify no NULLs in the data, then set `nullAble=false`
+   (or pick a NOT NULL column / demote to ordinary tag)
 
 **KaiwuDB Time Series Design**:
 
@@ -437,13 +445,21 @@ PRIMARY TAGS (device_id, metric);
 
 **Title**: Migration Process Timeout
 
-**Symptoms**: Migration killed after timeout
+**Symptoms**: Migration killed after timeout; also returned when an HTTP request
+(e.g. submitting MANY scripts in one `execute_migration`) exceeds the client read
+timeout — the request may still have reached the server, which keeps processing.
 
-**Default Timeout**: 3600 seconds (1 hour)
+**Default Timeout**: 3600 seconds (1 hour); client read timeout default 300s (KDTS_TIMEOUT)
 
 **Solutions**:
 
-1. **Increase timeout**:
+1. **Use batch script execution** (common cause: submitting dozens of scripts at once):
+   Use `workflow.execute_migration_batches(script_names, batch_size=10)` — submit 10 scripts
+   per batch, wait for the batch to reach final states, then submit the next.
+   A 4003 on submission means the request reached the server (it keeps processing) — still monitor.
+   (Full code example: SKILL.md Workflow 1 step 11)
+
+2. **Increase timeout**:
 
     ```yaml
     # application.yml
@@ -451,7 +467,9 @@ PRIMARY TAGS (device_id, metric);
       timeout: 7200  # 2 hours
     ```
 
-2. **Optimize migration**:
+    Client side: `KDTS_TIMEOUT=300` env / `KDTSClient(timeout=...)`.
+
+3. **Optimize migration**:
 
     ```json
     {
@@ -467,13 +485,13 @@ PRIMARY TAGS (device_id, metric);
     }
     ```
 
-3. **Reduce data volume**:
+4. **Reduce data volume**:
 
    - Add `where` clause to filter source
    - Migrate in batches by time range
    - Skip large tables initially
 
-4. **Check performance**:
+5. **Check performance**:
 
    - Source: slow queries? locks?
    - Network: bandwidth between source and target

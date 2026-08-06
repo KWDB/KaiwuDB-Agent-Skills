@@ -374,6 +374,10 @@ Test connection to data source or target.
 }
 ```
 
+> **IMPORTANT**: On FAILED validation, KDTS may still return `code: 0` with the
+> failure text in `data`. Success is `data == "SUCCEED"`,
+> NOT `code == 0`. The python api_client normalizes non-SUCCEED data to code=2001 automatically.
+
 ---
 
 #### POST /datasource/databases

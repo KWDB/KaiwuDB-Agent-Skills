@@ -66,6 +66,7 @@ AI Agent 将使用与用户相同的语言进行回复。
   }
   ```
     - 预期返回: `{"code": 0, "data": "SUCCEED"}`
+    - 注意:KDTS 对失败的校验也可能返回 code=0,失败文本在 `data` 字段 —— 必须以 `data == "SUCCEED"` 为成功判定
 - [ ] 目标 KaiwuDB 连接测试通过
     - 设置 `isTarget: true`
 

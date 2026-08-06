@@ -208,10 +208,22 @@ class KDTSClient:
 
         Returns:
             Validation result dict. On success, data contains 'SUCCEED'.
+            NOTE: KDTS returns code=0 even for FAILED validations — the failure text
+            is in the `data` field. This method normalizes such responses to
+            code=2001 (with the failure message), so callers can rely on `code == 0` meaning success.
         """
         request = source_config.copy()
         request['isTarget'] = is_target
-        return self._request('POST', '/datasource/validate', data=request)
+        result = self._request('POST', '/datasource/validate', data=request)
+        # Normalize: code=0 with non-SUCCEED data means connection failure (KDTS behavior)
+        data = result.get('data')
+        if result.get('code') == 0 and not (isinstance(data, str) and data.upper() == 'SUCCEED'):
+            result['code'] = 2001
+            if not result.get('message'):
+                # data may already start with "Connection failed: ..." (e.g. TDengine)
+                prefix = "Connection failed: "
+                result['message'] = data if str(data).startswith(prefix) else prefix + str(data)
+        return result
 
     def list_databases(self, source_config: Dict) -> Dict[str, Any]:
         """

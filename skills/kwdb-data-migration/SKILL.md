@@ -326,6 +326,11 @@ if result['code'] != 0:
     raise Exception("Target connection failed")
 ```
 
+> **NOTE (KDTS behavior)**: `test_connection()` returns code=0 even for FAILED
+> validations — the failure text is in the `data` field.
+> The api_client normalizes such responses to code=2001 automatically, so
+> `code == 0` always means success. Do NOT bypass this check.
+
 If connection fails, **stop immediately** and show error hint from `error_handler.py`.
 
 ### 4. Mandatory Backup Reminder

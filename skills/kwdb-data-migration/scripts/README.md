@@ -25,6 +25,8 @@ Full implementation of all 10 KDTS REST API endpoints.
 - `KDTSClient`: Main API client with methods for all endpoints
 - `build_source_config()`: Helper to create source configurations
 - `build_table_mapping()`: Helper to create table mappings
+- `mark_time_series_columns()`: Helper to mark column roles (isTs/isTag/isPrimaryTag,
+  auto-sets primary tags to NOT NULL) on a source Database for time-series DDL generation
 
 **Supported Endpoints:**
 | Method | Path | Purpose |

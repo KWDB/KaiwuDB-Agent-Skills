@@ -309,10 +309,13 @@ User Request
       TIMESERIES targets MUST provide explicit table mappings — empty tables fails
       with 4001 "No datax contents generated from config" (verified in practice)
     ↓
-[9] Execute Migration (api_client)
+[9] Execute Migration (api_client / workflow)
     - POST /datax/execute
     - Input: Script name(s)
     - Returns: Task ID(s), Log file path(s)
+    - MANY scripts (one per table): use `execute_migration_batches(script_names,
+      batch_size=10)` — submitting dozens of scripts in one request exceeds the client read timeout;
+      a 4003 on submission means the request reached the server, still monitor
     ↓
 [10] Monitor Progress (api_client)
     - GET /datax/status (polling)
