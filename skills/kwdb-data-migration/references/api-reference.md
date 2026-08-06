@@ -601,12 +601,12 @@ Preview DDL for target KaiwuDB based on source metadata.
 }
 ```
 
-| Field        | Type    | Required | Description                                                  |
-|--------------|---------|----------|--------------------------------------------------------------|
-| target       | Object  | Yes      | DataSourceRequest for target (must be KAIWUDB type)          |
-| sourceDb     | Object  | Yes      | Database object from /datasource/metadata response           |
-| metadata     | Object  | No       | MetaData config (can override source metadata settings)      |
-| isTimeSeries | Boolean | No       | true to generate time-series DDL (auto-detected from target) |
+| Field        | Type    | Required | Description                                             |
+|--------------|---------|----------|---------------------------------------------------------|
+| target       | Object  | Yes      | DataSourceRequest for target (must be KAIWUDB type)     |
+| sourceDb     | Object  | Yes      | Database object from /datasource/metadata response      |
+| metadata     | Object  | No       | MetaData config (can override source metadata settings) |
+| isTimeSeries | Boolean | No       | true to generate time-series DDL.                       |
 
 **Response**: `DdlScript` object
 

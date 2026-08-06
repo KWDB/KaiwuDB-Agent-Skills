@@ -291,13 +291,18 @@ class KDTSClient:
                     "index": True,
                     "view": False
                 }
-            is_time_series: If True, generate time series table DDL (default: False)
+            is_time_series: If True, request time series table DDL (default: False).
+                The request field is "isTimeSeries".
+                For time-series DDL to be generated, the source Database columns must
+                carry tag marks: "isTag" and the time column must be marked "isTs": true.
+                KDTS then generates CREATE TS DATABASE + CREATE TABLE ... TAGS (...) PRIMARY TAGS (...).
+                Tables WITHOUT any tag-marked column are SKIPPED (no DDL emitted).
 
         Returns:
             Response with data containing DdlScript:
                 {
                     "dbName": "SOURCE_DB",
-                    "createDb": "CREATE DATABASE ...",
+                    "createDb": "CREATE TS DATABASE ...",  (is_time_series=True)
                     "table": { "tableName": "CREATE TABLE xxx" },
                     "view": { "viewName": "CREATE VIEW xxx" }
                 }
@@ -756,6 +761,51 @@ def build_table_mapping(source_type: str, source_table: str,
             "writeMode": write_mode
         }
     }
+
+
+def mark_time_series_columns(source_db: Dict, table_name: str,
+                             time_column: Optional[str] = None,
+                             primary_tags: Optional[List[str]] = None,
+                             tags: Optional[List[str]] = None) -> Dict[str, Any]:
+    """
+    Mark column roles on a source Database object for time-series DDL generation.
+
+    Sets the column marks expected by KDTS (`Column.java` field names, declared
+    explicitly via @JsonProperty): "isTs" (time column), "isTag" (tag column),
+    "isPrimaryTag" (primary tag). KDTS generates time-series DDL from these marks.
+
+    Args:
+        source_db: Database object from read_metadata() response (mutated in place)
+        table_name: Table name within the database to mark
+        time_column: Column name to mark as the time series column (isTs=true)
+        primary_tags: List of column names to mark as primary tags (isTag+isPrimaryTag=true)
+        tags: List of column names to mark as ordinary tags (isTag=true)
+
+    Returns:
+        The same source_db object with marks applied.
+
+    Notes:
+        - PRIMARY TAG columns are automatically set to nullAble=false: KDTS demotes
+          nullable primary tags to ordinary tags (verified: 3006 if none remain).
+          Only pass columns whose SOURCE DATA is NULL-free as primary tags —
+          otherwise the write fails on NOT NULL violation.
+        - Tables without any isTag=true column are SKIPPED by KDTS (no DDL emitted)
+    """
+    tables = source_db.get("tableMap") or {}
+    if table_name not in tables:
+        raise ValueError(f"Table '{table_name}' not found in source_db tableMap")
+
+    primary_tags = primary_tags or []
+    tags = tags or []
+
+    for col in tables[table_name].get("columns", []):
+        name = col.get("columnName") or col.get("sourceColumnName")
+        col["isTs"] = name == time_column
+        col["isTag"] = name in primary_tags or name in tags
+        col["isPrimaryTag"] = name in primary_tags
+        if col["isPrimaryTag"]:
+            col["nullAble"] = False   # PRIMARY TAGS must be NOT NULL (KDTS requirement)
+    return source_db
 
 
 # ==================== CLI Entry Point ====================

@@ -544,7 +544,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    
    **For Time-Series Sources (InfluxDB, TDengine, OpenTSDB)**:
    - Tags are AUTO-MAPPED from source to KaiwuDB:
-     - InfluxDB tags → PRIMARY TAGS (first 4, rest become SECONDARY)
+     - InfluxDB tags → PRIMARY TAGS (first 4 eligible, rest become SECONDARY)
      - InfluxDB fields → VALUE columns
      - TDengine TAG columns → PRIMARY TAGS
      - TDengine regular columns → VALUE columns
@@ -553,24 +553,101 @@ All endpoints under `{base_url}/kdts/api/v1`:
    **Constraints**:
    - Maximum 4 PRIMARY TAGS per table (Error 3004 if exceeded)
    - At least 1 PRIMARY TAG required (Error 3006 if missing)
-   - Maximum 128 columns total (tags + values)
+   - Maximum 4096 columns total (tags + values), max 132 tags from source
    - Column names max 128 bytes
    
+   6.5 **Check Tag Column NULL Values (CRITICAL — verified failure in practice)**
+   
+   PRIMARY TAGS must be NOT NULL. If the source data contains NULL values in a column
+   selected as PRIMARY TAG, the data migration will FAIL on write.
+   
+   **Required interaction**: After tag selection, check the source data for NULLs in
+   all selected PRIMARY TAG columns:
+   
+   ```
+   [WARNING] Primary Tag NULL Check
+   ===============================
+   Table: orders
+   PRIMARY TAGS: customer_id, product_id
+   
+   Please verify in the source database (e.g., MySQL):
+   SELECT COUNT(*) FROM orders WHERE customer_id IS NULL OR product_id IS NULL;
+   
+   If count > 0, options:
+   1. Fix/backfill the NULL values in the source data, then re-run migration
+   2. Choose different columns as PRIMARY TAGS (or demote to ordinary TAGS)
+   3. Keep as-is — migration will fail on NULL tag values (NOT recommended)
+   ```
+   
+   **Also apply to KDTS auto-mapped primary tags** (time-series sources): KDTS demotes
+   NULL columns to ordinary tags with a warning, so the resulting DDL preview must be
+   checked before execution.
+   
+   6.6 **Apply Tag Marks to the Metadata (CRITICAL)**
+   
+   KDTS generates time-series DDL from the tag marks on the source Database columns.
+   After the user selects PRIMARY TAGS / TAGS / time column in steps 6.1-6.3, update the
+   `source_db` object from `read_metadata()` — set these JSON fields per column
+   (field names are declared explicitly in KDTS via `@JsonProperty`, matching
+   `Column.java`; see `KaiwuDBStrategy.java` for the generation logic):
+   
+   - Time column: `"isTs": true` (KDTS renders it as the FIRST column, `TIMESTAMPTZ NOT NULL`)
+   - Primary tag: `"isTag": true` AND `"isPrimaryTag": true` AND **`"nullAble": false`**
+   - Ordinary tag: `"isTag": true` only
+   - Everything else: leave `"isTs"/"isTag"/"isPrimaryTag"` as `false`
+   
+   **Primary tags MUST be NOT NULL in the column definition** (verified against KDTS
+   source): KDTS demotes nullable primary tags to ordinary tags; if none remain eligible
+   → Error 3006 (NO_PRIMARY_TAG). The helper sets `nullAble=false` automatically for
+   primary tags — only use columns whose source DATA is NULL-free (see step 6.5).
+   
+   Use the provided helper to avoid manual field edits:
+   ```python
+   from scripts.api_client import mark_time_series_columns
+   source_db = mark_time_series_columns(
+       source_db=source_db,          # Database object from read_metadata()
+       table_name="orders",
+       time_column="order_time",
+       primary_tags=["customer_id", "product_id"],
+       tags=["status"],
+   )
+   ```
+   
+   **KDTS behavior when generating (from source code)**:
+   - Tables with NO `"isTag": true` column are **SKIPPED** — no DDL is emitted for them
+   - Primary tag demotion: FLOAT/DOUBLE/DECIMAL/NUMERIC or nullable columns → demoted to
+     ordinary tags automatically (nullable primary tags are demoted with a warning)
+   - If no eligible primary tag remains → Error 3006 (NO_PRIMARY_TAG)
+   - Type conversion: primary tags of non-VARCHAR variable-length types (NVARCHAR, TEXT,
+     CLOB, BLOB, VARBYTES, JSON, etc.) → converted to VARCHAR(128); VARCHAR > 128 truncated;
+     VARCHAR without length → VARCHAR(64)
+   - Ordinary tags of forbidden types (TIMESTAMP, TIMESTAMPTZ, NVARCHAR, GEOMETRY) → VARCHAR
+   - > 132 tag columns → Error 3004; tag name > 128 bytes → Error 3005
+   - `CREATE TS DATABASE` is emitted; Database `interval`/`retentions` fields become
+     `PARTITION INTERVAL` / `RETENTIONS` clauses when present
+   
    **Implementation Note**: 
-   - KDTS `preview_ddl` API has NO tag-specification parameters (only `isTimeSeries: bool`)
-   - For RELATIONAL → TIMESERIES: The skill generates DDL based on user's tag selection and executes directly on KaiwuDB (bypassing KDTS for schema)
+   - KDTS `preview_ddl` fully supports time-series DDL generation from the tag marks
+     described above — NO need for the skill to hand-craft DDL
+   - The request field is `"isTimeSeries": true` (explicitly declared via
+     `@JsonProperty("isTimeSeries")` in `PreviewDdlRequest.java`)
    - After DDL execution, use **Data-Only Migration** (Workflow 3) for data transfer
    - For TIMESERIES → TIMESERIES: KDTS handles automatic tag mapping internally
 
-7. Preview DDL → preview_ddl() or Skill-Generated DDL
+7. Preview DDL → preview_ddl()
    Show generated DDL for each table
    
-   **For RELATIONAL → TIMESERIES (Skill-Generated DDL)**:
-   - DDL is generated based on user's tag selection from Step 6
+   **For RELATIONAL → TIMESERIES (KDTS-Generated DDL)**:
+   - Call `preview_ddl(target_config, source_db, metadata, is_time_series=True)` —
+     the source_db object already carries the tag/primaryTag/ts marks from Step 6.6
+   - KDTS generates `CREATE TS DATABASE` + time-series tables with TAGS / PRIMARY TAGS
+   - Tables without any tag-marked column are SKIPPED in the output (warn the user)
    - Display with clear tag annotations (PRIMARY TAG, SECONDARY TAG, VALUE FIELD)
+   - Point out any auto-demotion / type conversions in the DDL
+     (FLOAT/nullable primary tags demoted, NVARCHAR→VARCHAR(128), etc.)
    - User confirms before execution
    
-   Example DDL for RELATIONAL → TIMESERIES:
+   Example DDL for RELATIONAL → TIMESERIES (as generated by KDTS):
    ```sql
    CREATE TABLE orders
    (
@@ -595,7 +672,8 @@ All endpoints under `{base_url}/kdts/api/v1`:
    - KDTS auto-converts/demotes invalid tag types (see Section 3 in ddl-syntax.md)
 
    **For TIMESERIES → TIMESERIES (KDTS Auto-Generated)**:
-   - Call `preview_ddl(isTimeSeries=true)` to get KDTS-generated DDL
+   - Call `preview_ddl(target_config, source_db, metadata, is_time_series=True)`
+     to get KDTS-generated DDL
    - KDTS auto-selects first 4 ELIGIBLE tags as PRIMARY TAGS (not simply first 4)
    - Ineligible tags (FLOAT, NULL, over-length) are auto-demoted to ordinary tags
    - Invalid types (NVARCHAR, TEXT, etc.) are auto-converted to VARCHAR
@@ -619,15 +697,21 @@ All endpoints under `{base_url}/kdts/api/v1`:
    
    Ask user to confirm before execution
 
-8. Execute DDL → execute_ddl() or Direct DDL Execution
-   **For RELATIONAL → TIMESERIES**: Execute generated DDL directly on KaiwuDB using JDBC/ODBC connection
-   **For TIMESERIES → TIMESERIES**: Use KDTS `execute_ddl()` API
+8. Execute DDL → execute_ddl()
+   **For RELATIONAL → TIMESERIES**: Execute the previewed DdlScript via the KDTS `execute_ddl()` API:
+   `execute_ddl(target_config, previewed_ddl_script, auto_ddl=true)`.
+   Do NOT rely on a direct JDBC/ODBC connection — the agent executes through KDTS.
+   Note (verified in KDTS source): the `createDb` field of DdlScript is NOT executed —
+   KDTS generates the CREATE DATABASE / CREATE TS DATABASE statement itself from the
+   target engine and executes it when `auto_ddl=true`.
+   **For TIMESERIES → TIMESERIES**: Use KDTS `execute_ddl()` API with the previewed DdlScript
    
    Report success with table count
 
 9. **Switch to Data-Only Migration (RELATIONAL → TIMESERIES only)**
-   Since DDL was executed directly, continue with **Workflow 3: Data-Only Migration**
-   Use `build_migration()` with `dataMode="data"` (skip schema)
+   Since the schema was created by the Skill-generated DDL, continue with **Workflow 3: Data-Only Migration**
+   Note: `build_migration()` has NO `dataMode` parameter — data-only migration simply means
+   providing **explicit table mappings** (`tables` REQUIRED, never empty) with the target tables already existing
    IMPORTANT: DataX configuration with `core` and `setting` is REQUIRED for successful data migration!
    
    Ask user: "Use default DataX configuration or customize?"
@@ -765,7 +849,11 @@ All endpoints under `{base_url}/kdts/api/v1`:
 
 10. Build migration script → build_migration_script(data_config=user_config)
     Show generated script name(s)
-    For full migration, tables can be empty (auto-discover)
+    **IMPORTANT — tables parameter by target engine**:
+    - **RELATIONAL target**: `tables` can be empty (auto-discover all tables) for full migration
+    - **TIMESERIES target**: `tables` MUST be explicit table mappings — empty tables fails with
+      error 4001 "No datax contents generated from config" (verified in practice)
+      Build mappings with `build_table_mapping()` per table (source + target columns)
 
 11. Execute migration → execute_migration()
     Return log file paths
@@ -810,6 +898,7 @@ Report DDL execution result.
 
 5. Build migration script with explicit tables field
    → build_migration(tables=table_mappings, data_config=user_config)
+   Note: tables are ALWAYS required for TIMESERIES targets (auto-discovery fails with 4001)
 
 6. Execute migration
 
@@ -1024,7 +1113,7 @@ Data migration settings:
 Fetch size (rows per fetch, default 1000): 
 Batch size (rows per write, default 1000):
 Error tolerance (% allowed, default 0.02):
-Concurrency (channels, default 1):
+Concurrency (channels, default 4):
 ````
 
 ---
@@ -1178,6 +1267,51 @@ Concurrency (channels, default 1):
     - Skip DDL (if tables exist)
     - Retry with different options
 
+### Scenario 5: Build Failed with 4001 "No datax contents generated from config"
+
+**Problem**: `build_migration()` with empty `tables` fails with 4001
+
+**Recovery Steps**:
+
+1. Check the target engine:
+    - **RELATIONAL target**: empty `tables` is valid (auto-discovery) — check source type
+      supports full migration instead
+    - **TIMESERIES target**: auto-discovery is NOT supported — this is the expected cause
+      (verified in practice)
+2. Rebuild with **explicit table mappings** for every table:
+   ```python
+   mapping = build_table_mapping(
+       source_type="MYSQL",
+       source_table="test_tb",
+       target_table="test_tb",
+       columns="ts,c1,c2,c3",
+       write_mode="insert",
+   )
+   build_result = client.build_migration(source, target, tables=[mapping], data_config=data_config)
+   ```
+3. If still failing, check DataX templates on the KDTS server and the request body
+
+### Scenario 6: Migration Failed on Tag Column NULL Values
+
+**Problem**: Migration task FAILED (activeProcessCount=0) with no detail in status query;
+KDTS server log shows tag column NULL constraint violations
+
+**Root cause**: PRIMARY TAGS must be NOT NULL, but source data contains NULL values
+in the selected primary tag columns
+
+**Recovery Steps**:
+
+1. Ask the user to check the KDTS server log to confirm (e.g., `NULL` constraint error)
+2. Check source data for NULLs in primary tag columns:
+   ```sql
+   SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;
+   ```
+3. Offer options:
+    - **Fix source data**: backfill the NULL values, then re-run the migration (recommended)
+    - **Change tag selection**: pick different columns as PRIMARY TAGS (must be NOT NULL, non-float)
+    - **Demote to ordinary TAGS**: ordinary tags allow NULL (nullable)
+4. Re-run data migration — target schema stays unchanged in options 1 and 3
+
 ---
 
 ## Edge Case Handling
@@ -1304,6 +1438,7 @@ If conversation is interrupted:
 ## Cross-Reference
 
 - API Reference: `references/api-reference.md`
+- DDL Syntax: `references/ddl-syntax.md`
 - Source Types: `references/source-types.md`
 - Error Codes: `references/error-codes.md`
 - Type Mapping: `references/type-mapping.md`

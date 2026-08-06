@@ -302,8 +302,11 @@ User Request
     ↓
 [8] Build Script (api_client)
     - POST /datax/build
-    - Input: source, target, tables=[], data_config
+    - Input: source, target, tables, data_config
     - Returns: Script name(s)
+    - IMPORTANT: `tables=[]` (auto-discovery) is ONLY valid for RELATIONAL targets.
+      TIMESERIES targets MUST provide explicit table mappings — empty tables fails
+      with 4001 "No datax contents generated from config" (verified in practice)
     ↓
 [9] Execute Migration (api_client)
     - POST /datax/execute
@@ -323,10 +326,13 @@ User Request
 
 ### Key Data Structures
 
-**Source Configuration** (engine is auto-detected, no need to specify):
+**Source Configuration** (engine field is REQUIRED per KDTS API — the script layer
+auto-fills it via `DataSourceManager.build_config()`, but the request body always
+contains it: RELATIONAL for RDBMS, TIMESERIES for others):
 
 ```json
 {
+  "engine": "RELATIONAL",
   "type": "MYSQL",
   "host": "192.168.1.100",
   "port": 3306,
@@ -731,15 +737,22 @@ CREATE TABLE orders (
 | 3004       | Tag limit exceeded          | BLOCKED          | Reduce tags to max 128, primary tags to max 4    |
 | 3005       | Name too long               | BLOCKED          | Shorten names to max 128 bytes                   |
 | 3006       | No primary tag              | BLOCKED          | Add at least 1 PRIMARY TAG                       |
-| 3007       | Invalid tag type            | BLOCKED          | Remove unsupported types from tags               |
-| 3008       | Primary tag not in tag list | BLOCKED          | Add tag to TAGS clause first                     |
-| 3009       | First column not timestamp  | BLOCKED          | Make first column TIMESTAMP/TIMESTAMPTZ NOT NULL |
+
+> **Note**: Error codes 3007/3008/3009 (previously documented) are NOT found in the KDTS
+> source. Actual KDTS behavior is auto-conversion/demotion with warnings, not hard errors:
+> - Invalid tag types (NVARCHAR, TEXT, etc.) → auto-converted to VARCHAR
+> - Primary tags not eligible (FLOAT, NULL, over-length) → auto-demoted to ordinary tags
+> - First-column timestamp → ensured by KDTS in DDL generation
 
 ### Tag Handling for Migration
 
 #### Scenario 1: Relational Source → Time Series Target (MOST COMPLEX)
 
-**Problem**: KDTS API's `preview_ddl` has NO tag specification parameter. The SKILL must handle this case.
+**Problem**: KDTS `preview_ddl` generates time-series DDL from tag marks on the source
+Database columns (`"isTag"`/`"isPrimaryTag"`/`"isTs"`, declared explicitly via
+`@JsonProperty` in `Column.java`), with the request field `"isTimeSeries": true`
+(declared via `@JsonProperty("isTimeSeries")` in `PreviewDdlRequest.java`).
+The SKILL must collect tag selection and apply the marks.
 
 **Workflow**:
 ```
@@ -763,19 +776,41 @@ CREATE TABLE orders (
    c. Auto-select time column
       - Choose first timestamp/datetime column as time column
    
-4. Generate DDL (SKILL-GENERATED, not KDTS-generated)
-   - Apply type conversions (MySQL DATETIME → TIMESTAMPTZ)
-   - Validate tag types against KaiwuDB restrictions
-   - Format according to KaiwuDB syntax
+4. Apply tag marks to the source Database columns (@JsonProperty names from KDTS
+   `Column.java`; use the `mark_time_series_columns()` helper in api_client.py):
+   - Time column: `"isTs": true` (KDTS renders first column `TIMESTAMPTZ NOT NULL`)
+   - Primary tag: `"isTag": true` AND `"isPrimaryTag": true`
+   - Ordinary tag: `"isTag": true`
+   - Tables with NO `"isTag": true` column are SKIPPED by KDTS (no DDL emitted)
    
-5. Validate DDL
-   - Check first column is TIMESTAMPTZ NOT NULL
-   - Check PRIMARY TAGS count (1-4)
-   - Check tag type compatibility
+5. Check PRIMARY TAG columns for NULL values in source data (CRITICAL — verified failure)
+   - PRIMARY TAGS must be NOT NULL; NULL source values fail the write
+   - Run: SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;
+   - If count > 0: fix source data / choose different primary tags / demote to ordinary tags
    
-6. Execute DDL directly on KaiwuDB (via JDBC/ODBC, NOT KDTS API)
+6. Generate DDL via KDTS: `preview_ddl(target_config, source_db, metadata, is_time_series=True)`
+   (api_client sends `"isTimeSeries": true` per the @JsonProperty declaration)
+   - KDTS generates `CREATE TS DATABASE` + tables with `TAGS (...) PRIMARY TAGS (...)`
+   - KDTS auto-demotes: FLOAT/DOUBLE/DECIMAL/NUMERIC or nullable primary tags → ordinary tags
+     (nullable demoted with warning); no eligible primary tag → Error 3006
+   - KDTS auto-converts: primary tags of non-VARCHAR variable-length types → VARCHAR(128),
+     VARCHAR > 128 truncated, VARCHAR without length → VARCHAR(64); forbidden ordinary
+     tag types (TIMESTAMP, NVARCHAR, GEOMETRY) → VARCHAR
+   - > 132 tag columns → Error 3004; tag name > 128 bytes → Error 3005
    
-7. Continue with DATA-ONLY migration (KDTS API)
+7. Validate the KDTS-generated DDL (show to user before execution)
+   - First column is TIMESTAMPTZ NOT NULL
+   - PRIMARY TAGS count 1-4, in TAGS list, with NOT NULL
+   - Note tables skipped (no tag columns) and any auto-conversions/demotions
+   
+8. Execute DDL via the KDTS `execute_ddl()` API (NOT a direct JDBC/ODBC connection —
+   the agent executes through KDTS) with the previewed DdlScript.
+   Note: the `createDb` field is NOT executed — KDTS generates CREATE DATABASE /
+   CREATE TS DATABASE itself from the target engine when `auto_ddl=true`.
+   
+9. Continue with DATA-ONLY migration (KDTS API)
+   - `build_migration()` has NO `dataMode` parameter — data-only means explicit
+     table mappings (`tables` REQUIRED, never empty) with target tables existing
 ```
 
 **Validation Checklist for DDL Generation**:
@@ -829,7 +864,8 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
 
 **Workflow**:
 ```
-1. Call KDTS preview_ddl(isTimeSeries=true)
+1. Call KDTS preview_ddl with time-series mode (api_client `is_time_series=True`,
+   request JSON field `"isTimeSeries": true` per the @JsonProperty declaration)
    
 2. KDTS auto-generates DDL based on source metadata
    - Filters invalid primary tags (FLOAT, DOUBLE, DECIMAL, NUMERIC, NULL)

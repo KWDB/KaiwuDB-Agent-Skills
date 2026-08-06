@@ -240,6 +240,31 @@ AI Agent 将使用与用户相同的语言进行回复。
 - [ ] 确认目标表结构与源端一致
 - [ ] 如需清空数据，执行 `TRUNCATE TABLE`
 
+### 3.4 关系源 → 时序目标场景（RELATIONAL → TIMESERIES）
+
+**重要**：KDTS `preview_ddl` 完全支持时序 DDL 生成 —— 请求字段名为 `"isTimeSeries": true`，且 `sourceDb` 列上带有 tag 标记。
+
+- [ ] 引导用户选择主标签（PRIMARY TAGS，1-4 个，必选）
+    - 排除浮点类型（FLOAT/DOUBLE/DECIMAL/NUMERIC 等不可作主标签）
+    - 建议选择唯一标识列（如 device_id、sensor_id）
+- [ ] 引导用户选择普通标签（TAGS，可选）
+- [ ] 在 `sourceDb` 列上设置标记（可调用 `mark_time_series_columns()` 辅助函数）：
+    - 时间列：`"isTs": true`（KDTS 生成首列 `TIMESTAMPTZ NOT NULL`）
+    - 主标签：`"isTag": true` + `"isPrimaryTag": true` + `"nullAble": false`
+      （主标签列定义必须非空，否则 KDTS 降级该标签，可能报 3006；辅助函数自动处理）
+    - 普通标签：`"isTag": true`
+- [ ] 检查所选主标签列源数据无 NULL 值
+    ```sql
+    SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;
+    ```
+    （主标签必须非空，源数据含 NULL 会导致迁移失败）
+- [ ] 调用 `preview_ddl(target, source_db, metadata, is_time_series=True)` 生成时序 DDL
+    - 验证返回 `CREATE TS DATABASE` 与 `TAGS (...)` / `PRIMARY TAGS (...)` 子句
+    - 无 tag 标记的表会被 KDTS **跳过**（不生成 DDL），需提醒用户
+    - 注意 KDTS 自动降级/转换（浮点/nullable 主标签降级、NVARCHAR→VARCHAR 等）
+- [ ] 通过 `execute_ddl` API 执行（createDb 由 KDTS 按目标引擎自动生成）
+- [ ] 数据迁移阶段使用显式表映射（`tables` 必填）
+
 ---
 
 ## 阶段四：数据迁移
@@ -364,8 +389,10 @@ AI Agent 将使用与用户相同的语言进行回复。
   ```
 
   **注意**：
-  - 空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源）。
-    对于表级迁移，需要显式指定表列表。
+  - 空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源，且**仅限 RELATIONAL 目标**）。
+  - **TIMESERIES 目标必须显式提供表映射**：空 `tables` 会报错 4001
+    "No datax contents generated from config"（实测结论）。
+  - 对于表级迁移，需要显式指定表列表。
   - **关键提示**：`data` 中的 `core` 和 `setting` 字段对于成功执行 DataX 是必需的。
 
 - [ ] 记录返回的脚本文件名
@@ -473,7 +500,17 @@ AI Agent 将使用与用户相同的语言进行回复。
 - 启用并行（splitPk）
 - 优化查询（WHERE 条件）
 
-### Q4: 部分数据丢失
+### Q4: 迁移任务 FAILED 但状态查询无详细错误
+
+**检查清单：**
+
+- [ ] 查看 KDTS 服务器日志文件（`/opt/kdts/data/log/`）
+- [ ] 时序迁移：主标签列源数据是否含 NULL 值
+    - 主标签必须非空，源数据 NULL 会导致写入失败
+    - 解决方案：修复源数据 / 更换主标签列 / 降级为普通标签
+- [ ] 时序目标是否使用了显式表映射（空 `tables` 会报 4001）
+
+### Q5: 部分数据丢失
 
 **检查清单：**
 
