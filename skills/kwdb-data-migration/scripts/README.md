@@ -24,7 +24,12 @@ Full implementation of all 10 KDTS REST API endpoints.
 **Classes:**
 - `KDTSClient`: Main API client with methods for all endpoints
 - `build_source_config()`: Helper to create source configurations
-- `build_table_mapping()`: Helper to create table mappings
+- `build_table_mapping()`: Helper to create table mappings (uses the correct source
+  identifier field per type: `table`/`measurement`/`collectionName`; FTP/HDFS rejected)
+- `build_influxdb_mapping()`: Helper for InfluxDB measurement mappings — source column
+  names use `sourceColumnName` (`_time` for the time column, NOT `ts`), and the data
+  time range (begin/end datetime) is REQUIRED (no defaults; too-wide range causes
+  reader memory overflow)
 - `mark_time_series_columns()`: Helper to mark column roles (isTs/isTag/isPrimaryTag,
   auto-sets primary tags to NOT NULL) on a source Database for time-series DDL generation
 
@@ -45,7 +50,7 @@ Full implementation of all 10 KDTS REST API endpoints.
 **Key Features:**
 - Automatic error handling with standardized response format
 - Connection and read timeout management
-- HTTP 503 retry support
+- HTTP 503 detection (returns code 5001 with Retry-After hint; no automatic retry)
 - Request/response logging
 
 ### 2. data_source.py - Complete Data Source Management

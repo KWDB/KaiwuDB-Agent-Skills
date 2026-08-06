@@ -887,8 +887,18 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
    
 5. Execute DDL via KDTS API
    
-6. Continue with FULL migration (KDTS handles data)
+6. Continue with migration — TIMESERIES targets still need EXPLICIT table mappings
+   (auto-discovery fails with 4001 for all source types, verified in practice)
 ```
+
+**InfluxDB mapping requirements (verified in practice)**:
+- Source identifier field is `measurement` (NOT `table`); MONGODB uses `collectionName`.
+  `build_table_mapping()` handles this automatically; FTP/HDFS are rejected (file sources)
+- Source column list uses `sourceColumnName` — the time column is `_time` in InfluxDB
+  queries, NOT the target name `ts` (`build_influxdb_mapping()` handles this)
+- Data time range (beginDateTime/endDateTime) is REQUIRED with no defaults:
+  null → migration fails; too-wide range (1970~2099) → reader memory overflow.
+  Collect the actual data range from the user; splitIntervalS defaults to 86400
 
 **Auto-Mapping Rules**:
 

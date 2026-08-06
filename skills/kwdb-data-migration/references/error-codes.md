@@ -195,25 +195,12 @@ OPENTSDB, MONGODB, FTP, HDFS
 **Diagnostic Steps**:
 
 1. **Check database service**:
-
-    ```bash
-    # MySQL
-    mysqladmin ping -h host -P port -u user -p
-    
-    # PostgreSQL
-    pg_isready -h host -p port
-    
-    # Generic: Test TCP connection
-    telnet host port
-    nc -zv host port
-    ```
+   - MySQL: `mysqladmin ping -h host -P port -u user -p`
+   - PostgreSQL: `pg_isready -h host -p port`
+   - Generic TCP: `telnet host port` / `nc -zv host port`
 
 2. **Verify credentials**:
-
-    ```bash
-    # Try connecting manually
-    mysql -h host -P port -u user -p
-    ```
+   - Try connecting manually: `mysql -h host -P port -u user -p`
 
 3. **Check network/firewall**:
 
@@ -410,34 +397,17 @@ PRIMARY TAGS (device_id, metric);
 **Checklist**:
 
 1. **Python 3 available?**
-
-    ```bash
-    which python3
-    python3 --version
-    ```
+   - `which python3` / `python3 --version`
 
 2. **DataX installed?**
-
-    ```bash
-    ls /opt/kdts/datax/  # or configured path
-    cat /opt/kdts/datax/version.txt  # if exists
-    ```
+   - `ls /opt/kdts/datax/` (or configured path); `cat /opt/kdts/datax/version.txt` (if exists)
 
 3. **Permissions?**
-
-    ```bash
-    # KDTS user can execute DataX?
-    sudo -u kdts /opt/kdts/datax/bin/datax.py --help
-    ```
+   - Can the KDTS user execute DataX? `sudo -u kdts /opt/kdts/datax/bin/datax.py --help`
 
 4. **KDTS config check**:
-
-    ```yaml
-    # In application.yml
-    datax:
-      home.path: /opt/kdts/datax
-      python.path: /usr/bin/python3  # if not default
-    ```
+   - In `application.yml`: `datax.home.path` (e.g. `/opt/kdts/datax`) and
+     `datax.python.path` (e.g. `/usr/bin/python3` if not default)
 
 ---
 
@@ -460,30 +430,11 @@ timeout — the request may still have reached the server, which keeps processin
    (Full code example: SKILL.md Workflow 1 step 11)
 
 2. **Increase timeout**:
-
-    ```yaml
-    # application.yml
-    datax:
-      timeout: 7200  # 2 hours
-    ```
-
-    Client side: `KDTS_TIMEOUT=300` env / `KDTSClient(timeout=...)`.
+   - Server: `datax.timeout: 7200` in `application.yml` (2 hours)
+   - Client: `KDTS_TIMEOUT=300` env var or `KDTSClient(timeout=...)`
 
 3. **Optimize migration**:
-
-    ```json
-    {
-      "data": {
-        "fetchSize": 5000,
-        "batchSize": 5000,
-        "setting": {
-          "speed": {
-            "channel": 4
-          }
-        }
-      }
-    }
-    ```
+   - Increase `data.fetchSize`/`data.batchSize` (e.g. 5000) and `setting.speed.channel` for more concurrency
 
 4. **Reduce data volume**:
 
@@ -580,33 +531,16 @@ sudo systemctl restart kdts  # or however KDTS is managed
 **Diagnostic Steps**:
 
 1. **Check KDTS logs**:
-
-    ```bash
-    tail -f /var/log/kdts/app.log
-    grep "ERROR\|Exception" /var/log/kdts/app.log
-    ```
+   - `tail -f /var/log/kdts/app.log`;`grep "ERROR\|Exception" /var/log/kdts/app.log`
 
 2. **Check KDTS version**:
-
-    ```bash
-    curl http://localhost:8989/kdts/info/version
-    ```
+   - `curl http://localhost:8989/kdts/info/version`
 
 3. **Check system resources**:
-
-    ```bash
-    free -m  # Memory
-    df -h  # Disk space
-    top  # CPU
-    ```
+   - `free -m` (memory) / `df -h` (disk space) / `top` (CPU)
 
 4. **Restart KDTS** (if possible):
-
-    ```bash
-    sudo systemctl restart kdts
-    # or
-    sudo kill -9 $(pgrep -f kdts) && java -jar kdts-server.jar
-    ```
+   - `sudo systemctl restart kdts`; or `sudo kill -9 $(pgrep -f kdts) && java -jar kdts-server.jar`
 
 5. **Report issue** with:
     - KDTS version

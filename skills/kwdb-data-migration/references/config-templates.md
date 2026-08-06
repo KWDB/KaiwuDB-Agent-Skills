@@ -1086,3 +1086,77 @@ PRIMARY TAGS (device_id, metric);
   }
 }
 ```
+
+## 4. File/NoSQL Source Table Mapping Templates
+
+Table mappings for file-based and NoSQL sources (from KDTS test configurations).
+These CANNOT use `build_table_mapping()` — build them manually.
+
+### 4.1 FTP/SFTP Source Mapping
+
+```json
+{
+  "source": {
+    "sourceType": "FTP",
+    "protocol": "sftp",
+    "timeout": 60000,
+    "path": "[\"/data/files/test_tb.csv\"]",
+    "fieldDelimiter": ",",
+    "compress": null,
+    "encoding": "UTF-8",
+    "nullFormat": null,
+    "connectPattern": null,
+    "column": "[{\"index\":0,\"type\":\"date\",\"format\":\"yyyy-MM-dd HH:mm:ss.SSS\"},{\"index\":1,\"type\":\"long\"},{\"index\":2,\"type\":\"double\"},{\"index\":3,\"type\":\"string\"}]",
+    "skipHeader": true,
+    "maxTraversalLevel": null,
+    "csvReaderConfig": "{\"useTextQualifier\":false,\"safetySwitch\":true,\"skipEmptyRecords\":true}"
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3",
+    "writeMode": "insert"
+  }
+}
+```
+
+### 4.2 HDFS Source Mapping
+
+```json
+{
+  "source": {
+    "sourceType": "HDFS",
+    "path": "[\"/user/hive/warehouse/hdfs_test.db/test_tb\"]",
+    "fileType": "text",
+    "column": "[{\"index\":0,\"type\":\"date\",\"format\":\"yyyy-MM-dd HH:mm:ss.SSS\"},{\"index\":1,\"type\":\"long\"},{\"index\":2,\"type\":\"double\"},{\"index\":3,\"type\":\"string\"}]",
+    "fieldDelimiter": ","
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3",
+    "writeMode": "insert"
+  }
+}
+```
+
+### 4.3 MongoDB Source Mapping
+
+`column` is a JSON array string WITH types (NOT a comma string):
+
+```json
+{
+  "source": {
+    "sourceType": "MONGODB",
+    "collectionName": "test_tb",
+    "column": "[{\"name\":\"ts\",\"type\":\"date\"},{\"name\":\"c1\",\"type\":\"int\"},{\"name\":\"c2\",\"type\":\"long\"},{\"name\":\"c3\",\"type\":\"double\"}]",
+    "query": null
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3",
+    "writeMode": "insert"
+  }
+}
+```

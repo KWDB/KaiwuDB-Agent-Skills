@@ -255,16 +255,28 @@ AI Agent 将使用与用户相同的语言进行回复。
       （主标签列定义必须非空，否则 KDTS 降级该标签，可能报 3006；辅助函数自动处理）
     - 普通标签：`"isTag": true`
 - [ ] 检查所选主标签列源数据无 NULL 值
-    ```sql
-    SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;
-    ```
-    （主标签必须非空，源数据含 NULL 会导致迁移失败）
+    - 执行 `SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;`
+    - 主标签必须非空，源数据含 NULL 会导致迁移失败
 - [ ] 调用 `preview_ddl(target, source_db, metadata, is_time_series=True)` 生成时序 DDL
     - 验证返回 `CREATE TS DATABASE` 与 `TAGS (...)` / `PRIMARY TAGS (...)` 子句
     - 无 tag 标记的表会被 KDTS **跳过**（不生成 DDL），需提醒用户
     - 注意 KDTS 自动降级/转换（浮点/nullable 主标签降级、NVARCHAR→VARCHAR 等）
 - [ ] 通过 `execute_ddl` API 执行（createDb 由 KDTS 按目标引擎自动生成）
 - [ ] 数据迁移阶段使用显式表映射（`tables` 必填）
+
+### 3.5 InfluxDB 源场景（INFLUXDB1X/2X → TIMESERIES）
+
+**InfluxDB 表映射的特殊要求（实测验证）：**
+
+- [ ] 表映射使用 `measurement` 字段（非 `table`），调用 `build_influxdb_mapping()` 辅助函数
+- [ ] 源列名使用 `sourceColumnName`：时间列必须是 `_time`（不是目标列名 `ts`）
+- [ ] **数据时间范围必填（无默认值）**：向用户收集开始/结束时间
+    - 格式:`开始时间(YYYY-MM-DD HH:MM:SS)` 与 `结束时间(YYYY-MM-DD HH:MM:SS)`
+    - 不设置时间范围 → 迁移失败
+    - 范围过宽（如 1970-2099）→ reader 内存溢出（实测）
+    - 按实际数据范围输入，`splitIntervalS` 默认 86400（1 天窗口）
+- [ ] 构建表映射：调用
+    `build_influxdb_mapping(source_db, 'test_tb', begin_datetime='2025-10-22 00:00:00', end_datetime='2025-10-26 00:00:00')`
 
 ---
 

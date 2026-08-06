@@ -7,7 +7,7 @@ description: |
   - KDTS, migration tool, or data transfer between different databases
   - Specific source databases: MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse, TDengine, InfluxDB, OpenTSDB, MongoDB, FTP, HDFS
   - Migration operations: create migration task, configure data source, test connection, import data, sync schema, batch migration
-  - Migration management: query task status, view migration progress, check logs, pause/resume/kill migration, export/import config
+  - Migration management: query task status, view migration progress, check logs, kill migration, export/import config
   - Data type mapping, table structure sync, DDL generation, schema validation
   Even if the user does not explicitly say "migration", trigger this skill when they ask to transfer or sync data between databases with different engines.
 version: 1.0.0
@@ -127,16 +127,11 @@ This skill provides **automated heterogeneous database migration** to KaiwuDB / 
 old version that only provided manual GUI guidance, this skill directly calls the KDTS API to automate the entire
 migration workflow.
 
-### Two Migration Paths
+### Migration Path: KDTS REST API
 
-1. **Primary Path: KDTS REST API** (for heterogeneous databases)
-    - Supports 14 source types: MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse, TDengine 2.x/3.x, InfluxDB 1.x/2.x,
-      OpenTSDB, MongoDB, FTP, HDFS
-    - Full automation: connection test, schema migration (DDL), data migration, progress tracking
-
-2. **Secondary Path: KWDB Built-in EXPORT/IMPORT** (for KWDB-to-KWDB only)
-    - Direct data copy between KWDB instances
-    - Refer to `references/kwdb-kwdb-migration.md` for details
+- Supports 14 source types: MySQL, Oracle, PostgreSQL, SQL Server, ClickHouse, TDengine 2.x/3.x, InfluxDB 1.x/2.x,
+  OpenTSDB, MongoDB, FTP, HDFS, KaiwuDB (KaiwuDB as source = data migration only)
+- Full automation: connection test, schema migration (DDL), data migration, progress tracking
 
 ## KDTS Server Configuration
 
@@ -280,10 +275,13 @@ workflow = MigrationWorkflowManager(api_client=client)
 
 ### Utility Methods
 
-| Intent              | Module                        | Function                                         |
-|---------------------|-------------------------------|--------------------------------------------------|
-| Validate config     | `scripts/config_validator.py` | `ConfigValidator.validate_source_config(config)` |
-| Generate error hint | `scripts/error_handler.py`    | `ErrorHandler.get_error_hint(code)`              |
+| Intent                 | Module                        | Function                                                                                                  |
+|------------------------|-------------------------------|-----------------------------------------------------------------------------------------------------------|
+| Validate config        | `scripts/config_validator.py` | `ConfigValidator.validate_source_config(config)`                                                          |
+| Generate error hint    | `scripts/error_handler.py`    | `ErrorHandler.get_error_hint(code)`                                                                       |
+| Build table mapping    | `scripts/api_client.py`       | `build_table_mapping(source_type, source_table, ...)` (auto field: table/measurement/collectionName)      |
+| Build InfluxDB mapping | `scripts/api_client.py`       | `build_influxdb_mapping(source_db, measurement, begin_datetime, end_datetime, ...)` (time range REQUIRED) |
+| Mark TS columns        | `scripts/api_client.py`       | `mark_time_series_columns(source_db, table_name, time_column, primary_tags, tags)`                        |
 
 ---
 
@@ -859,7 +857,33 @@ All endpoints under `{base_url}/kdts/api/v1`:
     - **RELATIONAL target**: `tables` can be empty (auto-discover all tables) for full migration
     - **TIMESERIES target**: `tables` MUST be explicit table mappings — empty tables fails with
       error 4001 "No datax contents generated from config" (verified in practice)
-      Build mappings with `build_table_mapping()` per table (source + target columns)
+      Build mappings with `build_table_mapping()` per table (source + target columns).
+      **Source identifier field per type** (verified against KDTS source DTOs):
+      `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB, `measurement` for INFLUXDB,
+      `collectionName` for MONGODB — build_table_mapping handles this automatically.
+      FTP/HDFS are file sources (no table) — build their mappings manually (path-based).
+      **InfluxDB REQUIRED interaction — data time range**: before building an
+      InfluxDB mapping, ask the user for the data time range
+      (begin/end "YYYY-MM-DD HH:MM:SS") and pass it to `build_influxdb_mapping()`
+      with `split_interval_s` (default 86400 = 1 day). NO defaults for the range:
+      a null range fails the migration, and a too-wide range (e.g. 1970~2099)
+      causes reader memory overflow (both verified in practice).
+      Optional: readTimeout/connectTimeout (seconds; KDTS tests use 60).
+      **Extended mapping options** (verified in KDTS tests): `build_table_mapping()`
+      supports `where` (source filter, e.g. time range; RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
+      `pre_sql`/`post_sql` (target pre/post SQL, e.g. drop/create table), and SQL
+      expression columns for RDBMS (e.g. `"...,1 as t1"`).
+      **OpenTSDB ALSO requires the time range**: OpenTSDBReader emits
+      beginDateTime/endDateTime (no splitIntervalS) — collect the data time range
+      from the user and add `"beginDateTime"/"endDateTime"` to the mapping source.
+      **MongoDB column format**: `column` is a JSON array string with types
+      (e.g. `[{"name":"ts","type":"date"},...]`, see config-templates.md), NOT a
+      comma string — build it manually from the metadata.
+      **FTP/HDFS mapping examples**: see `references/config-templates.md`
+      (path is a JSON array string; column carries index/type/format mappings).
+      **View migration**: to migrate views, pass metadata option `view: true` to
+      `read_metadata()` / `preview_ddl()` — views are then included in the DDL
+      (verified in KDTS metadata tests).
 
 11. Execute migration → execute_migration() or execute_migration_batches()
     Return log file paths
@@ -1365,10 +1389,12 @@ in the selected primary tag columns
 
 **Handling**:
 
-1. Query all running tasks:
+1. Note: the KDTS API has NO "list all tasks" endpoint — `query_status()` works per
+   script name only. Check running tasks by querying the known script names, or ask
+   the user whether other migrations are running.
    ```python
-   # Check if other tasks are running
-   running_tasks = client.query_all_running_tasks()
+   for name in script_names:          # known scripts from build_migration()
+       status = client.query_status(name)
    ```
 2. If other tasks exist:
     - Show their names, progress, estimated completion

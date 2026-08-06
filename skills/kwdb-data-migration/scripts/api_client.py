@@ -730,20 +730,39 @@ def build_table_mapping(source_type: str, source_table: str,
                         target_table: Optional[str] = None,
                         columns: Optional[str] = None,
                         write_mode: str = "insert",
-                        source_source_type: Optional[str] = None) -> Dict[str, Any]:
+                        source_source_type: Optional[str] = None,
+                        where: Optional[str] = None,
+                        pre_sql: Optional[List[str]] = None,
+                        post_sql: Optional[List[str]] = None) -> Dict[str, Any]:
     """
     Helper function to build table mapping for migration.
 
     Args:
         source_type: KDTS source type (for determining sourceSourceType)
-        source_table: Source table name
+        source_table: Source table name (for INFLUXDB this is the measurement name,
+            for MONGODB the collection name)
         target_table: Target table name (default: same as source)
-        columns: Column selection string (e.g., "col1,col2,col3")
+        columns: Column selection string (e.g., "col1,col2,col3").
+            SQL expressions are allowed for RDBMS sources, e.g. "...,1 as t1"
+            (verified in KDTS tests)
         write_mode: Write mode for target KaiwuDB (insert, replace, etc.)
         source_source_type: Override sourceSourceType (auto-detected if None)
+        where: WHERE filter for table-based sources (RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
+            e.g. "ts >= '2025-04-01 00:00:00' and ts <= '2025-06-01 00:00:00'"
+            (verified in KDTS tests). Ignored for INFLUXDB (use time range) / MONGODB
+        pre_sql: SQL statements executed on the target before writing (e.g. drop/create
+            table — verified in KDTS tests)
+        post_sql: SQL statements executed on the target after writing
 
     Returns:
         TableMapping dict ready for build_migration.
+
+    Note (verified against KDTS source DTOs): the source table identifier field
+    differs per source type — `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB,
+    `measurement` for INFLUXDB (InfluxDB.java), `collectionName` for MONGODB
+    (MongoDB.java). Using the wrong field (e.g. `table` for InfluxDB) leaves the
+    field null on the server and the migration fails at execution.
+    FTP/HDFS are file sources (path-based, no table) — not supported here.
     """
     # Auto-detect sourceSourceType from KDTS source type
     if not source_source_type:
@@ -760,17 +779,116 @@ def build_table_mapping(source_type: str, source_table: str,
         }
         source_source_type = source_source_type_map.get(source_type.upper(), "RDBMS")
 
+    # Source table identifier field per source type (from KDTS source DTOs)
+    source_field_map = {
+        "RDBMS": "table",
+        "KAIWUDB": "table",
+        "TDENGINE": "table",
+        "OPENTSDB": "table",
+        "INFLUXDB": "measurement",
+        "MONGODB": "collectionName",
+    }
+    source_field = source_field_map.get(source_source_type)
+    if source_field is None:
+        raise ValueError(
+            f"Source type '{source_type}' is a file-based source (FTP/HDFS) with no table "
+            f"identifier — build its mapping manually (path-based) instead of using "
+            f"build_table_mapping()."
+        )
+
+    # where filter is supported by table-based sources (RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
+    # NOT by INFLUXDB (time range) or MONGODB (query)
+    source_map = {
+        "sourceType": source_source_type,
+        source_field: source_table,
+        "column": columns or "*"
+    }
+    if where is not None and source_source_type in ("RDBMS", "KAIWUDB", "TDENGINE", "OPENTSDB"):
+        source_map["where"] = where
+
+    target_map = {
+        "sourceType": "KAIWUDB",
+        "table": target_table or source_table,
+        "column": columns or "*",
+        "writeMode": write_mode
+    }
+    if pre_sql is not None:
+        target_map["preSql"] = pre_sql if isinstance(pre_sql, list) else [pre_sql]
+    if post_sql is not None:
+        target_map["postSql"] = post_sql if isinstance(post_sql, list) else [post_sql]
+
+    return {"source": source_map, "target": target_map}
+
+
+def build_influxdb_mapping(source_db: Dict, measurement: str,
+                           target_table: Optional[str] = None,
+                           write_mode: str = "insert",
+                           begin_datetime: Optional[str] = None,
+                           end_datetime: Optional[str] = None,
+                           split_interval_s: int = 86400,
+                           read_timeout: int = 0,
+                           connect_timeout: int = 0) -> Dict[str, Any]:
+    """
+    Build a table mapping for an InfluxDB source (measurement-level).
+
+    Uses the SOURCE column names from the metadata (sourceColumnName) for the
+    reader side: the InfluxDB time column is "_time" in queries, while the
+    metadata columnName is the target name ("ts") — passing columnName to the
+    plugin fails the query (verified in practice). The target side uses the
+    KaiwuDB column names (columnName).
+
+    Time-range parameters are REQUIRED and have NO defaults (verified in
+    practice): the influxdb reader plugin splits the query into windows of
+    splitIntervalS seconds across [begin_datetime, end_datetime]; a null range
+    fails the migration, and a too-wide range (e.g. 1970~2099) causes memory
+    overflow in the reader. ALWAYS ask the user for the actual data time range.
+
+    Args:
+        source_db: Database object from read_metadata() response
+        measurement: InfluxDB measurement name (= source table name)
+        target_table: Target KaiwuDB table name (default: same as measurement)
+        write_mode: Target write mode (default: insert)
+        begin_datetime: REQUIRED data start time "YYYY-MM-DD HH:MM:SS" (user input)
+        end_datetime: REQUIRED data end time "YYYY-MM-DD HH:MM:SS" (user input)
+        split_interval_s: Time window split in seconds for concurrent fetch (default: 86400 = 1 day)
+        read_timeout: InfluxDB read timeout in seconds (0 = plugin default; KDTS tests use 60)
+        connect_timeout: InfluxDB connect timeout in seconds (0 = plugin default; KDTS tests use 60)
+
+    Returns:
+        TableMapping dict with measurement + correct column lists + time range.
+    """
+    if not begin_datetime or not end_datetime:
+        raise ValueError(
+            "begin_datetime and end_datetime are REQUIRED for InfluxDB mapping — "
+            "ask the user for the actual data time range (no defaults; a null or "
+            "too-wide range fails/overflows the migration)."
+        )
+    tables = source_db.get("tableMap") or {}
+    if measurement not in tables:
+        raise ValueError(f"Measurement '{measurement}' not found in source_db tableMap")
+    cols = tables[measurement].get("columns", [])
+    source_cols = ",".join(c.get("sourceColumnName") or c.get("columnName") for c in cols)
+    target_cols = ",".join(c.get("columnName") for c in cols)
+    source = {
+        "sourceType": "INFLUXDB",
+        "measurement": measurement,
+        "column": source_cols,
+        "splitIntervalS": split_interval_s,
+        "beginDateTime": begin_datetime,
+        "endDateTime": end_datetime,
+    }
+    # Timeouts are optional (0 = plugin default); KDTS tests pass 60/60
+    if read_timeout > 0:
+        source["readTimeout"] = read_timeout
+    if connect_timeout > 0:
+        source["connectTimeout"] = connect_timeout
     return {
-        "source": {
-            "sourceType": source_source_type,
-            "table": source_table,
-            "column": columns or "*"
-        },
+        "source": source,
         "target": {
             "sourceType": "KAIWUDB",
-            "table": target_table or source_table,
-            "column": columns or "*",
-            "writeMode": write_mode
+            "table": target_table or measurement,
+            "column": target_cols,
+            "writeMode": write_mode,
         }
     }
 
