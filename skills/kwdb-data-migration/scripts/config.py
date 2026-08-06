@@ -12,7 +12,7 @@ Environment Variables:
     KDTS_HOST: KDTS server host (e.g., 127.0.0.1)
     KDTS_PORT: KDTS server port (e.g., 8989)
     KDTS_API_PREFIX: API prefix (default: /kdts/api/v1)
-    KDTS_TIMEOUT: Request timeout in seconds (default: 30)
+    KDTS_TIMEOUT: Request timeout in seconds (default: 300)
     KDTS_CONNECT_TIMEOUT: Connection timeout in seconds (default: 5)
 
 Usage:
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8989
 DEFAULT_API_PREFIX = "/kdts/api/v1"
-DEFAULT_TIMEOUT = 30
+DEFAULT_TIMEOUT = 300
 DEFAULT_CONNECT_TIMEOUT = 5
 
 # Environment variable names

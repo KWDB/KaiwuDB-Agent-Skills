@@ -157,7 +157,7 @@ export KDTS_PORT="8989"
 
 # Optional additional settings
 export KDTS_API_PREFIX="/kdts/api/v1"  # Default
-export KDTS_TIMEOUT="30"                # Default seconds
+export KDTS_TIMEOUT="300"               # Default seconds
 export KDTS_CONNECT_TIMEOUT="5"         # Default seconds
 ```
 
@@ -174,7 +174,7 @@ Create `kdts_config.json` in your project directory:
 {
   "base_url": "http://your-kdts-server.com:8989",
   "api_prefix": "/kdts/api/v1",
-  "timeout": 30,
+  "timeout": 300,
   "connect_timeout": 5
 }
 ```
@@ -269,13 +269,14 @@ workflow = MigrationWorkflowManager(api_client=client)
 
 ### Workflow Methods
 
-| Intent          | Method                                                 | Signature                                            |
-|-----------------|--------------------------------------------------------|------------------------------------------------------|
-| Full migration  | `MigrationWorkflowManager.run_full_migration()`        | `(source_config, target_config, ...)`                |
-| Schema-only     | `MigrationWorkflowManager.run_schema_only_migration()` | `(source_config, target_config, ...)`                |
-| Data-only       | `MigrationWorkflowManager.run_data_only_migration()`   | `(source_config, target_config, tables, ...)`        |
-| Batch migration | `MigrationWorkflowManager.run_batch_migration()`       | `(source_config, target_config, table_batches, ...)` |
-| Kill task       | `MigrationWorkflowManager.kill_task()`                 | `(script_name, confirm=False)`                       |
+| Intent                 | Method                                                 | Signature                                            |
+|------------------------|--------------------------------------------------------|------------------------------------------------------|
+| Full migration         | `MigrationWorkflowManager.run_full_migration()`        | `(source_config, target_config, ...)`                |
+| Schema-only            | `MigrationWorkflowManager.run_schema_only_migration()` | `(source_config, target_config, ...)`                |
+| Data-only              | `MigrationWorkflowManager.run_data_only_migration()`   | `(source_config, target_config, tables, ...)`        |
+| Batch migration        | `MigrationWorkflowManager.run_batch_migration()`       | `(source_config, target_config, table_batches, ...)` |
+| Batch script execution | `MigrationWorkflowManager.execute_migration_batches()` | `(script_names, batch_size=10, batch_timeout=3600)`  |
+| Kill task              | `MigrationWorkflowManager.kill_task()`                 | `(script_name, confirm=False)`                       |
 
 ### Utility Methods
 
@@ -855,12 +856,28 @@ All endpoints under `{base_url}/kdts/api/v1`:
       error 4001 "No datax contents generated from config" (verified in practice)
       Build mappings with `build_table_mapping()` per table (source + target columns)
 
-11. Execute migration → execute_migration()
+11. Execute migration → execute_migration() or execute_migration_batches()
     Return log file paths
+    **BATCH EXECUTION (REQUIRED for many scripts)**: When `build_migration()` returns
+    MANY scripts (one per table), DO NOT submit them all in a single
+    `execute_migration()` call — the KDTS server starts DataX processes sequentially
+    and the request exceeds the client read timeout (4003, verified in practice).
+    Instead use the batch workflow manager:
+    ```python
+    result = workflow.execute_migration_batches(
+        script_names=script_names,   # all generated scripts
+        batch_size=10,               # 10 scripts per batch
+        batch_timeout=3600,          # per-batch wait limit
+    )
+    # result['all_succeeded'] == True  → every batch reached SUCCEEDED
+    ```
+    Rule of thumb: batch_size=10 for large table counts (>20 tables); single-shot
+    `execute_migration()` is fine for ≤ 10 scripts. Timeout note: a 4003 on submission
+    means the request reached the server (it keeps processing) — still monitor.
 
 12. Monitor progress → query_task_status() (polling every 2s)
     Show status: SUBMITTED → RUNNING → SUCCEEDED/FAILED
-    Report final status
+    Report final status (execute_migration_batches monitors each batch to completion)
 
 13. Verify (manual step for user)
     Remind to compare row counts between source and target
@@ -900,7 +917,8 @@ Report DDL execution result.
    → build_migration(tables=table_mappings, data_config=user_config)
    Note: tables are ALWAYS required for TIMESERIES targets (auto-discovery fails with 4001)
 
-6. Execute migration
+6. Execute migration (use `execute_migration_batches()` when > 10 scripts — see
+   Workflow 1 step 11 for batch execution rules)
 
 7. Monitor progress
 ````
@@ -924,7 +942,8 @@ Report DDL execution result.
 5. Build migration script with explicit tables field
    → build_migration(tables=all_mappings, data_config=user_config)
 
-6. Execute and monitor
+6. Execute and monitor (use `execute_migration_batches()` when > 10 scripts — see
+   Workflow 1 step 11 for batch execution rules)
 ````
 
 ---
@@ -1033,17 +1052,17 @@ When API returns error:
 
 ### Common Error Scenarios
 
-| Code | Meaning                 | Action                                       |
-|------|-------------------------|----------------------------------------------|
-| 1001 | Invalid parameters      | Show which field is missing/wrong            |
-| 1002 | Unsupported source type | Show supported types, ask user to choose     |
-| 2001 | Connection failed       | Check host/port/credentials, test network    |
-| 3004 | Tag limit exceeded      | Reduce tag columns or split migration        |
-| 4001 | Build failed            | Check table mapping, ensure both sides match |
-| 4002 | Launch failed           | Check Python 3 availability on KDTS server   |
-| 4003 | Timeout                 | Increase timeout or reduce data volume       |
-| 5001 | Thread pool full        | Wait and retry (HTTP 503, Retry-After: 10)   |
-| 5002 | Python not found        | Install Python 3 on KDTS server              |
+| Code | Meaning                 | Action                                                          |
+|------|-------------------------|-----------------------------------------------------------------|
+| 1001 | Invalid parameters      | Show which field is missing/wrong                               |
+| 1002 | Unsupported source type | Show supported types, ask user to choose                        |
+| 2001 | Connection failed       | Check host/port/credentials, test network                       |
+| 3004 | Tag limit exceeded      | Reduce tag columns or split migration                           |
+| 4001 | Build failed            | Check table mapping, ensure both sides match                    |
+| 4002 | Launch failed           | Check Python 3 availability on KDTS server                      |
+| 4003 | Timeout                 | Batch execution + larger KDTS_TIMEOUT; still monitor after 4003 |
+| 5001 | Thread pool full        | Wait and retry (HTTP 503, Retry-After: 10)                      |
+| 5002 | Python not found        | Install Python 3 on KDTS server                                 |
 
 ---
 
@@ -1327,9 +1346,13 @@ in the selected primary tag columns
    # Split into batches of 100K rows
    batch_config = {"splitPk": "id", "channel": 10}
    ```
-2. Monitor progress frequently (every 10 seconds)
-3. Warn user about estimated time
-4. Offer to run in background mode (poll only, no waiting)
+2. **Execute scripts in batches** (many tables → many scripts): use
+   `workflow.execute_migration_batches(script_names, batch_size=10)` — submitting
+   dozens of scripts in one `execute_migration()` call causes HTTP 4003 timeouts
+   (verified in practice); batch execution waits per batch to completion
+3. Monitor progress frequently (every 30 seconds)
+4. Warn user about estimated time
+5. Offer to run in background mode (poll only, no waiting)
 
 ### Edge Case 2: Concurrent Migration Tasks
 

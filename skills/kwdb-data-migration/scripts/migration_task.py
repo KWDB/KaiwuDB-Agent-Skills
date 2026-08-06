@@ -278,6 +278,100 @@ class MigrationWorkflowManager:
 
         return result
 
+    def execute_migration_batches(
+        self,
+        script_names: List[str],
+        batch_size: int = 10,
+        batch_timeout: int = 3600,
+        poll_interval: int = 2,
+        on_batch_progress: Optional[Callable[[int, int, Dict[str, Any]], None]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Execute migration scripts in batches (RECOMMENDED for many tables).
+
+        Submits scripts batch by batch (default 10 per batch) and waits for every
+        script in the batch to reach a final state before submitting the next one.
+        Prevents HTTP 4003 request timeouts caused by submitting dozens of scripts
+        in a single request (the KDTS server starts DataX processes sequentially
+        and can exceed the client read timeout).
+
+        Args:
+            script_names: List of script file names to execute
+            batch_size: Number of scripts per batch (default: 10)
+            batch_timeout: Max seconds to wait for one batch to finish (default: 3600)
+            poll_interval: Status polling interval in seconds (default: 2)
+            on_batch_progress: Optional callback (batch_index, total_batches, batch_result)
+
+        Returns:
+            Summary dict:
+                {
+                    "total_batches": int,
+                    "completed_batches": int,
+                    "all_succeeded": bool,
+                    "batch_results": [ {batch, all_succeeded, final_statuses, elapsed_time} ]
+                }
+
+        Notes:
+            - A 4003 timeout on submission means the request REACHED the server and
+              the server keeps processing — the batch is still monitored to completion.
+            - UNKNOWN status is not final: scripts still queued on the server are
+              polled until they reach SUCCEEDED/FAILED/KILLED.
+        """
+        self._require_api_client()
+        batches = [script_names[i:i + batch_size] for i in range(0, len(script_names), batch_size)]
+        total_batches = len(batches)
+        results = []
+
+        for idx, batch in enumerate(batches, 1):
+            logger.info(f"Executing batch {idx}/{total_batches} ({len(batch)} scripts)")
+            exec_result = self.execute_migration_script(batch)
+            code = exec_result.get("code")
+            if code not in (0, 4003):
+                # Hard submission failure (not a timeout): record and move on
+                results.append({"batch": idx, "all_succeeded": False,
+                                "submitted": False, "error": exec_result})
+                continue
+            # code 4003 = request reached the server but response timed out;
+            # the server keeps processing, so still wait for final states.
+            batch_status = self._wait_batch_completion(batch, batch_timeout, poll_interval)
+            batch_status["batch"] = idx
+            results.append(batch_status)
+            if on_batch_progress:
+                on_batch_progress(idx, total_batches, batch_status)
+
+        all_succeeded = all(r.get("all_succeeded") for r in results)
+        return {
+            "total_batches": total_batches,
+            "completed_batches": len(results),
+            "all_succeeded": all_succeeded,
+            "batch_results": results,
+        }
+
+    def _wait_batch_completion(self, script_names: List[str],
+                               timeout: int, poll_interval: int) -> Dict[str, Any]:
+        """Poll all scripts in a batch until every one reaches a final state."""
+        start_time = time.time()
+        final_statuses = {}
+        while time.time() - start_time < timeout:
+            for sn in script_names:
+                if sn in final_statuses:
+                    continue
+                status = self.query_task_status(sn)
+                st = status.get("data", {}).get("status", MigrationStatus.UNKNOWN.value)
+                if st in MigrationWorkflowManager.FINAL_STATUSES:
+                    final_statuses[sn] = st
+            if len(final_statuses) == len(script_names):
+                break
+            time.sleep(poll_interval)
+
+        all_succeeded = (len(final_statuses) == len(script_names)
+                         and all(v == MigrationStatus.SUCCEEDED.value for v in final_statuses.values()))
+        return {
+            "all_succeeded": all_succeeded,
+            "final_statuses": final_statuses,
+            "elapsed_time": time.time() - start_time,
+        }
+
     # ==================== Status Monitoring ====================
 
     def query_task_status(

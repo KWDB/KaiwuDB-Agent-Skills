@@ -108,6 +108,14 @@ End-to-end migration workflow management by composing KDTS API calls.
 - Batch migration support for large datasets
 - Safe task termination with confirmation
 
+**Batch Script Execution (`execute_migration_batches`):**
+- When `build_migration()` returns MANY scripts (one per table), submitting them all in
+  one `execute_migration()` call exceeds the HTTP read timeout.
+- Use `workflow.execute_migration_batches(script_names, batch_size=10)` to submit
+  10 scripts per batch, wait for the batch to reach final states, then submit the next.
+- A 4003 on submission means the request reached the server (it keeps processing) —
+  the batch is still monitored to completion.
+
 **Important:** KDTS API only supports KILL and QUERY actions. No pause/resume.
 
 ### 4. config_validator.py - Configuration Validation

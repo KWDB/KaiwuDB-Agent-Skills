@@ -420,6 +420,11 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
   ```json
   ["MYSQL2KAIWUDB_1719290000.json"]
   ```
+- [ ] **Use batch execution when scripts > 10** (`execute_migration_batches(script_names, batch_size=10)`)
+    - Submitting dozens of scripts in one request triggers HTTP 4003 timeouts
+    - Submit 10 scripts per batch, wait for the batch to reach final states, then next
+    - A 4003 on submission only means the response timed out — the request reached the
+      server (it keeps processing), so still monitor the batch
 - [ ] Record returned log file path
 
 ### 4.3 Monitor Progress
