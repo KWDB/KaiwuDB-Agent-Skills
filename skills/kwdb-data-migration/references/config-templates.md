@@ -1160,6 +1160,13 @@ Table mappings for file-based and NoSQL sources. These CANNOT use `build_table_m
   name/type pairs — types: `date` / `int` / `long` / `double` / `bool` / `string` / `bytes`
 - `query` (optional filter): MongoDB JSON query syntax as a string, e.g.
   `{"t1":{"$gte":1,"$lt":8}}` — filters documents before migration
+- **Table creation LIMITED to two options** (KDTS does NOT support MongoDB→KaiwuDB
+  type mapping — its generic fallback emits invalid types like LONG/STRING):
+  1. User pre-creates the target table (skip DDL);
+  2. SKILL generates DDL from user-provided table info with the mapping
+     int→INT4 / long→INT8 / double→FLOAT8 / string→VARCHAR / bytes→VARBYTES /
+     date→TIMESTAMP / bool→BOOL, user confirms, then execute_ddl.
+     DDL failure → inform the user the table was NOT created, END migration
 
 ```json
 {

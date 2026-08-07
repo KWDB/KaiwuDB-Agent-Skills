@@ -944,13 +944,19 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
   `NUMBER(1,0)` fall back to `NUMBER` → FLOAT → demoted primary tag → 3006
 
 **Other source-specific requirements**:
-- SQL Server: JDBC URL MUST include `encrypt=true;trustServerCertificate=true`
+- SQL Server: JDBC URL MUST include `encrypt=true;trustServerCertificate=true`;
+  metadata table schemaName may come back as the DATABASE name → DDL `"db"."db"."table"`
+  duplicated — set schemaName to `public` (→ `"db"."public"."table"`);
 - OpenTSDB: `column` = FULL METRIC names (`table.metric` format); time range
   REQUIRED; usually no authentication
 - KaiwuDB source (KaiwuDB→KaiwuDB): REQUIRES time range (beginDateTime/endDateTime)
   + `tsColumn` (time column name)
 - MongoDB: `collectionName` identifier; `column` JSON array (name/type); `query`
-  optional (MongoDB JSON query syntax, e.g. `{"t1":{"$gte":1,"$lt":8}}`)
+  optional (MongoDB JSON query syntax, e.g. `{"t1":{"$gte":1,"$lt":8}}`);
+  table creation LIMITED to two options (KDTS does NOT support MongoDB type mapping):
+  user pre-creates the table, or SKILL generates DDL from user-provided table info
+  (int→INT4/long→INT8/double→FLOAT8/string→VARCHAR/bytes→VARBYTES/date→TIMESTAMP/
+  bool→BOOL) with user confirmation; DDL failure → end migration
 - FTP: `path` MUST start with `/`;path is the SFTP SERVER-side path;
   `skipHeader: true` when the CSV has a header row
 - HDFS: `path` is the HDFS SERVER-side absolute path (JSON array); `fileType`

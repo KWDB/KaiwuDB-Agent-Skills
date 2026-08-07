@@ -949,6 +949,9 @@ All endpoints under `{base_url}/kdts/api/v1`:
         `jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`
       - supports `where` filters and SQL expression columns (RDBMS mapping, e.g.
         `1 as t1`); two-step migration (schema + data), no full migration
+      - **schemaName fix**: the metadata table schemaName may come back as
+        the DATABASE name → DDL becomes `"db"."db"."table"` (duplicated). Set the table
+        schemaName to `public` so DDL is `"db"."public"."table"`
       **KaiwuDB-source mapping requirements** (KaiwuDB→KaiwuDB): 
       the KaiwuDB source (time-series engine) REQUIRES `beginDateTime`/`endDateTime` (data time range)
       and `tsColumn` (time column name, e.g. "ts") in the mapping — collect the time range from the user.
@@ -959,6 +962,14 @@ All endpoints under `{base_url}/kdts/api/v1`:
         string — types: date/int/long/double/bool/string/bytes
       - **`query` (optional filter)**: MongoDB JSON query syntax as a string,
         e.g. `{"t1":{"$gte":1,"$lt":8}}` — filters documents before migration
+      - **Table creation is LIMITED to two options** (KDTS does NOT support MongoDB→KaiwuDB 
+        type mapping — its generic fallback emits invalid types like LONG/STRING):
+        1. **User pre-creates the target table** (skip DDL, migrate data directly);
+        2. **SKILL generates the DDL from the USER-provided column info + type
+           mapping rules** (int→INT4, long→INT8, double→FLOAT8, string→VARCHAR,
+           bytes→VARBYTES, date→TIMESTAMP, bool→BOOL), user confirms, then
+           `execute_ddl()`. If DDL execution FAILS: inform the user that the target
+           table was NOT created and END the migration.
       **FTP mapping requirements**:
       - **`path` MUST be an absolute path starting with `/`**
       - **`path` is the SFTP SERVER-side path**, NOT the client local path — it must

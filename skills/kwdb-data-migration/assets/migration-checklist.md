@@ -142,12 +142,19 @@ FTP, HDFS; read_metadata returns 3001):**
 - [ ] **SQL Server source**: JDBC URL MUST include `encrypt=true;trustServerCertificate=true`
       (`jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`);
       supports `where` filters and expression columns; two-step migration (schema + data)
+    - **schemaName fix**: the metadata table schemaName may come back as the DATABASE 
+      name → DDL becomes `"db"."db"."table"` (duplicated); set it to `public` → `"db"."public"."table"`
 - [ ] **KaiwuDB source** (KaiwuDB→KaiwuDB): the time-series engine source
       REQUIRES time range (beginDateTime/endDateTime) + `tsColumn` (time column
       name); collect the time range from the user
 - [ ] **MongoDB source**: identifier is `collectionName`; `column` is a
       JSON array (name/type: date/int/long/double/bool/string/bytes); `query` optional
       (MongoDB JSON query syntax filter, e.g. `{"t1":{"$gte":1,"$lt":8}}`)
+    - **Table creation is LIMITED to two options** (KDTS does NOT support MongoDB→KaiwuDB type mapping):
+      ① User pre-creates the target table (skip DDL, migrate data directly);
+      ② **SKILL generates DDL from the user-provided table info** (mapping: int→INT4, long→INT8,
+      double→FLOAT8, string→VARCHAR, bytes→VARBYTES, date→TIMESTAMP, bool→BOOL), user confirms, then execute
+    - **DDL execution FAILED → inform the user the table was NOT created, END migration**
 - [ ] **FTP path requirements**: MUST start with `/`; path is the SFTP SERVER-side path; 
       Set `skipHeader: true` when the CSV has a header row
 - [ ] **HDFS path requirements**: path is the HDFS SERVER-side absolute path

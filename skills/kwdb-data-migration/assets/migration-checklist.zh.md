@@ -138,10 +138,17 @@ AI Agent 将使用与用户相同的语言进行回复。
 - [ ] **SQL Server 源**:JDBC URL 需带 `encrypt=true;trustServerCertificate=true`
     （`jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`）;
     支持 where 过滤与表达式列;两步迁移（结构+数据）
+    - **schemaName 修正**:元数据表 schemaName 可能为库名 → DDL 出现 `"db"."db"."table"` 重复;
+      需将 schemaName 改为 `public` → `"db"."public"."table"`
 - [ ] **KaiwuDB 源**（KaiwuDB→KaiwuDB）:时序引擎源需 **时间范围**
     （beginDateTime/endDateTime）+ **tsColumn**（时间列名）;向用户收集时间范围
 - [ ] **MongoDB 源**:表标识为 `collectionName`;column 为 JSON 数组（name/type/date/int/long/double/bool/string/bytes）;
     `query` 可选（MongoDB JSON 查询语法过滤,如 `{"t1":{"$gte":1,"$lt":8}}`）
+    - **建表仅两种方式（KDTS 不支持 MongoDB 类型映射）**:
+      ① 用户提前在目标端创建表（跳过 DDL,直接数据迁移）;
+      ② **SKILL 根据用户提供的表信息生成 DDL**（映射:int→INT4、long→INT8、double→FLOAT8、
+        string→VARCHAR、bytes→VARBYTES、date→TIMESTAMP、bool→BOOL）,用户确认后执行
+    - **DDL 执行失败 → 提示用户未成功创建表,结束迁移**
 - [ ] **FTP path 要求**:必须以 `/` 开头;path 是 **SFTP 服务器视角**路径；CSV 含表头时设置 `skipHeader: true`
 - [ ] **HDFS path 要求**:path 为 **HDFS 服务器视角**绝对路径（JSON 数组,如
       `/user/hive/warehouse/hdfs_test.db/test_tb`）;`fileType` 必填（text/orc/parquet/rcfile）;
