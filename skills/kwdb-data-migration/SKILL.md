@@ -856,7 +856,12 @@ All endpoints under `{base_url}/kdts/api/v1`:
     **IMPORTANT — tables parameter by target engine**:
     - **RELATIONAL target**: `tables` can be empty (auto-discover all tables) for full migration
     - **TIMESERIES target**: `tables` MUST be explicit table mappings — empty tables fails with
-      error 4001 "No datax contents generated from config" (verified in practice)
+      error 4001 "No datax contents generated from config" (verified in practice;
+      KDTS source explicitly rejects whole-database migration into the time-series engine)
+    - **PostgreSQL source limitation**: auto-discovery filters tables by `schema == dbName`. 
+      Tables in the `public` schema (the common case) are filtered out → auto-discovery 
+      fails with 4001 even for RELATIONAL targets. Use explicit table mappings for PostgreSQL,
+      unless the tables live in a schema named after the database.
       Build mappings with `build_table_mapping()` per table (source + target columns).
       **Source identifier field per type** (verified against KDTS source DTOs):
       `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB, `measurement` for INFLUXDB,

@@ -307,7 +307,10 @@ User Request
     - Returns: Script name(s)
     - IMPORTANT: `tables=[]` (auto-discovery) is ONLY valid for RELATIONAL targets.
       TIMESERIES targets MUST provide explicit table mappings — empty tables fails
-      with 4001 "No datax contents generated from config" (verified in practice)
+      with 4001 "No datax contents generated from config" (verified in practice;
+      KDTS source explicitly rejects whole-database migration into time-series engine)
+    - PostgreSQL: auto-discovery filters tables by `schema == dbName` — `public` schema 
+      tables are filtered out, use explicit table mappings (verified in practice)
     ↓
 [9] Execute Migration (api_client / workflow)
     - POST /datax/execute

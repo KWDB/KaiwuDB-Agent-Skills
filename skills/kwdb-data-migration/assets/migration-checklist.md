@@ -420,7 +420,10 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
   - Empty `tables` array means auto-discover all tables (for sources that support full migration,
     and RELATIONAL targets ONLY).
   - **TIMESERIES targets MUST use explicit table mappings**: empty `tables` fails with 4001
-    "No datax contents generated from config" (verified in practice).
+    "No datax contents generated from config".
+  - **PostgreSQL source limitation**: auto-discovery filters tables by `schema == dbName`.
+    Tables in the `public` schema (the common case) are filtered out → 4001 even for RELATIONAL targets.
+    Use explicit table mappings for PostgreSQL unless tables live in a schema named after the database.
   - For table-level migration, specify tables explicitly.
   - **CRITICAL**: Both `core` and `setting` fields in `data` are REQUIRED for successful DataX execution.
 

@@ -404,7 +404,10 @@ AI Agent 将使用与用户相同的语言进行回复。
   **注意**：
   - 空的 `tables` 数组表示自动发现所有表（仅适用于支持完整迁移的源，且**仅限 RELATIONAL 目标**）。
   - **TIMESERIES 目标必须显式提供表映射**：空 `tables` 会报错 4001
-    "No datax contents generated from config"（实测结论）。
+    "No datax contents generated from config"。
+  - **PostgreSQL 源限制**：自动发现按 `schema == dbName` 过滤表。
+    `public` schema 下的表（常见情况）会被过滤 → 即使 RELATIONAL 目标也会报 4001。
+    除非表位于与库同名的 schema 下，否则 PostgreSQL 需显式表映射。
   - 对于表级迁移，需要显式指定表列表。
   - **关键提示**：`data` 中的 `core` 和 `setting` 字段对于成功执行 DataX 是必需的。
 
