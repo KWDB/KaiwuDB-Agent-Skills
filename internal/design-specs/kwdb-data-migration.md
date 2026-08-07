@@ -118,8 +118,8 @@ class KDTSClient:
 | MYSQL      | 3306         | Yes            | Yes      | Relational database                                       |
 | ORACLE     | 1521         | Yes            | Yes      | Relational database                                       |
 | POSTGRESQL | 5432         | Yes            | Yes      | Relational database                                       |
-| SQLSERVER  | 1433         | No             | Yes      | Relational database, metadata + data only                 |
-| CLICKHOUSE | 9000         | Yes            | No       | Relational database, full migration without metadata      |
+| SQLSERVER  | 1433         | No             | Yes      | Relational database                                       |
+| CLICKHOUSE | 9000         | Yes            | No       | Relational database                                       |
 | KAIWUDB    | 26257        | No             | No       | Source or target, data migration only                     |
 | TDENGINE3X | 6030         | Yes            | Yes      | Time series database                                      |
 | TDENGINE2X | 6030         | No             | No       | Time series database, older version                       |
@@ -285,6 +285,14 @@ User Request
 [4] Metadata Read (api_client)
     - POST /datasource/metadata
     - Returns: Database object (tables, columns, PKs, indexes)
+    - Sources WITHOUT metadata support:
+      4a. Check whether the TARGET table already exists — if yes and matching,
+          skip DDL and go to data migration directly
+      4b. If not exists: collect the table structure from the USER (CREATE TABLE
+          DDL or column list) — NEVER guess or rely on test code
+      4c. Build the Database object via `build_manual_metadata()` (+ optional
+          `mark_time_series_columns()` / `build_added_column()`), then continue
+          with DDL preview/execute, and only then migrate data
     ↓
 [5] DDL Preview (api_client)
     - POST /metadata/preview
@@ -912,6 +920,9 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
   split_interval_s=86400, read_timeout=0, connect_timeout=0)` — InfluxDB mappings
 - `build_added_column(column_name, default_value, source_type, is_tag, is_primary_tag)`
   — new columns for sources lacking them (ALL source types)
+- `build_manual_metadata(source_type, db_name, table_name, columns)` — Database object
+  for sources WITHOUT KDTS metadata support; the table structure MUST come from 
+  the user (CREATE TABLE DDL or column list) — never guess
 - `mark_time_series_columns(source_db, table_name, time_column, primary_tags, tags)`
   — tag marks for time-series DDL generation
 
@@ -931,6 +942,21 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
 - Table/column names are UPPERCASE — mapping columns must match exactly
 - New-column types need exact mappings (see table above); unmapped values such as
   `NUMBER(1,0)` fall back to `NUMBER` → FLOAT → demoted primary tag → 3006
+
+**Other source-specific requirements**:
+- SQL Server: JDBC URL MUST include `encrypt=true;trustServerCertificate=true`
+- OpenTSDB: `column` = FULL METRIC names (`table.metric` format); time range
+  REQUIRED; usually no authentication
+- KaiwuDB source (KaiwuDB→KaiwuDB): REQUIRES time range (beginDateTime/endDateTime)
+  + `tsColumn` (time column name)
+- MongoDB: `collectionName` identifier; `column` JSON array (name/type); `query`
+  optional (MongoDB JSON query syntax, e.g. `{"t1":{"$gte":1,"$lt":8}}`)
+- FTP: `path` MUST start with `/`;path is the SFTP SERVER-side path;
+  `skipHeader: true` when the CSV has a header row
+- HDFS: `path` is the HDFS SERVER-side absolute path (JSON array); `fileType`
+  REQUIRED (text/orc/parquet/rcfile); Kerberos fields for secured clusters
+- Sources without metadata: table structure MUST come from the USER (CREATE TABLE DDL or column list) — never guess;
+  build via `build_manual_metadata()` (check target table existence first)
 
 **Auto-Mapping Rules**:
 

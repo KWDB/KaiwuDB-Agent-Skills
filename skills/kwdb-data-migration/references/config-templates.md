@@ -1089,10 +1089,15 @@ PRIMARY TAGS (device_id, metric);
 
 ## 10. File/NoSQL Source Table Mapping Templates
 
-Table mappings for file-based and NoSQL sources (from KDTS test configurations).
-These CANNOT use `build_table_mapping()` — build them manually.
+Table mappings for file-based and NoSQL sources. These CANNOT use `build_table_mapping()` — build them manually.
 
 ### 10.1 FTP/SFTP Source Mapping
+
+**Requirements**:
+- `path` MUST be an absolute path starting with `/`; it is the SFTP 
+   SERVER-side path (resolvable where the SFTP service runs).
+- `skipHeader: true` when the CSV has a header row
+- `column` is a JSON array string with index/type/format per field
 
 ```json
 {
@@ -1122,6 +1127,14 @@ These CANNOT use `build_table_mapping()` — build them manually.
 
 ### 10.2 HDFS Source Mapping
 
+**Requirements**:
+- `path` is the HDFS SERVER-side path (JSON array string, absolute) — NOT local
+- `fileType` REQUIRED: `text` / `orc` / `parquet` / `rcfile`
+- `column` is a JSON array string with index/type/format per field
+- `compress` (e.g. `gzip`) for text files; Kerberos fields for secured clusters
+- DataSource: host = NameNode host, port = 9000 (RPC)
+- Target tables must pre-exist
+
 ```json
 {
   "source": {
@@ -1142,7 +1155,11 @@ These CANNOT use `build_table_mapping()` — build them manually.
 
 ### 10.3 MongoDB Source Mapping
 
-`column` is a JSON array string WITH types (NOT a comma string):
+**Requirements**:
+- `column` is a JSON array string WITH types (NOT a comma string):
+  name/type pairs — types: `date` / `int` / `long` / `double` / `bool` / `string` / `bytes`
+- `query` (optional filter): MongoDB JSON query syntax as a string, e.g.
+  `{"t1":{"$gte":1,"$lt":8}}` — filters documents before migration
 
 ```json
 {
@@ -1150,7 +1167,7 @@ These CANNOT use `build_table_mapping()` — build them manually.
     "sourceType": "MONGODB",
     "collectionName": "test_tb",
     "column": "[{\"name\":\"ts\",\"type\":\"date\"},{\"name\":\"c1\",\"type\":\"int\"},{\"name\":\"c2\",\"type\":\"long\"},{\"name\":\"c3\",\"type\":\"double\"}]",
-    "query": null
+    "query": "{\"t1\":{\"$gte\":1,\"$lt\":8}}"
   },
   "target": {
     "sourceType": "KAIWUDB",
@@ -1230,4 +1247,51 @@ mapping = build_table_mapping(
     columns="ts,c1,...,12,1 as t1",
     target_columns="ts,c1,...,12,t1",
 )
+```
+
+### 10.6 OpenTSDB / KaiwuDB-Source Mapping
+
+**OpenTSDB source**:
+- `column` = FULL METRIC names in `table.metric` format (e.g. `test_tb.c1,test_tb.c2,...`)
+- time range REQUIRED: `beginDateTime` / `endDateTime`
+
+```json
+{
+  "source": {
+    "sourceType": "OPENTSDB",
+    "table": "test_tb",
+    "column": "test_tb.c1,test_tb.c2,test_tb.c3,test_tb.c4,test_tb.c5,test_tb.c6",
+    "beginDateTime": "2024-04-09 16:00:00",
+    "endDateTime": "2024-04-09 18:00:00"
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3,c4,c5,c6",
+    "writeMode": "insert"
+  }
+}
+```
+
+**KaiwuDB source** (KaiwuDB→KaiwuDB):
+- time range REQUIRED: `beginDateTime` / `endDateTime`
+- `tsColumn`: the time column name (e.g. `ts`)
+
+```json
+{
+  "source": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,t1",
+    "beginDateTime": "2025-04-01 00:00:00",
+    "endDateTime": "2025-06-01 00:00:00",
+    "tsColumn": "ts"
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "test_tb",
+    "column": "ts,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,c12,t1",
+    "writeMode": "insert"
+  }
+}
 ```

@@ -38,6 +38,8 @@ Full implementation of all 10 KDTS REST API endpoints.
   default value (int→INT4 or INT8 for InfluxDB, str→VARCHAR, bool→BOOL eligible for
   PRIMARY TAG; float→FLOAT4/FLOAT8 ordinary TAG ONLY, never a primary tag);
   sourceColumnType picked per source for an exact KDTS mapping
+- `build_manual_metadata()`: Helper to build a Database object for sources WITHOUT
+  KDTS metadata support. The table structure MUST come from the USER (CREATE TABLE DDL or column list) — never guess
 - `mark_time_series_columns()`: Helper to mark column roles (isTs/isTag/isPrimaryTag,
   auto-sets primary tags to NOT NULL) on a source Database for time-series DDL generation
 

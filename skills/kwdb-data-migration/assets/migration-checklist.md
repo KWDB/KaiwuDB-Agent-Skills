@@ -122,11 +122,38 @@ The AI Agent will respond in the same language the user uses.
 
 ### 2.3 Sources Without Metadata Support
 
-**If source does NOT support metadata (TDengine 2.x, OpenTSDB, MongoDB, FTP, HDFS):**
+**If source does NOT support metadata (ClickHouse, TDengine 2.x, OpenTSDB, MongoDB,
+FTP, HDFS; read_metadata returns 3001):**
 
-- [ ] Skip metadata step
-- [ ] Manually prepare table mapping configuration
-- [ ] Explicitly specify tables field in migration request
+- [ ] **Check whether the target DB/table already exists**
+    - Target table exists and matches → skip DDL, go directly to data migration
+    - Not exists → continue with the table-creation flow below
+- [ ] **Collect the table structure from the USER** (source CREATE TABLE DDL or a
+      column list with names and types)
+    - NEVER guess the structure
+- [ ] Build the Database object via `build_manual_metadata(source_type, db_name, table_name, columns)`
+- [ ] Mark time-series columns/tags (`mark_time_series_columns`) or add columns (`build_added_column`) as needed
+- [ ] `preview_ddl` → user confirmation → `execute_ddl` creates the target table
+- [ ] After the table is created, run the data migration (explicit table mappings, `tables` REQUIRED)
+- [ ] File sources (FTP/HDFS) have no table structure: pre-create target tables or migrate per file configuration
+- [ ] **OpenTSDB source**: `column` is a list of FULL METRIC names in
+      `table.metric` format (e.g. `test_tb.c1,test_tb.c2,...`); time range REQUIRED
+      (beginDateTime/endDateTime); usually NO authentication (username/password empty)
+- [ ] **SQL Server source**: JDBC URL MUST include `encrypt=true;trustServerCertificate=true`
+      (`jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`);
+      supports `where` filters and expression columns; two-step migration (schema + data)
+- [ ] **KaiwuDB source** (KaiwuDB→KaiwuDB): the time-series engine source
+      REQUIRES time range (beginDateTime/endDateTime) + `tsColumn` (time column
+      name); collect the time range from the user
+- [ ] **MongoDB source**: identifier is `collectionName`; `column` is a
+      JSON array (name/type: date/int/long/double/bool/string/bytes); `query` optional
+      (MongoDB JSON query syntax filter, e.g. `{"t1":{"$gte":1,"$lt":8}}`)
+- [ ] **FTP path requirements**: MUST start with `/`; path is the SFTP SERVER-side path; 
+      Set `skipHeader: true` when the CSV has a header row
+- [ ] **HDFS path requirements**: path is the HDFS SERVER-side absolute path
+      (JSON array, e.g. `/user/hive/warehouse/hdfs_test.db/test_tb`); `fileType`
+      REQUIRED (text/orc/parquet/rcfile); text supports fieldDelimiter/encoding/
+      compress/csvReaderConfig; connect to NameNode (host:9000)
 
 **Note:** SQL Server, InfluxDB 1.x and 2.x support metadata reading (META_AND_DATA capability), but do NOT support full migration. Use two-step migration approach for these sources.
 

@@ -287,6 +287,7 @@ workflow = MigrationWorkflowManager(api_client=client)
 | Generate error hint    | `scripts/error_handler.py`    | `ErrorHandler.get_error_hint(code)`                                                                       |
 | Build table mapping    | `scripts/api_client.py`       | `build_table_mapping(source_type, source_table, ...)` (auto field: table/measurement/collectionName)      |
 | Build InfluxDB mapping | `scripts/api_client.py`       | `build_influxdb_mapping(source_db, measurement, begin_datetime, end_datetime, ...)` (time range REQUIRED) |
+| Build manual metadata  | `scripts/api_client.py`       | `build_manual_metadata(source_type, db_name, table_name, columns)`                                        |
 | Mark TS columns        | `scripts/api_client.py`       | `mark_time_series_columns(source_db, table_name, time_column, primary_tags, tags)`                        |
 
 ---
@@ -382,27 +383,34 @@ Example: MYSQL2KAIWUDB_1719290000000.json
 
 Refer to `references/source-types.md` for complete capability matrix.
 
-| Category    | Source Type  | Full Migration  | Metadata | Notes                                    |
-|-------------|--------------|-----------------|----------|------------------------------------------|
-| Relational  | MySQL        | Yes             | Yes      |                                          |
-| Relational  | Oracle       | Yes             | Yes      |                                          |
-| Relational  | PostgreSQL   | Yes             | Yes      |                                          |
-| Relational  | SQL Server   | No              | Yes      | Metadata + Data, no full migration       |
-| Relational  | ClickHouse   | Yes             | No       | Full migration, no metadata              |
-| Relational  | KaiwuDB      | No              | No       | Data migration only (as source)          |
-| Time Series | TDengine 3.x | Yes             | Yes      |                                          |
-| Time Series | TDengine 2.x | No              | No       | Data migration only                      |
-| Time Series | InfluxDB 1.x | No              | Yes      | Metadata + Data, no full migration       |
-| Time Series | InfluxDB 2.x | No              | Yes      | Metadata + Data, no full migration       |
-| Time Series | OpenTSDB     | No              | No       | Data migration only                      |
-| NoSQL       | MongoDB      | No              | No       | Data migration only                      |
-| File        | FTP/SFTP     | No              | No       | Data migration only                      |
-| File        | HDFS         | No              | No       | Data migration only                      |
+| Category    | Source Type  | Full Migration | Metadata | Notes                              |
+|-------------|--------------|----------------|----------|------------------------------------|
+| Relational  | MySQL        | Yes            | Yes      |                                    |
+| Relational  | Oracle       | Yes            | Yes      |                                    |
+| Relational  | PostgreSQL   | Yes            | Yes      |                                    |
+| Relational  | SQL Server   | No             | Yes      |                                    |
+| Relational  | ClickHouse   | Yes            | No       | Data migration only                |
+| Time Series | KaiwuDB      | No             | No       | Data migration only (as source)    |
+| Time Series | TDengine 3.x | Yes            | Yes      |                                    |
+| Time Series | TDengine 2.x | No             | No       | Data migration only                |
+| Time Series | InfluxDB 1.x | No             | Yes      | Metadata + Data, no full migration |
+| Time Series | InfluxDB 2.x | No             | Yes      | Metadata + Data, no full migration |
+| Time Series | OpenTSDB     | No             | No       | Data migration only                |
+| NoSQL       | MongoDB      | No             | No       | Data migration only                |
+| File        | FTP/SFTP     | No             | No       | Data migration only                |
+| File        | HDFS         | No             | No       | Data migration only                |
 
 > **Note:**
 > - Target is **ALWAYS** KaiwuDB with engine specified as RELATIONAL or TIMESERIES
 > - Source **MUST** also specify engine field (RELATIONAL for RDBMS, TIMESERIES for others)
 > - For SQL Server, InfluxDB 1.x/2.x: Use two-step migration (Schema first, then Data)
+> - **Sources without metadata support (e.g. ClickHouse)**: KDTS `preview_ddl` generates DDL
+>   from the passed-in Database object, NOT from the source connection — so a table-based
+>   source (ClickHouse, TDengine 2.x) can still get DDL. **REQUIRED interaction — the table
+>   structure MUST come from the USER** (source CREATE TABLE DDL or a column list); NEVER
+>   guess the structure or rely on test code. Build the Database object manually from the
+>   user-provided structure (use `build_manual_metadata()`), then call `preview_ddl()` as
+>   usual. File sources (FTP/HDFS) have no table structure — pre-create the target tables.
 
 ### KaiwuDB Time-Series Table Constraints
 
@@ -494,6 +502,23 @@ All endpoints under `{base_url}/kdts/api/v1`:
 
 5. Read source metadata → read_metadata()
    Show table count, columns per table, PK/constraint info
+   
+   **Branch for sources WITHOUT metadata support**:
+   5a. Check whether the TARGET table already exists (ask the user, or infer from a previous migration). 
+   5b. If the target table exists and matches: skip DDL, go directly to data migration.
+   5c. If NOT exists: **REQUIRED interaction — collect the table structure from the USER**
+       (source CREATE TABLE DDL or a column list with names and types). NEVER guess the structure.
+   5d. Build the Database object manually from the user-provided structure:
+       ```python
+       from scripts import build_manual_metadata, build_added_column, mark_time_series_columns
+       db = build_manual_metadata('CLICKHOUSE', 'clickhouse_kwdb', 'test_tb', user_columns)
+       mark_time_series_columns(db, 'test_tb', time_column='ts', primary_tags=['t1'], tags=[])
+       # add a new column if the user wants one (e.g. t1 default 1)
+       db['tableMap']['test_tb']['columns'].append(
+           build_added_column('t1', 1, source_type='CLICKHOUSE', is_tag=True, is_primary_tag=True))
+       ```
+   5e. Continue with DDL preview (step 7) → confirmation → execute → then data migration.
+       For file sources (FTP/HDFS, no table structure): pre-create the target tables.
 
 6. **Configure Tags for Time-Series Target** (ONLY for TIMESERIES target with RELATIONAL source)
    
@@ -912,14 +937,46 @@ All endpoints under `{base_url}/kdts/api/v1`:
       supports `where` (source filter, e.g. time range; RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
       `pre_sql`/`post_sql` (target pre/post SQL, e.g. drop/create table), and SQL
       expression columns for RDBMS (e.g. `"...,1 as t1"`).
-      **OpenTSDB ALSO requires the time range**: OpenTSDBReader emits
-      beginDateTime/endDateTime (no splitIntervalS) — collect the data time range
-      from the user and add `"beginDateTime"/"endDateTime"` to the mapping source.
-      **MongoDB column format**: `column` is a JSON array string with types
-      (e.g. `[{"name":"ts","type":"date"},...]`, see config-templates.md), NOT a
-      comma string — build it manually from the metadata.
-      **FTP/HDFS mapping examples**: see `references/config-templates.md`
-      (path is a JSON array string; column carries index/type/format mappings).
+      **OpenTSDB mapping requirements**:
+      - `column` is a list of FULL METRIC names in `table.metric` format
+        (e.g. `"test_tb.c1,test_tb.c2,..."`) — NOT plain column names
+      - **time range REQUIRED**: beginDateTime/endDateTime (no splitIntervalS) —
+        collect the data time range from the user
+      - OpenTSDB usually has NO authentication (username/password may be empty)
+      **SQL Server source requirements**:
+      - JDBC URL MUST include `encrypt=true;trustServerCertificate=true`
+        (modern JDBC drivers require TLS by default):
+        `jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`
+      - supports `where` filters and SQL expression columns (RDBMS mapping, e.g.
+        `1 as t1`); two-step migration (schema + data), no full migration
+      **KaiwuDB-source mapping requirements** (KaiwuDB→KaiwuDB): 
+      the KaiwuDB source (time-series engine) REQUIRES `beginDateTime`/`endDateTime` (data time range)
+      and `tsColumn` (time column name, e.g. "ts") in the mapping — collect the time range from the user.
+      **MongoDB mapping requirements**:
+      - source identifier is `collectionName` (NOT `table`)
+      - `column` is a JSON array string with name/type (e.g.
+        `[{"name":"ts","type":"date"},{"name":"c1","type":"int"},...]`), NOT a comma
+        string — types: date/int/long/double/bool/string/bytes
+      - **`query` (optional filter)**: MongoDB JSON query syntax as a string,
+        e.g. `{"t1":{"$gte":1,"$lt":8}}` — filters documents before migration
+      **FTP mapping requirements**:
+      - **`path` MUST be an absolute path starting with `/`**
+      - **`path` is the SFTP SERVER-side path**, NOT the client local path — it must
+        be resolvable where the SFTP service runs (Windows host, WSL, or container).
+      - **`skipHeader: true`** when the CSV has a header row (otherwise the header is migrated as data)
+      - `column` is a JSON array string with index/type/format per field (see `references/config-templates.md` §10.1)
+      **HDFS mapping requirements**:
+      - `path` is the HDFS SERVER-side path (JSON array string, absolute, e.g.
+        `["/user/hive/warehouse/hdfs_test.db/test_tb"]`) — NOT a local path
+      - `fileType` REQUIRED: `text` / `orc` / `parquet` / `rcfile` (text supports
+        fieldDelimiter/encoding/compress/csvReaderConfig; orc/parquet do not)
+      - `column` is a JSON array string with index/type/format per field (same
+        structure as FTP, e.g. 14 columns with date/long/double/boolean/string)
+      - `compress`: file compression (e.g. `gzip` for text files)
+      - Kerberos-secured clusters: `haveKerberos` + `kerberosPrincipal` + `kerberosKeytabFilePath`
+      - DataSource: host = NameNode host, port = 9000 (RPC), user/password
+      - target tables must pre-exist (file source, no table structure)
+      **HDFS mapping example**: see `references/config-templates.md` §10.2
       **View migration**: to migrate views, pass metadata option `view: true` to
       `read_metadata()` / `preview_ddl()` — views are then included in the DDL.
 

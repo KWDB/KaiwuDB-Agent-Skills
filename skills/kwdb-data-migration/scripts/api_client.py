@@ -823,6 +823,60 @@ def build_table_mapping(source_type: str, source_table: str,
     return {"source": source_map, "target": target_map}
 
 
+def build_manual_metadata(source_type: str, db_name: str, table_name: str,
+                          columns: List[Dict[str, Any]],
+                          schema_name: str = "default") -> Dict[str, Any]:
+    """
+    Build a Database object MANUALLY for sources without KDTS metadata support.
+
+    KDTS `preview_ddl` generates DDL from the passed-in Database object, NOT from
+    the source connection — so a table-based source with a known structure can
+    still get DDL generated this way.
+
+    **IMPORTANT — the table structure MUST come from the USER** (source CREATE
+    TABLE DDL or a column list the user provides).
+    NEVER guess the structure — production schemas are arbitrary.
+
+    Args:
+        source_type: KDTS source type
+        db_name: Database name (used as the DDL database name)
+        table_name: Table name
+        columns: List of column dicts from the USER-PROVIDED structure, each with
+            at least: {"columnName": str, "sourceColumnType": str}
+            (optional: sourceColumnName, nullAble, comment, ...)
+        schema_name: Source schema (default: "default")
+
+    Returns:
+        Database object ready for preview_ddl() / execute_ddl().
+    """
+    cols = []
+    for i, c in enumerate(columns, 1):
+        cols.append({
+            "dbType": source_type, "schemaName": schema_name, "tableName": table_name,
+            "sourceColumnName": c.get("sourceColumnName", c["columnName"]),
+            "columnName": c["columnName"],
+            "sourceColumnType": c.get("sourceColumnType", ""),
+            "columnType": c.get("sourceColumnType", ""),
+            "columnOrder": i, "strLength": None, "precision": None, "scale": None,
+            "nullAble": c.get("nullAble", True), "comment": c.get("comment", ""),
+            "extra": "", "columnKey": "", "finalConvertDataType": None,
+            "isChecked": True, "isTs": False, "isTag": False, "isPrimaryTag": False,
+        })
+    return {
+        "type": source_type, "name": db_name, "encoding": "UTF-8",
+        "interval": None, "retentions": None, "comment": None,
+        "tableMap": {
+            table_name: {
+                "schemaName": schema_name, "sourceTableName": table_name,
+                "tableName": table_name, "tableCollation": None, "tableComment": None,
+                "columns": cols, "primaryKey": None, "constraint": [],
+                "indexes": [], "source": None,
+            }
+        },
+        "viewMap": {},
+    }
+
+
 def build_added_column(column_name: str, default_value: Any,
                        source_type: str = "MYSQL",
                        is_tag: bool = False,

@@ -121,11 +121,31 @@ AI Agent 将使用与用户相同的语言进行回复。
 
 ### 2.3 不支持元数据的源
 
-**如果源不支持元数据（SQL Server 部分版本、TDengine 2.x、InfluxDB 2.x、MongoDB、FTP、HDFS）：**
+**如果源不支持元数据（ClickHouse、TDengine 2.x、OpenTSDB、MongoDB、FTP、HDFS；read_metadata 报 3001）：**
 
-- [ ] 跳过元数据步骤
-- [ ] 手动准备表映射配置
-- [ ] 在迁移请求中显式指定 tables 字段
+- [ ] **先检查目标库/表是否存在**
+    - 目标表已存在且结构匹配 → 跳过 DDL,直接数据迁移
+    - 不存在 → 继续以下建表流程
+- [ ] **向用户收集表结构**（源端 CREATE TABLE DDL 或列清单:列名+类型）
+    - 严禁猜测表结构
+- [ ] 调用 `build_manual_metadata(source_type, db_name, table_name, columns)` 构造 Database 对象
+- [ ] 按需标记时序列/标签（`mark_time_series_columns`）或新增列（`build_added_column`）
+- [ ] `preview_ddl` → 用户确认 → `execute_ddl` 创建目标表
+- [ ] 成功创建表后,再进行数据迁移（显式表映射,tables 必填）
+- [ ] 文件源（FTP/HDFS）无表结构概念:预建目标表或按文件配置迁移
+- [ ] **OpenTSDB 源**:column 为 **metric 全名列表**（`表名.指标名` 格式,如 `test_tb.c1,test_tb.c2,...`）;
+    时间范围必填（beginDateTime/endDateTime）; 通常无认证（username/password 可空）
+- [ ] **SQL Server 源**:JDBC URL 需带 `encrypt=true;trustServerCertificate=true`
+    （`jdbc:sqlserver://host:1433;databaseName=db;encrypt=true;trustServerCertificate=true`）;
+    支持 where 过滤与表达式列;两步迁移（结构+数据）
+- [ ] **KaiwuDB 源**（KaiwuDB→KaiwuDB）:时序引擎源需 **时间范围**
+    （beginDateTime/endDateTime）+ **tsColumn**（时间列名）;向用户收集时间范围
+- [ ] **MongoDB 源**:表标识为 `collectionName`;column 为 JSON 数组（name/type/date/int/long/double/bool/string/bytes）;
+    `query` 可选（MongoDB JSON 查询语法过滤,如 `{"t1":{"$gte":1,"$lt":8}}`）
+- [ ] **FTP path 要求**:必须以 `/` 开头;path 是 **SFTP 服务器视角**路径；CSV 含表头时设置 `skipHeader: true`
+- [ ] **HDFS path 要求**:path 为 **HDFS 服务器视角**绝对路径（JSON 数组,如
+      `/user/hive/warehouse/hdfs_test.db/test_tb`）;`fileType` 必填（text/orc/parquet/rcfile）;
+      text 类型支持 fieldDelimiter/encoding/compress/csvReaderConfig;连接为 NameNode(host:9000)
 
 ---
 
