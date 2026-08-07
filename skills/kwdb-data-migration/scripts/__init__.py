@@ -15,7 +15,7 @@ Modules:
 
 from .api_client import (KDTSClient, build_source_config, build_target_config,
                          build_table_mapping, build_influxdb_mapping,
-                         mark_time_series_columns)
+                         build_added_column, mark_time_series_columns)
 from .data_source import (
     DataSourceManager,
     Engine,
@@ -44,6 +44,7 @@ __all__ = [
     "build_target_config",
     "build_table_mapping",
     "build_influxdb_mapping",
+    "build_added_column",
     "mark_time_series_columns",
     # data_source
     "DataSourceManager",

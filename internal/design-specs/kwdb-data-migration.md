@@ -307,10 +307,10 @@ User Request
     - Returns: Script name(s)
     - IMPORTANT: `tables=[]` (auto-discovery) is ONLY valid for RELATIONAL targets.
       TIMESERIES targets MUST provide explicit table mappings — empty tables fails
-      with 4001 "No datax contents generated from config" (verified in practice;
-      KDTS source explicitly rejects whole-database migration into time-series engine)
+      with 4001 "No datax contents generated from config" (KDTS source explicitly 
+      rejects whole-database migration into time-series engine)
     - PostgreSQL: auto-discovery filters tables by `schema == dbName` — `public` schema 
-      tables are filtered out, use explicit table mappings (verified in practice)
+      tables are filtered out, use explicit table mappings
     ↓
 [9] Execute Migration (api_client / workflow)
     - POST /datax/execute
@@ -790,7 +790,7 @@ The SKILL must collect tag selection and apply the marks.
    - Ordinary tag: `"isTag": true`
    - Tables with NO `"isTag": true` column are SKIPPED by KDTS (no DDL emitted)
    
-5. Check PRIMARY TAG columns for NULL values in source data (CRITICAL — verified failure)
+5. Check PRIMARY TAG columns for NULL values in source data (CRITICAL)
    - PRIMARY TAGS must be NOT NULL; NULL source values fail the write
    - Run: SELECT COUNT(*) FROM <table> WHERE <primary_tag_col> IS NULL;
    - If count > 0: fix source data / choose different primary tags / demote to ordinary tags
@@ -891,10 +891,10 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
 5. Execute DDL via KDTS API
    
 6. Continue with migration — TIMESERIES targets still need EXPLICIT table mappings
-   (auto-discovery fails with 4001 for all source types, verified in practice)
+   (auto-discovery fails with 4001 for all source types)
 ```
 
-**InfluxDB mapping requirements (verified in practice)**:
+**InfluxDB mapping requirements**:
 - Source identifier field is `measurement` (NOT `table`); MONGODB uses `collectionName`.
   `build_table_mapping()` handles this automatically; FTP/HDFS are rejected (file sources)
 - Source column list uses `sourceColumnName` — the time column is `_time` in InfluxDB
@@ -902,6 +902,35 @@ Source Timestamp → Time column (converted to TIMESTAMPTZ)
 - Data time range (beginDateTime/endDateTime) is REQUIRED with no defaults:
   null → migration fails; too-wide range (1970~2099) → reader memory overflow.
   Collect the actual data range from the user; splitIntervalS defaults to 86400
+
+**Mapping helpers (scripts/api_client.py)**:
+- `build_table_mapping(source_type, source_table, ..., where, pre_sql, post_sql,
+  target_columns)` — source identifier per type (`table`/`measurement`/`collectionName`);
+  `target_columns` REQUIRED when source columns contain SQL expressions
+  (e.g. source `"...,1 as t1"` → target `"...,t1"`, else DataX cannot find the column)
+- `build_influxdb_mapping(source_db, measurement, begin_datetime, end_datetime,
+  split_interval_s=86400, read_timeout=0, connect_timeout=0)` — InfluxDB mappings
+- `build_added_column(column_name, default_value, source_type, is_tag, is_primary_tag)`
+  — new columns for sources lacking them (ALL source types)
+- `mark_time_series_columns(source_db, table_name, time_column, primary_tags, tags)`
+  — tag marks for time-series DDL generation
+
+**Added-column type rules (ALL source types → KaiwuDB)**:
+- Type derived from the DEFAULT VALUE: int → INT4 (INT8 for InfluxDB), str → VARCHAR,
+  bool → BOOL (eligible for PRIMARY TAG)
+- **float → FLOAT4/FLOAT8 — ordinary TAG ONLY, NEVER a primary tag** (float types are
+  demoted by KDTS; 3006 if no eligible primary tag remains)
+- sourceColumnType per source for exact mapping: MySQL/SQLServer/TDengine `INT`,
+  Oracle `NUMBER(10,0)`, PostgreSQL `INTEGER`, ClickHouse `INT32`, InfluxDB `INTEGER`,
+  KaiwuDB `INT4` (no KDTS mapping rules — verify generated DDL)
+- SELECT-based sources use a SQL expression matching the default (e.g. `1 as t1`)
+
+**Oracle source requirements**:
+- Source dbName MUST be the owner (schema) name, usually UPPERCASE — KDTS reads
+  `all_tab_comments WHERE owner = dbName`; lowercase returns zero tables
+- Table/column names are UPPERCASE — mapping columns must match exactly
+- New-column types need exact mappings (see table above); unmapped values such as
+  `NUMBER(1,0)` fall back to `NUMBER` → FLOAT → demoted primary tag → 3006
 
 **Auto-Mapping Rules**:
 

@@ -954,6 +954,58 @@ Next: Configure DataX parameters for data migration
 
 ---
 
+## Scenario 11: Oracle to KaiwuDB (TIMESERIES) - Adding a t1 Primary Tag Column
+
+### User Request
+
+```
+Migrate the Oracle oracle_kwdb database to a KaiwuDB time-series database
+(target database: oracle_kwdb). Oracle has no time-series column — add a new
+column t1 as the time-series primary tag with default value 1.
+Oracle connection: ORACLE_KWDB/123456 @ 127.0.0.1:1521 (SID: ORCL)
+```
+
+### Expected AI Agent Response
+
+````
+[INFO] Migration intent recognized: Oracle -> KaiwuDB (TIMESERIES), database oracle_kwdb
+[INFO] Oracle note: source dbName must be the owner name (ORACLE_KWDB, UPPERCASE)
+
+[OK] Connection tests passed (Oracle + KaiwuDB)
+
+[INFO] Oracle metadata read: table TEST_TB, 13 columns (TS, C1-C12)
+[INFO] Oracle table/column names are UPPERCASE
+
+[INFO] Adding new t1 primary tag column (not present in Oracle):
+  Use build_added_column('t1', 1, source_type='ORACLE', is_tag=True, is_primary_tag=True)
+  - int default 1 → INT4 (eligible for primary tag, auto NOT NULL)
+  - sourceColumnType = NUMBER(10,0) (exact mapping to INT4, avoids FLOAT fallback)
+
+[WARNING] DDL preview:
+CREATE TS DATABASE "oracle_kwdb";
+CREATE TABLE "oracle_kwdb"."TEST_TB" (
+    "TS" TIMESTAMPTZ NOT NULL,
+    "C1" INT2, "C2" INT4, "C3" INT8, "C4" FLOAT4, "C5" FLOAT4,
+    "C6" VARCHAR(5), "C7" CHAR(1), "C8" NCHAR(10),
+    "C9" VARCHAR(10), "C10" NVARCHAR(10), "C11" VARBYTES, "C12" TIMESTAMPTZ
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+Execute this DDL? (yes/no)
+
+User: yes
+
+[OK] DDL executed successfully
+
+[INFO] Building migration script (explicit table mapping):
+  Source columns: TS,C1,...,C12,1 as t1 (SQL expression generates default 1)
+  Target columns: TS,C1,...,C12,t1 (real column names via target_columns)
+[OK] Migration launched: ORACLE2KAIWUDB_xxx.json
+
+[REPORT] Migration completed: SUCCEEDED
+[TIP] Compare source/target row counts to verify data integrity
+````
+
+---
+
 ## Summary
 
 These interaction scenarios validate that the AI Agent:

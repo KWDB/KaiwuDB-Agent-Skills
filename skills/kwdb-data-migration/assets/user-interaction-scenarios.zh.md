@@ -954,6 +954,57 @@ PRIMARY TAGS (service, endpoint, method, status_code);
 
 ---
 
+## 场景 11: Oracle 到 KaiwuDB (TIMESERIES) - 新增 t1 主标签列
+
+### 用户请求
+
+```
+将 Oracle 的 oracle_kwdb 库迁移到 KaiwuDB 时序库（库名 oracle_kwdb）。
+Oracle 没有时序列，新增 t1 列作为时序主标签，默认值为 1。
+Oracle 连接: ORACLE_KWDB/123456 @ 127.0.0.1:1521 (SID: ORCL)
+```
+
+### 预期的 AI Agent 回复
+
+````
+[信息] 识别迁移意图: Oracle -> KaiwuDB (TIMESERIES)，库名 oracle_kwdb
+[信息] Oracle 注意: 源 dbName 需使用 owner 名（ORACLE_KWDB，大写）
+
+[OK] 连接测试通过（Oracle + KaiwuDB）
+
+[信息] 读取 Oracle 元数据: 表 TEST_TB，13 列（TS, C1-C12）
+[信息] Oracle 表名/列名均为大写
+
+[信息] 新增 t1 主标签列（Oracle 无此列）:
+  使用 build_added_column('t1', 1, source_type='ORACLE', is_tag=True, is_primary_tag=True)
+  - 整数默认值 1 → INT4（可作主标签，自动 NOT NULL）
+  - sourceColumnType = NUMBER(10,0)（精确映射 INT4，避免回退 FLOAT）
+
+[警告] DDL 预览:
+CREATE TS DATABASE "oracle_kwdb";
+CREATE TABLE "oracle_kwdb"."TEST_TB" (
+    "TS" TIMESTAMPTZ NOT NULL,
+    "C1" INT2, "C2" INT4, "C3" INT8, "C4" FLOAT4, "C5" FLOAT4,
+    "C6" VARCHAR(5), "C7" CHAR(1), "C8" NCHAR(10),
+    "C9" VARCHAR(10), "C10" NVARCHAR(10), "C11" VARBYTES, "C12" TIMESTAMPTZ
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+是否执行该 DDL? (yes/no)
+
+用户: yes
+
+[OK] DDL 执行成功
+
+[信息] 构建迁移脚本（显式表映射）:
+  源列: TS,C1,...,C12,1 as t1（SQL 表达式生成默认值 1）
+  目标列: TS,C1,...,C12,t1（真实列名，target_columns）
+[OK] 迁移启动: ORACLE2KAIWUDB_xxx.json
+
+[报告] 迁移完成: SUCCEEDED
+[提示] 请对比源/目标行数验证数据完整性
+````
+
+---
+
 ## 标签说明
 
 | 标签     | 含义             |

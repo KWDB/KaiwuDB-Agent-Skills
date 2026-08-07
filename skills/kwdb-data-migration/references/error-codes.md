@@ -328,8 +328,7 @@ KaiwuDB:    jdbc:mysql://host:9092/dbname (MySQL protocol compatibility)
 
 **Symptoms**: Time-series migration cannot identify primary tag
 
-**Cause**: No column suitable for primary key in source. Common reasons
-(verified in practice):
+**Cause**: No column suitable for primary key in source. Common reasons:
 - All candidate columns are FLOAT/DOUBLE/DECIMAL/NUMERIC (classified as float, demoted)
 - Selected primary tag columns are **nullable in the column definition** — KDTS demotes
   nullable primary tags to ordinary tags (3006 if none remain). Fix: set `nullAble=false`

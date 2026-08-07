@@ -266,17 +266,37 @@ AI Agent 将使用与用户相同的语言进行回复。
 
 ### 3.5 InfluxDB 源场景（INFLUXDB1X/2X → TIMESERIES）
 
-**InfluxDB 表映射的特殊要求（实测验证）：**
+**InfluxDB 表映射的特殊要求：**
 
 - [ ] 表映射使用 `measurement` 字段（非 `table`），调用 `build_influxdb_mapping()` 辅助函数
 - [ ] 源列名使用 `sourceColumnName`：时间列必须是 `_time`（不是目标列名 `ts`）
 - [ ] **数据时间范围必填（无默认值）**：向用户收集开始/结束时间
     - 格式:`开始时间(YYYY-MM-DD HH:MM:SS)` 与 `结束时间(YYYY-MM-DD HH:MM:SS)`
     - 不设置时间范围 → 迁移失败
-    - 范围过宽（如 1970-2099）→ reader 内存溢出（实测）
+    - 范围过宽（如 1970-2099）→ reader 内存溢出
     - 按实际数据范围输入，`splitIntervalS` 默认 86400（1 天窗口）
 - [ ] 构建表映射：调用
     `build_influxdb_mapping(source_db, 'test_tb', begin_datetime='2025-10-22 00:00:00', end_datetime='2025-10-26 00:00:00')`
+
+### 3.6 Oracle 源注意事项
+
+- [ ] **源 dbName 必须是 owner（用户）名，通常大写**：KDTS 按 `owner = dbName` 读取 Oracle 元数据，
+    小写库名返回空表列表（如 `ORACLE_KWDB` 而非 `oracle_kwdb`）
+- [ ] **表名/列名均为大写**：表映射列名必须与元数据一致（如 `TS,C1,...`）
+- [ ] **表达式列目标列分离**：源列含 `1 as t1` 时，必须传 `target_columns="...,t1"`（目标用真实列名，
+    否则 DataX 找不到目标列报错）
+
+### 3.7 新增列类型规则（所有源类型 → KaiwuDB）
+
+源表缺少某列（如新增 tag 列）时，**按默认值推导类型**（调用 `build_added_column()`，
+适用于 RDBMS/TDengine/InfluxDB/KaiwuDB 所有源）：
+- 整数默认值 → `INT4`（InfluxDB 为 `INT8`）；字符串默认值 → `VARCHAR`；布尔默认值 → `BOOL`（可作主标签）
+- **浮点默认值 → `FLOAT4/FLOAT8`，只能作普通 tag，不能作主标签**（浮点会被 KDTS 降级，
+  无合格主标签时报 3006）
+- sourceColumnType 按源精确映射：MySQL/SQLServer/TDengine `INT`、Oracle `NUMBER(10,0)`、
+  PostgreSQL `INTEGER`、ClickHouse `INT32`、InfluxDB `INTEGER`、KaiwuDB `INT4`
+- SELECT 源映射列用 SQL 表达式与默认值对应（如默认值 1 → `1 as t1`）；InfluxDB 用
+  `build_influxdb_mapping()`（无 SQL 表达式支持）
 
 ---
 
@@ -429,7 +449,7 @@ AI Agent 将使用与用户相同的语言进行回复。
     - 4003 仅表示响应超时,请求已送达服务端,仍需继续监控该批
 - [ ] 记录返回的日志文件路径
 
-### 4.3 监控进度
+### 4.4 监控进度
 
 - [ ] 定期查询任务状态
   ```
@@ -443,7 +463,7 @@ AI Agent 将使用与用户相同的语言进行回复。
     - `KILLED`: 被终止
 - [ ] 如失败，查看详细日志
 
-### 4.4 大规模数据迁移建议
+### 4.5 大规模数据迁移建议
 
 - [ ] 为大表设置 `splitPk` 启用并行
 - [ ] 调整 `fetchSize` 和 `batchSize`

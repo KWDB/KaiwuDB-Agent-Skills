@@ -279,7 +279,7 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
 
 ### 3.5 InfluxDB Source Scenario (INFLUXDB1X/2X → TIMESERIES)
 
-**InfluxDB mapping requirements (verified in practice):**
+**InfluxDB mapping requirements:**
 
 - [ ] Use the `measurement` field in the mapping (NOT `table`) — use the
       `build_influxdb_mapping()` helper
@@ -288,10 +288,35 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
 - [ ] **Data time range is REQUIRED (no defaults)**: collect begin/end from the user
     - Format: `Begin time (YYYY-MM-DD HH:MM:SS)` and `End time (YYYY-MM-DD HH:MM:SS)`
     - No time range → migration fails
-    - Too-wide range (e.g. 1970-2099) → reader memory overflow (verified)
+    - Too-wide range (e.g. 1970-2099) → reader memory overflow
     - Use the actual data range; `splitIntervalS` defaults to 86400 (1-day windows)
 - [ ] Build the mapping via:
     `build_influxdb_mapping(source_db, 'test_tb', begin_datetime='2025-10-22 00:00:00', end_datetime='2025-10-26 00:00:00')`
+
+### 3.6 Oracle Source Notes
+
+- [ ] **Source dbName must be the owner name, usually UPPERCASE**: KDTS reads Oracle
+      metadata via `owner = dbName`; a lowercase dbName returns zero tables
+      (e.g. `ORACLE_KWDB`, not `oracle_kwdb`)
+- [ ] **Table/column names are UPPERCASE**: mapping columns must match the metadata
+      exactly (e.g. `TS,C1,...`)
+- [ ] **Expression columns need separated target columns**: source `1 as t1` requires
+      `target_columns="...,t1"` (target must use real column names, else DataX fails
+      to find the target column)
+
+### 3.7 Added-Column Type Rules (ALL source types → KaiwuDB)
+
+When adding a column the source lacks (e.g. a tag column), derive the type from the
+DEFAULT VALUE (use `build_added_column()`; applies to RDBMS/TDengine/InfluxDB/KaiwuDB):
+- int default → `INT4` (`INT8` for InfluxDB); str default → `VARCHAR`; bool default →
+  `BOOL` (eligible for PRIMARY TAG)
+- **float default → `FLOAT4/FLOAT8` — ordinary TAG ONLY, NEVER a primary tag**
+  (float types are demoted by KDTS; 3006 if no eligible primary tag remains)
+- sourceColumnType per source for an exact mapping: MySQL/SQLServer/TDengine `INT`,
+  Oracle `NUMBER(10,0)`, PostgreSQL `INTEGER`, ClickHouse `INT32`, InfluxDB `INTEGER`,
+  KaiwuDB `INT4`
+- SELECT-based sources use a SQL expression matching the default (e.g. default 1 →
+  `1 as t1`); InfluxDB uses `build_influxdb_mapping()` (no SQL-expression support)
 
 ---
 
@@ -446,7 +471,7 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
       server (it keeps processing), so still monitor the batch
 - [ ] Record returned log file path
 
-### 4.3 Monitor Progress
+### 4.4 Monitor Progress
 
 - [ ] Periodically query task status
   ```
@@ -460,7 +485,7 @@ field is `"isTimeSeries": true`, and the `sourceDb` columns carry tag marks.
     - `KILLED`: Terminated
 - [ ] If failed, view detailed logs
 
-### 4.4 Large Dataset Migration Tips
+### 4.5 Large Dataset Migration Tips
 
 - [ ] Set `splitPk` on large tables to enable parallelism
 - [ ] Adjust `fetchSize` and `batchSize`

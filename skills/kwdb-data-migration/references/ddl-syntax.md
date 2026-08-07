@@ -37,13 +37,10 @@ CREATE TS DATABASE <database_name> [RETENTIONS <keep_duration>] [PARTITION INTER
 
 **Examples**:
 ```sql
--- Simple time series database (never expire)
 CREATE TS DATABASE sensor_data;
 
--- Database with 1 year retention
 CREATE TS DATABASE sensor_data RETENTIONS 1Y;
 
--- Database with custom partition interval
 CREATE TS DATABASE metrics RETENTIONS 30D PARTITION INTERVAL 1D;
 ```
 
@@ -666,7 +663,6 @@ When generating DDL to convert relational tables to time series:
 
 **Example Conversion** (MySQL to KaiwuDB Time Series):
 ```sql
--- MySQL Source Table
 CREATE TABLE sensor_data (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     device_id BIGINT NOT NULL,
@@ -677,7 +673,6 @@ CREATE TABLE sensor_data (
     status VARCHAR(20)
 );
 
--- Generated KaiwuDB Time Series Table (user selected: PRIMARY TAGS=device_id, TAGS=location,status)
 CREATE TABLE sensor_data (
     reading_time TIMESTAMPTZ NOT NULL,
     id BIGINT,

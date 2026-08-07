@@ -90,15 +90,21 @@ User: KDTS at http://192.168.1.100:8989, MySQL: root/password abc at 192.168.1.5
 AI Agent:
   [OK] Parameters collected, starting migration process...
   
-  Step 1/6: Testing database connections...
+  Step 1: Testing database connections...
   [OK] MySQL connection successful
   [OK] KaiwuDB connection successful
   
-  Step 2/6: Reading MySQL metadata...
+  Step 2: Reading MySQL metadata...
   [INFO] Found 5 tables: orders, customers, products, categories, inventory
   
-  Step 3/6: Previewing DDL (KaiwuDB time series tables)...
-  [Shows DDL content]
+  Step 3: Configuring time-series tags (TIMESERIES target)...
+  For table orders, select the time column and PRIMARY TAGS (1-4):
+  - Time column: order_time
+  - PRIMARY TAGS: customer_id, product_id
+  [WARNING] Verify no NULL values in the primary tag columns
+  
+  Step 4: Previewing DDL (KaiwuDB time series tables)...
+  [Shows DDL content with TAGS / PRIMARY TAGS]
   
   [WARNING] About to execute DDL to create tables. Continue? (yes/no)
 ````
@@ -560,7 +566,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    - Maximum 4096 columns total (tags + values), max 132 tags from source
    - Column names max 128 bytes
    
-   6.5 **Check Tag Column NULL Values (CRITICAL — verified failure in practice)**
+   6.5 **Check Tag Column NULL Values (CRITICAL)**
    
    PRIMARY TAGS must be NOT NULL. If the source data contains NULL values in a column
    selected as PRIMARY TAG, the data migration will FAIL on write.
@@ -600,8 +606,8 @@ All endpoints under `{base_url}/kdts/api/v1`:
    - Ordinary tag: `"isTag": true` only
    - Everything else: leave `"isTs"/"isTag"/"isPrimaryTag"` as `false`
    
-   **Primary tags MUST be NOT NULL in the column definition** (verified against KDTS
-   source): KDTS demotes nullable primary tags to ordinary tags; if none remain eligible
+   **Primary tags MUST be NOT NULL in the column definition**: 
+   KDTS demotes nullable primary tags to ordinary tags; if none remain eligible
    → Error 3006 (NO_PRIMARY_TAG). The helper sets `nullAble=false` automatically for
    primary tags — only use columns whose source DATA is NULL-free (see step 6.5).
    
@@ -705,9 +711,8 @@ All endpoints under `{base_url}/kdts/api/v1`:
    **For RELATIONAL → TIMESERIES**: Execute the previewed DdlScript via the KDTS `execute_ddl()` API:
    `execute_ddl(target_config, previewed_ddl_script, auto_ddl=true)`.
    Do NOT rely on a direct JDBC/ODBC connection — the agent executes through KDTS.
-   Note (verified in KDTS source): the `createDb` field of DdlScript is NOT executed —
-   KDTS generates the CREATE DATABASE / CREATE TS DATABASE statement itself from the
-   target engine and executes it when `auto_ddl=true`.
+   Note: the `createDb` field of DdlScript is NOT executed — KDTS generates the 
+   CREATE DATABASE / CREATE TS DATABASE statement itself from the target engine and executes it when `auto_ddl=true`.
    **For TIMESERIES → TIMESERIES**: Use KDTS `execute_ddl()` API with the previewed DdlScript
    
    Report success with table count
@@ -856,14 +861,43 @@ All endpoints under `{base_url}/kdts/api/v1`:
     **IMPORTANT — tables parameter by target engine**:
     - **RELATIONAL target**: `tables` can be empty (auto-discover all tables) for full migration
     - **TIMESERIES target**: `tables` MUST be explicit table mappings — empty tables fails with
-      error 4001 "No datax contents generated from config" (verified in practice;
-      KDTS source explicitly rejects whole-database migration into the time-series engine)
+      error 4001 "No datax contents generated from config" (KDTS source explicitly rejects 
+      whole-database migration into the time-series engine)
     - **PostgreSQL source limitation**: auto-discovery filters tables by `schema == dbName`. 
       Tables in the `public` schema (the common case) are filtered out → auto-discovery 
       fails with 4001 even for RELATIONAL targets. Use explicit table mappings for PostgreSQL,
       unless the tables live in a schema named after the database.
+    - **Oracle source requirements**:
+      - **dbName must be the owner (schema) name, usually UPPERCASE** — KDTS reads Oracle
+        metadata via `all_tab_comments WHERE owner = dbName`; a lowercase dbName returns
+        zero tables (e.g. dbName=`ORACLE_KWDB`, not `oracle_kwdb`)
+      - **Names are UPPERCASE**: table and column names from the metadata are uppercase
+        (e.g. `TEST_TB`, `TS`, `C1`); table-mapping columns must match exactly (uppercase)
+      - **New-column type trap**: when adding a column to the metadata, pick a
+        sourceColumnType with an exact mapping — `NUMBER(5,0)→INT2`, `NUMBER(10,0)→INT4`,
+        `NUMBER(19,0)→INT8`; an unmapped value like `NUMBER(1,0)` falls back to `NUMBER`
+        → FLOAT (float type) → demoted primary tag → error 3006
+      - **Expression columns need separated target columns**: source `"...,1 as t1"`
+        requires `target_columns="...,t1"` (target must use real column names, else
+        DataX cannot find the target column)
+    - **Added-column type rules (ALL source types → KaiwuDB)**: when adding a
+      column that the source lacks (e.g. a tag column), derive its type from the
+      DEFAULT VALUE — use `build_added_column(column_name, default_value, source_type)`:
+      - int default → INT4 (INT8 for InfluxDB), str default → VARCHAR, bool default →
+        BOOL (eligible for PRIMARY TAG)
+      - **float default → FLOAT4/FLOAT8 — ordinary TAG ONLY, NEVER a primary tag**
+        (float types are demoted by KDTS; 3006 if no eligible primary tag remains)
+      - applies to ALL sources: RDBMS (MySQL/Oracle/PostgreSQL/SQL Server/ClickHouse),
+        TDengine 2.x/3.x, InfluxDB 1.x/2.x, KaiwuDB
+      - the sourceColumnType is picked per source for an EXACT mapping
+        (MySQL/SQLServer/TDengine `INT`, Oracle `NUMBER(10,0)`, PostgreSQL `INTEGER`,
+        ClickHouse `INT32`, InfluxDB `INTEGER`, KaiwuDB `INT4`)
+      - NOTE: KaiwuDB has no type-mapping rules in KDTS — verify the generated DDL
+      - for SELECT-based sources the mapping source column uses a SQL expression
+        matching the default (e.g. `1 as t1` for default 1); InfluxDB mappings use
+        `build_influxdb_mapping()` (no SQL-expression support)
       Build mappings with `build_table_mapping()` per table (source + target columns).
-      **Source identifier field per type** (verified against KDTS source DTOs):
+      **Source identifier field per type**:
       `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB, `measurement` for INFLUXDB,
       `collectionName` for MONGODB — build_table_mapping handles this automatically.
       FTP/HDFS are file sources (no table) — build their mappings manually (path-based).
@@ -872,9 +906,9 @@ All endpoints under `{base_url}/kdts/api/v1`:
       (begin/end "YYYY-MM-DD HH:MM:SS") and pass it to `build_influxdb_mapping()`
       with `split_interval_s` (default 86400 = 1 day). NO defaults for the range:
       a null range fails the migration, and a too-wide range (e.g. 1970~2099)
-      causes reader memory overflow (both verified in practice).
+      causes reader memory overflow.
       Optional: readTimeout/connectTimeout (seconds; KDTS tests use 60).
-      **Extended mapping options** (verified in KDTS tests): `build_table_mapping()`
+      **Extended mapping options**: `build_table_mapping()`
       supports `where` (source filter, e.g. time range; RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
       `pre_sql`/`post_sql` (target pre/post SQL, e.g. drop/create table), and SQL
       expression columns for RDBMS (e.g. `"...,1 as t1"`).
@@ -887,15 +921,14 @@ All endpoints under `{base_url}/kdts/api/v1`:
       **FTP/HDFS mapping examples**: see `references/config-templates.md`
       (path is a JSON array string; column carries index/type/format mappings).
       **View migration**: to migrate views, pass metadata option `view: true` to
-      `read_metadata()` / `preview_ddl()` — views are then included in the DDL
-      (verified in KDTS metadata tests).
+      `read_metadata()` / `preview_ddl()` — views are then included in the DDL.
 
 11. Execute migration → execute_migration() or execute_migration_batches()
     Return log file paths
     **BATCH EXECUTION (REQUIRED for many scripts)**: When `build_migration()` returns
     MANY scripts (one per table), DO NOT submit them all in a single
     `execute_migration()` call — the KDTS server starts DataX processes sequentially
-    and the request exceeds the client read timeout (4003, verified in practice).
+    and the request exceeds the client read timeout.
     Instead use the batch workflow manager:
     ```python
     result = workflow.execute_migration_batches(
@@ -1330,7 +1363,6 @@ Concurrency (channels, default 4):
     - **RELATIONAL target**: empty `tables` is valid (auto-discovery) — check source type
       supports full migration instead
     - **TIMESERIES target**: auto-discovery is NOT supported — this is the expected cause
-      (verified in practice)
 2. Rebuild with **explicit table mappings** for every table:
    ```python
    mapping = build_table_mapping(
@@ -1382,8 +1414,8 @@ in the selected primary tag columns
    ```
 2. **Execute scripts in batches** (many tables → many scripts): use
    `workflow.execute_migration_batches(script_names, batch_size=10)` — submitting
-   dozens of scripts in one `execute_migration()` call causes HTTP 4003 timeouts
-   (verified in practice); batch execution waits per batch to completion
+   dozens of scripts in one `execute_migration()` call causes HTTP 4003 timeouts; 
+   batch execution waits per batch to completion
 3. Monitor progress frequently (every 30 seconds)
 4. Warn user about estimated time
 5. Offer to run in background mode (poll only, no waiting)

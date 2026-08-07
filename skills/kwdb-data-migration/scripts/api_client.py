@@ -733,7 +733,8 @@ def build_table_mapping(source_type: str, source_table: str,
                         source_source_type: Optional[str] = None,
                         where: Optional[str] = None,
                         pre_sql: Optional[List[str]] = None,
-                        post_sql: Optional[List[str]] = None) -> Dict[str, Any]:
+                        post_sql: Optional[List[str]] = None,
+                        target_columns: Optional[str] = None) -> Dict[str, Any]:
     """
     Helper function to build table mapping for migration.
 
@@ -742,26 +743,28 @@ def build_table_mapping(source_type: str, source_table: str,
         source_table: Source table name (for INFLUXDB this is the measurement name,
             for MONGODB the collection name)
         target_table: Target table name (default: same as source)
-        columns: Column selection string (e.g., "col1,col2,col3").
-            SQL expressions are allowed for RDBMS sources, e.g. "...,1 as t1"
-            (verified in KDTS tests)
+        columns: Source column selection string (e.g., "col1,col2,col3").
+            SQL expressions are allowed for RDBMS sources, e.g. "...,1 as t1" — when
+            using expressions, pass the real target column names via target_columns
         write_mode: Write mode for target KaiwuDB (insert, replace, etc.)
         source_source_type: Override sourceSourceType (auto-detected if None)
         where: WHERE filter for table-based sources (RDBMS/KAIWUDB/TDENGINE/OPENTSDB),
-            e.g. "ts >= '2025-04-01 00:00:00' and ts <= '2025-06-01 00:00:00'"
-            (verified in KDTS tests). Ignored for INFLUXDB (use time range) / MONGODB
-        pre_sql: SQL statements executed on the target before writing (e.g. drop/create
-            table — verified in KDTS tests)
+            e.g. "ts >= '2025-04-01 00:00:00' and ts <= '2025-06-01 00:00:00'".
+            Ignored for INFLUXDB (use time range) / MONGODB
+        pre_sql: SQL statements executed on the target before writing (e.g. drop/create table)
         post_sql: SQL statements executed on the target after writing
+        target_columns: Target column names (default: same as `columns`). REQUIRED
+            when source `columns` contain SQL expressions — the target must use the
+            real column names (e.g. source "...,1 as t1" → target "...,t1"),
+            otherwise DataX cannot find the target column
 
     Returns:
         TableMapping dict ready for build_migration.
 
-    Note (verified against KDTS source DTOs): the source table identifier field
-    differs per source type — `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB,
-    `measurement` for INFLUXDB (InfluxDB.java), `collectionName` for MONGODB
-    (MongoDB.java). Using the wrong field (e.g. `table` for InfluxDB) leaves the
-    field null on the server and the migration fails at execution.
+    Note: the source table identifier field differs per source type
+    — `table` for RDBMS/KAIWUDB/TDENGINE/OPENTSDB, `measurement` for INFLUXDB,
+    `collectionName` for MONGODB. Using the wrong field (e.g. `table` for InfluxDB)
+    leaves the field null on the server and the migration fails at execution.
     FTP/HDFS are file sources (path-based, no table) — not supported here.
     """
     # Auto-detect sourceSourceType from KDTS source type
@@ -809,7 +812,7 @@ def build_table_mapping(source_type: str, source_table: str,
     target_map = {
         "sourceType": "KAIWUDB",
         "table": target_table or source_table,
-        "column": columns or "*",
+        "column": target_columns or columns or "*",
         "writeMode": write_mode
     }
     if pre_sql is not None:
@@ -818,6 +821,78 @@ def build_table_mapping(source_type: str, source_table: str,
         target_map["postSql"] = post_sql if isinstance(post_sql, list) else [post_sql]
 
     return {"source": source_map, "target": target_map}
+
+
+def build_added_column(column_name: str, default_value: Any,
+                       source_type: str = "MYSQL",
+                       is_tag: bool = False,
+                       is_primary_tag: bool = False) -> Dict[str, Any]:
+    """
+    Build a NEW column definition to append to a source Database table, for sources
+    that lack the column (e.g. adding a `t1` primary tag to an Oracle table).
+    Applies to ALL source types (RDBMS, TDengine, InfluxDB, KaiwuDB).
+
+    The KaiwuDB type is derived from the DEFAULT VALUE:
+    - int default      → INT4 (INT8 for InfluxDB)   (eligible for PRIMARY TAG)
+    - str default      → VARCHAR (eligible for PRIMARY TAG)
+    - float default    → FLOAT4/FLOAT8 (ordinary TAG ONLY — float types are demoted
+      by KDTS and CANNOT be primary tags; error 3006 if no eligible primary tag remains)
+    - bool default     → BOOL   (eligible for PRIMARY TAG)
+
+    IMPORTANT: the source column type must have an EXACT KDTS mapping for the source
+    type (e.g. Oracle `NUMBER(10,0)` → INT4, NOT `NUMBER(1,0)` which falls back to
+    `NUMBER` → FLOAT and demotes the primary tag). Selected automatically per source.
+    NOTE: KAIWUDB has no type-mapping rules in KDTS — the type may be rewritten by
+    applyColumnTypeMapping; verify the generated DDL.
+
+    Args:
+        column_name: New column name (e.g. "t1")
+        default_value: Default value used in the SQL expression column
+            (e.g. `1 as t1` in the mapping's source columns)
+        source_type: KDTS source type (MYSQL, ORACLE, POSTGRESQL, SQLSERVER,
+            CLICKHOUSE, TDENGINE2X/3X, INFLUXDB1X/2X, KAIWUDB)
+        is_tag: Mark as tag (isTag=true)
+        is_primary_tag: Mark as primary tag (isPrimaryTag=true) — requires an
+            int/str/bool default; float defaults are FORCED to ordinary tags
+
+    Returns:
+        Column dict ready to append to table["columns"].
+    """
+    if is_primary_tag and isinstance(default_value, float):
+        is_primary_tag = False
+        is_tag = True   # float can only be an ordinary tag
+
+    # Source column types with EXACT KDTS mappings per source type
+    int_src_map = {
+        "MYSQL": "INT", "ORACLE": "NUMBER(10,0)", "POSTGRESQL": "INTEGER",
+        "SQLSERVER": "INT", "CLICKHOUSE": "INT32",
+        "TDENGINE2X": "INT", "TDENGINE3X": "INT",
+        "INFLUXDB1X": "INTEGER", "INFLUXDB2X": "INTEGER",
+        "KAIWUDB": "INT4",
+    }
+    src_upper = (source_type or "").upper()
+
+    if isinstance(default_value, bool):
+        mapped, src_type = "BOOL", "BOOLEAN"
+    elif isinstance(default_value, int):
+        # InfluxDB INTEGER maps to INT8 (no INT4 in its mapping rules)
+        mapped = "INT8" if src_upper.startswith("INFLUXDB") else "INT4"
+        src_type = int_src_map.get(src_upper, "INT")
+    elif isinstance(default_value, float):
+        mapped, src_type = "FLOAT4", "FLOAT"
+    else:
+        mapped, src_type = "VARCHAR", "VARCHAR"
+
+    return {
+        "dbType": "RDBMS", "schemaName": "", "tableName": "",
+        "sourceColumnName": column_name, "columnName": column_name,
+        "sourceColumnType": src_type, "columnType": mapped,
+        "columnOrder": 999, "strLength": None, "precision": None, "scale": None,
+        "nullAble": not is_primary_tag,   # primary tags must be NOT NULL
+        "comment": "", "extra": "", "columnKey": "",
+        "finalConvertDataType": mapped, "isChecked": True,
+        "isTs": False, "isTag": is_tag, "isPrimaryTag": is_primary_tag,
+    }
 
 
 def build_influxdb_mapping(source_db: Dict, measurement: str,
@@ -834,14 +909,13 @@ def build_influxdb_mapping(source_db: Dict, measurement: str,
     Uses the SOURCE column names from the metadata (sourceColumnName) for the
     reader side: the InfluxDB time column is "_time" in queries, while the
     metadata columnName is the target name ("ts") — passing columnName to the
-    plugin fails the query (verified in practice). The target side uses the
-    KaiwuDB column names (columnName).
+    plugin fails the query. The target side uses the KaiwuDB column names (columnName).
 
-    Time-range parameters are REQUIRED and have NO defaults (verified in
-    practice): the influxdb reader plugin splits the query into windows of
-    splitIntervalS seconds across [begin_datetime, end_datetime]; a null range
-    fails the migration, and a too-wide range (e.g. 1970~2099) causes memory
-    overflow in the reader. ALWAYS ask the user for the actual data time range.
+    Time-range parameters are REQUIRED and have NO defaults:
+    the influxdb reader plugin splits the query into windows of splitIntervalS
+    seconds across [begin_datetime, end_datetime]; a null range fails the migration,
+    and a too-wide range (e.g. 1970~2099) causes memory overflow in the reader.
+    ALWAYS ask the user for the actual data time range.
 
     Args:
         source_db: Database object from read_metadata() response

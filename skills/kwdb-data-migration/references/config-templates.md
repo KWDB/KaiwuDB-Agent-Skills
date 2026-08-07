@@ -1087,12 +1087,12 @@ PRIMARY TAGS (device_id, metric);
 }
 ```
 
-## 4. File/NoSQL Source Table Mapping Templates
+## 10. File/NoSQL Source Table Mapping Templates
 
 Table mappings for file-based and NoSQL sources (from KDTS test configurations).
 These CANNOT use `build_table_mapping()` — build them manually.
 
-### 4.1 FTP/SFTP Source Mapping
+### 10.1 FTP/SFTP Source Mapping
 
 ```json
 {
@@ -1120,7 +1120,7 @@ These CANNOT use `build_table_mapping()` — build them manually.
 }
 ```
 
-### 4.2 HDFS Source Mapping
+### 10.2 HDFS Source Mapping
 
 ```json
 {
@@ -1140,7 +1140,7 @@ These CANNOT use `build_table_mapping()` — build them manually.
 }
 ```
 
-### 4.3 MongoDB Source Mapping
+### 10.3 MongoDB Source Mapping
 
 `column` is a JSON array string WITH types (NOT a comma string):
 
@@ -1159,4 +1159,75 @@ These CANNOT use `build_table_mapping()` — build them manually.
     "writeMode": "insert"
   }
 }
+```
+
+### 10.4 Oracle Source Mapping (with expression column)
+
+Oracle requirements: dbName = owner (UPPERCASE), names are UPPERCASE, expression
+columns need separated target columns:
+
+```python
+mapping = build_table_mapping(
+    source_type="ORACLE",
+    source_table="TEST_TB",
+    target_table="TEST_TB",
+    columns="TS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,1 as t1",
+    target_columns="TS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,t1",
+    write_mode="insert",
+)
+```
+
+```json
+{
+  "source": {
+    "sourceType": "RDBMS",
+    "table": "TEST_TB",
+    "column": "TS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,1 as t1"
+  },
+  "target": {
+    "sourceType": "KAIWUDB",
+    "table": "TEST_TB",
+    "column": "TS,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11,C12,t1",
+    "writeMode": "insert"
+  }
+}
+```
+
+New-column type mapping for Oracle (must have exact mappings):
+`NUMBER(5,0)→INT2`, `NUMBER(10,0)→INT4`, `NUMBER(19,0)→INT8`;
+unmapped values (e.g. `NUMBER(1,0)`) fall back to `NUMBER` → FLOAT (float type).
+
+### 10.5 Added-Column Type Derivation (ALL source types)
+
+Type derived from the DEFAULT VALUE via `build_added_column()` (RDBMS, TDengine,
+InfluxDB, KaiwuDB):
+
+| Default value    | KaiwuDB type                 | Primary tag?               | SQL expression in source columns |
+|------------------|------------------------------|----------------------------|----------------------------------|
+| int (e.g. 1)     | `INT4` (`INT8` for InfluxDB) | Yes                        | `1 as t1`                        |
+| str (e.g. 'x')   | `VARCHAR`                    | Yes                        | `'x' as t1`                      |
+| bool             | `BOOL`                       | Yes                        | `true as t1`                     |
+| float (e.g. 1.5) | `FLOAT4/FLOAT8`              | **No — ordinary tag only** | `1.5 as t1`                      |
+
+sourceColumnType per source (exact KDTS mappings):
+
+| Source type                                 | int sourceColumnType | maps to |
+|---------------------------------------------|----------------------|---------|
+| MYSQL / SQLSERVER / TDENGINE2X / TDENGINE3X | `INT`                | INT4    |
+| ORACLE                                      | `NUMBER(10,0)`       | INT4    |
+| POSTGRESQL                                  | `INTEGER`            | INT4    |
+| CLICKHOUSE                                  | `INT32`              | INT4    |
+| INFLUXDB1X / INFLUXDB2X                     | `INTEGER`            | INT8    |
+| KAIWUDB                                     | `INT4`               | INT4    |
+
+```python
+from scripts import build_added_column, build_table_mapping
+
+table["columns"].append(build_added_column("t1", 1, source_type="MYSQL", is_tag=True, is_primary_tag=True))
+
+mapping = build_table_mapping(
+    source_type="MYSQL", source_table="test_tb", target_table="test_tb",
+    columns="ts,c1,...,12,1 as t1",
+    target_columns="ts,c1,...,12,t1",
+)
 ```

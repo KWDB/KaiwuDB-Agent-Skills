@@ -25,11 +25,19 @@ Full implementation of all 10 KDTS REST API endpoints.
 - `KDTSClient`: Main API client with methods for all endpoints
 - `build_source_config()`: Helper to create source configurations
 - `build_table_mapping()`: Helper to create table mappings (uses the correct source
-  identifier field per type: `table`/`measurement`/`collectionName`; FTP/HDFS rejected)
+  identifier field per type: `table`/`measurement`/`collectionName`; FTP/HDFS rejected).
+  Supports `where` (source filter), `pre_sql`/`post_sql` (target SQL) and
+  `target_columns` — REQUIRED when source `columns` contain SQL expressions
+  (e.g. source `"...,1 as t1"` → target `"...,t1"`), otherwise DataX cannot find the target column
 - `build_influxdb_mapping()`: Helper for InfluxDB measurement mappings — source column
   names use `sourceColumnName` (`_time` for the time column, NOT `ts`), and the data
   time range (begin/end datetime) is REQUIRED (no defaults; too-wide range causes
   reader memory overflow)
+- `build_added_column()`: Helper to build a NEW column definition for sources lacking
+  it (ALL source types: RDBMS/TDengine/InfluxDB/KaiwuDB) — type derived from the
+  default value (int→INT4 or INT8 for InfluxDB, str→VARCHAR, bool→BOOL eligible for
+  PRIMARY TAG; float→FLOAT4/FLOAT8 ordinary TAG ONLY, never a primary tag);
+  sourceColumnType picked per source for an exact KDTS mapping
 - `mark_time_series_columns()`: Helper to mark column roles (isTs/isTag/isPrimaryTag,
   auto-sets primary tags to NOT NULL) on a source Database for time-series DDL generation
 
