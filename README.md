@@ -31,6 +31,34 @@ cp -R skills/<skill-name> ~/.codex/skills/
 
 Only install skills that appear in public discovery or release manifests. Planned skill directories may exist in the repository before they are ready.
 
+## Prerequisite: `kwdb-mcp-server` for `kwdb-intelligent-inspection`
+
+The `kwdb-intelligent-inspection` skill uses MCP tools (`query-metrics`, `query-slow-sql`) exposed by `kwdb-mcp-server` v3.2.0+. The MCP server is a **separate Go binary** (≈ 10.7 MB) that the LLM does **not** deploy automatically — it must be running and reachable on `localhost` (or another host) before the skill can take the MCP path.
+
+Full deployment reference (operators only — not loaded by the LLM-driven skill): [`docs/kwdb-mcp-server-deployment.md`](docs/kwdb-mcp-server-deployment.md).
+
+TL;DR — start command:
+
+```bash
+/usr/local/bin/kwdb-mcp-server \
+  -port 8003 -transport http \
+  --admin-base-url=https://<admin_host>:<admin_port> \
+  "postgresql://<user>:<url_encoded_password>@<db_host>:26257/<database>?sslmode=disable"
+```
+
+Then register it in `~/.claude.json`:
+
+```json
+{
+  "kwdb-mcp-server": {
+    "type": "http",
+    "url": "http://localhost:8003/mcp"
+  }
+}
+```
+
+**Why the LLM does not deploy.** The MCP server holds the database credentials and signs HTTP Basic Auth against the admin endpoint on the LLM's behalf. If the LLM were allowed to launch it, the credentials would leak into the conversation context and defeat the security boundary the MCP server exists to provide. Operators deploy out-of-band; the LLM only consumes the tools.
+
 ## Ready Skills
 
 - `kwdb-install-deploy`: Install and deploy KWDB with standard single-node and cluster workflows.

@@ -9,6 +9,8 @@ Before calling this script you MUST have already called
 `detect_tls_mode.py` to confirm TLS is not enforced. See
 `inspection-requirements-confirmation.md` for the full workflow.
 
+This script is an **insecure-only fallback**. It hard-codes plain HTTP and does not authenticate. For TLS deployments, deploy `kwdb-mcp-server` v3.2.0+ and use the MCP tools (`query-metrics` / `query-slow-sql`) instead — the SKILL.md workflow takes that path when MCP tools are available.
+
 ### Full Collection (all metrics)
 
 ```
@@ -20,15 +22,16 @@ python3 scripts/get_kwdb_ts_metrics.py --host <host>
 ```
 python3 scripts/get_kwdb_ts_metrics.py \
     --host <host> \
-    --metric <metric_name> [--metric <metric_name> ...]
+    --metric <metric_name> \
+    --metric <metric_name>
 ```
 
 Example:
 ```
 python3 scripts/get_kwdb_ts_metrics.py \
     --host 10.110.10.146 \
-    --metric cr.node.sys.cpu.user.percent \
-    --metric cr.node.sql.insert.count
+    --metric sys.cpu.user.percent \
+    --metric sql.insert.count
 ```
 
 ### Options
@@ -48,5 +51,5 @@ See `references/metric-types.md` for the complete list of available metrics.
 
 ### Success signal
 
-The call is successful only when the script exits with code 0 and
+The call is successful only when `python3 scripts/get_kwdb_ts_metrics.py` exits with code 0 and
 stdout is present (not empty).

@@ -38,7 +38,7 @@ Single JSON object on stdout:
 
 | Field | When |
 |-------|------|
-| `determined: true, tls_enabled: true` | Handshake succeeded -> TLS is enforced. Inspection not supported. |
+| `determined: true, tls_enabled: true` | Handshake succeeded -> TLS is enforced. Inspection **requires kwdb-mcp-server MCP tools** (`query-metrics` / `query-slow-sql`); legacy scripts in this skill are insecure-only. |
 | `determined: true, tls_enabled: false` | Server explicitly rejected TLS (`wrong version number` / `0A00010B`) -> plaintext. |
 | `determined: false` | Other failures (refused, timed out, network error, unknown SSL error). **Do not assume plaintext.** |
 
@@ -54,4 +54,4 @@ Single JSON object on stdout:
 - **Treating `determined: false` as plaintext**: the script refuses to guess. Stop the workflow and ask the user / check reachability with `probe_ports.py` first.
 - **Replacing this with `curl -k`**: the `kwdb-intelligent-inspection` skill explicitly forbids `curl` / `wget` invocations; use this script instead.
 - **Calling on `localhost` / `127.0.0.1` / `::1`**: rejected at the CLI layer.
-- **Passing `--port` as a JSON number without the leading `--port` flag**: the script's `argparse` treats bare numeric args as positionals and will error with "the following arguments are required: --host, --port". Every port value must be wrapped in the matching `--port` flag, not appear as a bare positional.
+- **Passing `--port` as a JSON number without the leading `--port` flag**: the script's argparse treats bare numeric args as positionals (and will error with "the following arguments are required: --host, --port"). Always wrap every port value in the matching `--port` flag, never as a bare positional.
