@@ -9,6 +9,7 @@ This document provides the complete and authoritative DDL syntax for creating Ka
 ### 1.1 Time Series Database
 
 **Syntax**:
+
 ```sql
 CREATE TS DATABASE <database_name> [RETENTIONS <keep_duration>] [PARTITION INTERVAL <interval>];
 ```
@@ -36,6 +37,7 @@ CREATE TS DATABASE <database_name> [RETENTIONS <keep_duration>] [PARTITION INTER
 **Maximum value**: 1000 years, value must be integer.
 
 **Examples**:
+
 ```sql
 CREATE TS DATABASE sensor_data;
 
@@ -47,11 +49,13 @@ CREATE TS DATABASE metrics RETENTIONS 30D PARTITION INTERVAL 1D;
 ### 1.2 Relational Database
 
 **Syntax**:
+
 ```sql
 CREATE DATABASE <database_name>;
 ```
 
 **Example**:
+
 ```sql
 CREATE DATABASE orders_db;
 ```
@@ -83,11 +87,13 @@ PRIMARY [TAGS | ATTRIBUTES] (<primary_tag_1>, <primary_tag_2>, ...)
 ### 2.2 Parameter Descriptions
 
 #### Table Name
+
 - Max 128 bytes
 - Must be unique within the database
 - Follows identifier naming conventions
 
 #### Column List (Data Columns)
+
 - **Minimum**: 2 columns
 - **Maximum**: 4096 columns
 - **First column requirement**: MUST be `TIMESTAMP` or `TIMESTAMPTZ` with `NOT NULL`
@@ -98,12 +104,14 @@ PRIMARY [TAGS | ATTRIBUTES] (<primary_tag_1>, <primary_tag_2>, ...)
 - Time precision support: Milliseconds (default), Microseconds, Nanoseconds
 
 #### Tag List (TAGS or ATTRIBUTES)
+
 - **Minimum**: 1 tag (at least 1 PRIMARY TAG required)
 - **Maximum**: 128 tags per table (source) + 4 primary tags = 132 total from source
 - Tag name: Max 128 bytes (UTF-8, 128 bytes max)
 - Can specify `NOT NULL`, defaults to nullable
 
 **Forbidden Ordinary Tag Types** (from KDTS source):
+
 - TIMESTAMP, TIMESTAMPTZ
 - NVARCHAR
 - GEOMETRY
@@ -111,6 +119,7 @@ PRIMARY [TAGS | ATTRIBUTES] (<primary_tag_1>, <primary_tag_2>, ...)
 **Auto-conversion**: If source tag type is forbidden, KDTS automatically converts it to VARCHAR.
 
 #### Primary Tag List (PRIMARY TAGS or PRIMARY ATTRIBUTES)
+
 - **Minimum**: 1 PRIMARY TAG (required, error 3006 if missing)
 - **Maximum**: 4 PRIMARY TAGS per table (error 3004 if exceeded)
 - PRIMARY TAGS MUST be defined in the tag list
@@ -118,11 +127,13 @@ PRIMARY [TAGS | ATTRIBUTES] (<primary_tag_1>, <primary_tag_2>, ...)
 - PRIMARY TAGS CANNOT be modified after table creation
 
 **Forbidden Primary Tag Types** (from KDTS source - TypeMapping.FLOAT_TYPE_NAMES + NON_VARCHAR_VARIABLE_LENGTH_TYPES):
+
 - Floating point types: FLOAT, FLOAT4, FLOAT8, DOUBLE, REAL, BINARY_FLOAT, BINARY_DOUBLE
 - **Note**: DECIMAL and NUMERIC are ALSO classified as float types by KDTS and forbidden as primary tags
 - Non-VARCHAR variable-length types: NVARCHAR, NCHAR, TEXT, CLOB, BLOB, BYTES, VARBYTES, JSON, ARRAY, MAP, INET, INTERVAL, UUID
 
 **Auto-conversion for Primary Tags**:
+
 - If primary tag source type is forbidden (e.g., NVARCHAR, NCHAR, TEXT), KDTS automatically converts to VARCHAR(128)
 - If primary tag VARCHAR length > 128, KDTS truncates to VARCHAR(128)
 - If primary tag VARCHAR has no explicit length, KDTS defaults to VARCHAR(64)
@@ -359,6 +370,7 @@ ALTER TABLE <table_name> ADD TAG <tag_name> <data_type> [NOT NULL];
 ```
 
 **Example**:
+
 ```sql
 ALTER TABLE sensor_readings ADD TAG firmware_version VARCHAR(20);
 ```
@@ -370,6 +382,7 @@ ALTER TABLE <table_name> ALTER TAG <tag_name> TYPE <new_data_type>;
 ```
 
 **Example**:
+
 ```sql
 ALTER TABLE sensor_readings ALTER TAG firmware_version TYPE VARCHAR(50);
 ```
@@ -381,6 +394,7 @@ ALTER TABLE <table_name> RENAME TAG <old_tag_name> TO <new_tag_name>;
 ```
 
 **Example**:
+
 ```sql
 ALTER TABLE sensor_readings RENAME TAG location TO deployment_location;
 ```
@@ -392,6 +406,7 @@ ALTER TABLE <table_name> DROP TAG <tag_name>;
 ```
 
 **Example**:
+
 ```sql
 ALTER TABLE sensor_readings DROP TAG firmware_version;
 ```
@@ -415,6 +430,7 @@ CREATE INDEX <index_name> ON <table_name> (<tag_name>);
 ```
 
 **Example**:
+
 ```sql
 CREATE INDEX idx_sensor_location ON sensor_readings (location);
 ```
@@ -429,6 +445,7 @@ CREATE INDEX idx_composite ON <table_name> (<tag_1>, <tag_2>, ...);
 ```
 
 **Example**:
+
 ```sql
 CREATE INDEX idx_tenant_service ON order_metrics (tenant_id, service_id);
 ```
@@ -662,6 +679,7 @@ When generating DDL to convert relational tables to time series:
 5. **Apply type constraints**: KDTS will auto-convert/demote invalid tag types
 
 **Example Conversion** (MySQL to KaiwuDB Time Series):
+
 ```sql
 CREATE TABLE sensor_data (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -702,6 +720,7 @@ When migrating between time series databases, KDTS auto-generates DDL:
 7. **Validate**: If no eligible primary tag -> ERROR 3006
 
 **Example Conversion** (InfluxDB to KaiwuDB):
+
 ```
 -- InfluxDB Source
 Measurement: cpu_usage

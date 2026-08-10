@@ -1006,6 +1006,105 @@ User: yes
 
 ---
 
+## Scenario 12: MongoDB to KaiwuDB (TIMESERIES) - SKILL-Generated DDL + query Filter
+
+### User Request
+
+```
+Migrate the MongoDB mongo_kwdb database to a KaiwuDB time-series database
+(target database: mongo_kwdb). collectionName: test_tb; 14 columns
+(ts date, c1-c2 int, c3 long, c4-c5 double, c6 bool, c7-c10 string, c11 bytes,
+c12 date, t1 int); query filter: {"t1":{"$gte":1,"$lt":8}}.
+Address: 127.0.0.1:27017, root/123456
+```
+
+### Expected AI Agent Response
+
+````
+[INFO] Migration intent recognized: MongoDB -> KaiwuDB (TIMESERIES), database mongo_kwdb
+[INFO] MongoDB note: KDTS does NOT support MongoDB type mapping; table creation is
+      limited to two options (① pre-create the table, ② SKILL generates DDL from the user-provided table info)
+
+[OK] Connection tests passed (MongoDB + KaiwuDB)
+
+[INFO] Generating DDL from user-provided table info + type mapping
+      (int→INT4, long→INT8, double→FLOAT8, string→VARCHAR, bytes→VARBYTES, date→TIMESTAMP, bool→BOOL)
+
+[WARNING] DDL preview:
+CREATE TS DATABASE "mongo_kwdb";
+CREATE TABLE "mongo_kwdb"."test_tb" (
+    "ts" TIMESTAMPTZ NOT NULL, "c1" INT4, "c2" INT4, "c3" INT8,
+    "c4" FLOAT8, "c5" FLOAT8, "c6" BOOL,
+    "c7" VARCHAR, "c8" VARCHAR, "c9" VARCHAR, "c10" VARCHAR,
+    "c11" VARBYTES, "c12" TIMESTAMP
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+Execute this DDL? (yes/no)
+
+User: yes
+
+[OK] DDL executed successfully
+
+[INFO] Building migration script: collectionName=test_tb + column JSON +
+      query={"t1":{"$gte":1,"$lt":8}}
+[OK] Migration launched: MONGODB2KAIWUDB_xxx.json
+
+[REPORT] Migration completed: SUCCEEDED
+[TIP] Due to the query filter, the target only contains documents with t1=1~7;
+      verify by comparing counts
+````
+
+---
+
+## Scenario 13: SQL Server to KaiwuDB (TIMESERIES) - schemaName Fix + t1 Primary Tag
+
+### User Request
+
+```
+Migrate the SQL Server sqlserver_kwdb database to a KaiwuDB time-series database
+(target database: sqlserver_kwdb). Connection: sa/Password@2024 @ 127.0.0.1:1433
+(URL with encrypt=true;trustServerCertificate=true). Add 1 as t1 as the primary tag.
+```
+
+### Expected AI Agent Response
+
+````
+[INFO] Migration intent recognized: SQL Server -> KaiwuDB (TIMESERIES), database sqlserver_kwdb
+[INFO] SQL Server note: URL needs encrypt=true;trustServerCertificate=true; two-step migration
+
+[OK] Connection tests passed (SQL Server + KaiwuDB)
+
+[INFO] Metadata read: table test_tb, 13 columns
+[INFO] schemaName fix: metadata schemaName=sqlserver_kwdb (database name) → public
+      (avoids duplicated "db"."db"."table" in the DDL)
+
+[INFO] Adding new t1 primary tag column (1 as t1 expression):
+  build_added_column('t1', 1, source_type='SQLSERVER', is_tag=True, is_primary_tag=True)
+  → INT4, auto NOT NULL
+
+[WARNING] DDL preview:
+CREATE TS DATABASE "sqlserver_kwdb";
+CREATE TABLE "sqlserver_kwdb"."public"."test_tb" (
+    "ts" TIMESTAMPTZ NOT NULL, "c1" INT2, "c2" INT4, "c3" INT8,
+    "c4" FLOAT4, "c5" FLOAT4, "c6" BOOL,
+    "c7" CHAR(1), "c8" NCHAR(20), "c9" VARCHAR(10), "c10" NVARCHAR(20),
+    "c11" VARBYTES, "c12" TIMESTAMPTZ
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+Execute this DDL? (yes/no)
+
+User: yes
+
+[OK] DDL executed successfully
+
+[INFO] Building migration script: source columns ts,c1,...,c12,1 as t1; target
+      columns ts,c1,...,c12,t1 (target_columns)
+[OK] Migration launched: SQLSERVER2KAIWUDB_xxx.json
+
+[REPORT] Migration completed: SUCCEEDED
+[TIP] Compare source/target row counts and spot-check the t1 default value
+````
+
+---
+
 ## Summary
 
 These interaction scenarios validate that the AI Agent:

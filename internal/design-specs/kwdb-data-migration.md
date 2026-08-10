@@ -130,7 +130,8 @@ class KDTSClient:
 | FTP        | 21           | No             | No       | File source                                               |
 | HDFS       | 8020         | No             | No       | File source                                               |
 
-**Note**: Engine field is required for all source configurations per KDTS API. For KAIWUDB as source, engine must be explicitly specified (RELATIONAL or TIMESERIES). Target (KaiwuDB) must specify engine: RELATIONAL or TIMESERIES.
+**Note**: Engine field is required for all source configurations per KDTS API. For KAIWUDB as source, engine must be 
+explicitly specified (RELATIONAL or TIMESERIES). Target (KaiwuDB) must specify engine: RELATIONAL or TIMESERIES.
 
 **Key Classes**:
 
@@ -407,7 +408,8 @@ contains it: RELATIONAL for RDBMS, TIMESERIES for others):
 
 **DataX Configuration** (for data migration, passed to `build_migration` as `data_config`):
 
-**IMPORTANT**: DataX configuration with `core` and `setting` fields is REQUIRED for successful data migration. These fields control the speed, resource usage, and error handling of the migration process.
+**IMPORTANT**: DataX configuration with `core` and `setting` fields is REQUIRED for successful data migration. 
+These fields control the speed, resource usage, and error handling of the migration process.
 
 **Default Configuration**:
 
@@ -639,7 +641,8 @@ Can resume after interruption:
 
 ## KaiwuDB DDL Requirements
 
-**IMPORTANT**: This section summarizes critical DDL rules for migration. For complete syntax, examples, and KDTS auto-mapping implementation details, refer to `references/ddl-syntax.md`.
+**IMPORTANT**: This section summarizes critical DDL rules for migration. For complete syntax, examples, 
+and KDTS auto-mapping implementation details, refer to `references/ddl-syntax.md`.
 
 ### Time Series Table DDL Syntax
 

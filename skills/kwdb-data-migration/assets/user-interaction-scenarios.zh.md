@@ -1005,6 +1005,102 @@ CREATE TABLE "oracle_kwdb"."TEST_TB" (
 
 ---
 
+## 场景 12: MongoDB 到 KaiwuDB (TIMESERIES) - SKILL 生成 DDL + query 过滤
+
+### 用户请求
+
+```
+将 MongoDB 的 mongo_kwdb 库迁移到 KaiwuDB 时序库（库名 mongo_kwdb）。
+collectionName: test_tb; column 14 列(ts date, c1-c2 int, c3 long, c4-c5 double,
+c6 bool, c7-c10 string, c11 bytes, c12 date, t1 int);
+query 过滤: {"t1":{"$gte":1,"$lt":8}}
+地址: 127.0.0.1:27017, root/123456
+```
+
+### 预期的 AI Agent 回复
+
+````
+[信息] 识别迁移意图: MongoDB -> KaiwuDB (TIMESERIES), 库名 mongo_kwdb
+[信息] MongoDB 说明: KDTS 不支持 MongoDB 类型映射,建表仅两种方式
+      (① 提前建表 ② SKILL 根据用户提供的表信息生成 DDL)
+
+[OK] 连接测试通过 (MongoDB + KaiwuDB)
+
+[信息] 按用户提供的表信息 + 类型映射生成 DDL
+      (int→INT4, long→INT8, double→FLOAT8, string→VARCHAR, bytes→VARBYTES, date→TIMESTAMP, bool→BOOL)
+
+[警告] DDL 预览:
+CREATE TS DATABASE "mongo_kwdb";
+CREATE TABLE "mongo_kwdb"."test_tb" (
+    "ts" TIMESTAMPTZ NOT NULL, "c1" INT4, "c2" INT4, "c3" INT8,
+    "c4" FLOAT8, "c5" FLOAT8, "c6" BOOL,
+    "c7" VARCHAR, "c8" VARCHAR, "c9" VARCHAR, "c10" VARCHAR,
+    "c11" VARBYTES, "c12" TIMESTAMP
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+是否执行该 DDL? (yes/no)
+
+用户: yes
+
+[OK] DDL 执行成功
+
+[信息] 构建迁移脚本: collectionName=test_tb + column JSON + query={"t1":{"$gte":1,"$lt":8}}
+[OK] 迁移启动: MONGODB2KAIWUDB_xxx.json
+
+[报告] 迁移完成: SUCCEEDED
+[提示] 因 query 过滤,目标仅包含 t1=1~7 的文档;请比对验证
+````
+
+---
+
+## 场景 13: SQL Server 到 KaiwuDB (TIMESERIES) - schemaName 修正 + t1 主标签
+
+### 用户请求
+
+```
+将 SQL Server 的 sqlserver_kwdb 库迁移到 KaiwuDB 时序库（库名 sqlserver_kwdb）。
+连接: sa/Password@2024 @ 127.0.0.1:1433 (URL 带 encrypt=true;trustServerCertificate=true)
+增加 1 as t1 为主标签
+```
+
+### 预期的 AI Agent 回复
+
+````
+[信息] 识别迁移意图: SQL Server -> KaiwuDB (TIMESERIES), 库名 sqlserver_kwdb
+[信息] SQL Server 说明: URL 需带 encrypt=true;trustServerCertificate=true;两步迁移
+
+[OK] 连接测试通过 (SQL Server + KaiwuDB)
+
+[信息] 元数据读取成功: 表 test_tb, 13 列
+[信息] schemaName 修正: 元数据 schemaName=sqlserver_kwdb(库名) → public
+      (避免 DDL 出现 "db"."db"."table" 重复)
+
+[信息] 新增 t1 主标签列 (1 as t1 表达式):
+  build_added_column('t1', 1, source_type='SQLSERVER', is_tag=True, is_primary_tag=True)
+  → INT4, 自动 NOT NULL
+
+[警告] DDL 预览:
+CREATE TS DATABASE "sqlserver_kwdb";
+CREATE TABLE "sqlserver_kwdb"."public"."test_tb" (
+    "ts" TIMESTAMPTZ NOT NULL, "c1" INT2, "c2" INT4, "c3" INT8,
+    "c4" FLOAT4, "c5" FLOAT4, "c6" BOOL,
+    "c7" CHAR(1), "c8" NCHAR(20), "c9" VARCHAR(10), "c10" NVARCHAR(20),
+    "c11" VARBYTES, "c12" TIMESTAMPTZ
+) TAGS ("t1" INT4 NOT NULL) PRIMARY TAGS ("t1");
+是否执行该 DDL? (yes/no)
+
+用户: yes
+
+[OK] DDL 执行成功
+
+[信息] 构建迁移脚本: 源列 ts,c1,...,c12,1 as t1; 目标列 ts,c1,...,c12,t1 (target_columns)
+[OK] 迁移启动: SQLSERVER2KAIWUDB_xxx.json
+
+[报告] 迁移完成: SUCCEEDED
+[提示] 请对比源/目标行数并抽查 t1 默认值
+````
+
+---
+
 ## 标签说明
 
 | 标签     | 含义             |

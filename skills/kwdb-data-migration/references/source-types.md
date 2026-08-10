@@ -46,6 +46,24 @@ Complete reference of all source types supported by KDTS, their capabilities, an
 - Full migration (auto-discovery) is supported for: MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, KAIWUDB, TDENGINE3X
 - CLICKHOUSE and KAIWUDB support Full Migration (auto-discovery) but NOT Metadata reading (DDL generation)
 
+**Source-specific requirements:**
+
+| Source           | Requirements                                                                                                                                                              |
+|------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| MYSQL            | `where` filters, SQL expression columns (e.g. `1 as t1`), `target_columns` separation                                                                                     |
+| ORACLE           | dbName MUST be the owner name (UPPERCASE, e.g. `ORACLE_KWDB`); names are UPPERCASE; new columns need exact NUMBER mappings (`NUMBER(10,0)`→INT4, NOT `NUMBER(1,0)`→FLOAT) |
+| POSTGRESQL       | auto-discovery filters by `schema == dbName` — tables in `public` schema need explicit mappings                                                                           |
+| SQLSERVER        | JDBC URL needs `encrypt=true;trustServerCertificate=true`; metadata schemaName may be the DB name → fix to `public`; two-step migration                                   |
+| CLICKHOUSE       | no metadata — build the Database object manually from USER-provided table structure (`build_manual_metadata`)                                                             |
+| KAIWUDB (source) | time range (beginDateTime/endDateTime) + `tsColumn` REQUIRED                                                                                                              |
+| TDENGINE3X       | full migration; explicit table mappings for TIMESERIES targets                                                                                                            |
+| TDENGINE2X       | data-only; manual metadata for DDL (user-provided structure)                                                                                                              |
+| INFLUXDB1X/2X    | mapping uses `measurement`; time column `_time`; data time range REQUIRED (no defaults; too-wide range → memory overflow)                                                 |
+| OPENTSDB         | `column` = FULL METRIC names (`table.metric`); time range REQUIRED; usually no auth                                                                                       |
+| MONGODB          | `collectionName`; column JSON array (name/type); `query` filter optional; table creation LIMITED (pre-create or SKILL-generated DDL — KDTS has no MongoDB type mapping)   |
+| FTP              | `path` MUST start with `/` (FtpReader validates); path is SFTP SERVER-side; `skipHeader: true` for CSV headers                                                            |
+| HDFS             | `path` is HDFS SERVER-side absolute (JSON array); `fileType` REQUIRED (text/orc/parquet/rcfile); Kerberos for secured clusters                                            |
+
 ---
 
 ## Source-Target Engine Compatibility (STRICT)

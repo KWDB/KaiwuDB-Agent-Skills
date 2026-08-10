@@ -503,6 +503,108 @@ Comprehensive functional test suite for the KWDB heterogeneous database migratio
 
 ---
 
+### T11: build_table_mapping (Helper)
+
+#### T11.1 Source Identifier per Type
+
+**Description**: Verify the correct source identifier field per source type
+**Steps**:
+
+1. `build_table_mapping("MYSQL", "users")` → source has `table`
+2. `build_table_mapping("INFLUXDB2X", "test_tb")` → source has `measurement`
+3. `build_table_mapping("MONGODB", "my_collection")` → source has `collectionName`
+4. `build_table_mapping("FTP", "x")` → raises ValueError
+   **Expected**: Correct identifier per type; FTP/HDFS rejected
+
+#### T11.2 Extended Options
+
+**Description**: Verify where / preSql / postSql / target_columns
+**Steps**:
+
+1. `build_table_mapping("MYSQL", "test_tb", columns="ts,c1,1 as t1",
+   target_columns="ts,c1,t1", where="ts >= '2025-01-01 00:00:00'",
+   pre_sql=["drop table if exists test_tb"], post_sql=["vacuum"])`
+2. Verify source(where) / target(column / preSql / postSql)
+   **Expected**: All extended options applied; target_columns separates expression columns
+
+### T12: build_influxdb_mapping (Helper)
+
+#### T12.1 Time Range REQUIRED
+
+**Description**: Verify time range is mandatory
+**Steps**:
+
+1. Call `build_influxdb_mapping(source_db, "test_tb")` without time range
+2. Verify ValueError raised
+3. Call with begin_datetime/end_datetime → verify measurement, `_time` source column,
+   splitIntervalS=86400 default
+   **Expected**: Missing range raises; valid mapping has measurement + `_time` + range
+
+### T13: build_added_column (Helper)
+
+#### T13.1 Type Derivation from Default Value
+
+**Description**: Verify type from default value
+**Steps**:
+
+1. int default 1 → `INT4`, primary tag eligible, nullAble=False
+2. InfluxDB int default → `INT8`
+3. str default → `VARCHAR`
+4. float default 1.5 → `FLOAT4`, FORCED ordinary tag (isPrimaryTag=False)
+5. Verify sourceColumnType per source (Oracle NUMBER(10,0), PostgreSQL INTEGER)
+   **Expected**: Correct type derivation; float never a primary tag
+
+### T14: build_manual_metadata (Helper)
+
+#### T14.1 Database Object Construction
+
+**Description**: Verify Database object from user-provided structure
+**Steps**:
+
+1. `build_manual_metadata("CLICKHOUSE", "clickhouse_kwdb", "test_tb", user_columns)`
+2. Verify tableMap / columns count / column names
+   **Expected**: Valid Database object; no tag marks applied yet
+
+### T15: mark_time_series_columns (Helper)
+
+#### T15.1 Column Marks
+
+**Description**: Verify ts/tag/primaryTag marks
+**Steps**:
+
+1. Call with time_column, primary_tags, tags
+2. Verify time column isTs=True
+3. Verify primary tag isTag+isPrimaryTag=True and nullAble auto False
+4. Verify ordinary tag isTag=True, isPrimaryTag=False
+   **Expected**: Marks applied; primary tags auto NOT NULL
+
+### T16: test_connection Normalization
+
+#### T16.1 code=0 + Non-SUCCEED Normalized
+
+**Description**: Verify KDTS code=0 failure normalization
+**Steps**:
+
+1. Mock response {"code": 0, "data": "Connection failed: Cannot locate driver"}
+2. Call test_connection → verify code normalized to 2001, message preserved
+3. Mock {"code": 0, "data": "SUCCEED"} → verify code stays 0
+   **Expected**: code=0 + non-SUCCEED → 2001; success unchanged
+
+### T17: execute_migration_batches (Workflow)
+
+#### T17.1 Batched Execution
+
+**Description**: Verify batch execution with per-batch monitoring
+**Steps**:
+
+1. Mock client (execute_migration / query_status)
+2. 25 scripts, batch_size=10 → execute_migration_batches
+3. Verify 3 execute calls with [10, 10, 5] sizes
+4. Verify all_succeeded=True and per-batch final statuses
+   **Expected**: Batches submitted sequentially; each monitored to final state
+
+---
+
 ## Test Execution Checklist
 
 ### Before Each Test

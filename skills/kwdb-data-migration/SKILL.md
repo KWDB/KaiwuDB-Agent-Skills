@@ -480,7 +480,8 @@ All endpoints under `{base_url}/kdts/api/v1`:
 - MYSQL, ORACLE, POSTGRESQL, CLICKHOUSE, KAIWUDB, TDENGINE3X
 
 **Note:** 
-- KAIWUDB and CLICKHOUSE support auto-discovery (Full Migration) but do NOT support metadata reading (DDL generation). You may need to pre-create target tables or use alternative DDL generation methods.
+- KAIWUDB and CLICKHOUSE support auto-discovery (Full Migration) but do NOT support metadata reading (DDL generation). 
+  You may need to pre-create target tables or use alternative DDL generation methods.
 - SQLSERVER, INFLUXDB1X/2X support metadata + data but NOT auto-discovery (use Workflow 2).
 - TDENGINE2X, OPENTSDB, MONGODB, FTP, HDFS only support data migration (use Workflow 3).
 
@@ -808,6 +809,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    If user wants to customize, explain the configuration based on KDTS source annotations:
    
    **UserData Top-Level Configuration**:
+   
    | Field | Type | Default | Description |
    |---|---|---|---|
    | enable | boolean | false | Whether to enable user data migration |
@@ -818,6 +820,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    
    **core.transport.channel.speed Configuration** (Map<String, Object> - Per-Channel Level):
    `byte` and `record` can be configured simultaneously; they are different dimensions of rate limiting and **NOT mutually exclusive**!
+   
    | Key | Type | Description |
    |---|---|---|
    | byte | Long | Per-channel byte rate limit (bytes/second), e.g., 1048576 means 1MB/s/channel |
@@ -825,6 +828,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    
    **setting.speed Configuration** (Map<String, Object> - Global Level):
    The following parameters can be combined to implement flexible rate limiting strategies:
+   
    | Key | Type | Description |
    |---|---|---|
    | channel | Integer | Fixed channel count. If configured, channel count is fixed and does not participate in auto-calculation |
@@ -832,6 +836,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    | record | Long | Global record rate limit, must be used with core.transport.channel.speed.record |
    
    **Configuration Combination Examples**:
+   
    | Configuration Method | setting.speed Configuration | core.transport.channel.speed Configuration | Description |
    |---|---|---|---|
    | Fixed Channel Count + Global Rate Limit | channel=4, byte=52428800, record=40000 | byte=1048576, record=1000 | Fixed 4 channels, global rate limit distributed to each channel |
@@ -848,6 +853,7 @@ All endpoints under `{base_url}/kdts/api/v1`:
    - channel and byte/record together: Channel count fixed, byte/record serve as global rate limits
    
    **setting.errorLimit Configuration** (Map<String, Object>):
+   
    | Key | Type | Description |
    |---|---|---|
    | record | Integer | Maximum allowed number of error records |

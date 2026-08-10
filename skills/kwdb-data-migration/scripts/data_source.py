@@ -129,16 +129,15 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "jdbc_prefix": "jdbc:clickhouse://",
     },
     # KaiwuDB (source or target)
-    # Note: KAIWUDB supports Full Migration (auto-discovery) but NOT metadata reading.
     # When used as target, engine must be explicitly specified (RELATIONAL or TIMESERIES).
     SourceType.KAIWUDB: {
         "engine": None,  # Engine must be explicitly specified for KAIWUDB
         "default_port": 26257,
         "jdbc_driver": "com.kaiwudb.Driver",
         "jdbc_url_template": "jdbc:kaiwudb://{host}:{port}/{db}",
-        "capability": SourceCapability.FULL_MIGRATION,  # KAIWUDB supports auto-discovery
-        "supports_metadata": False,  # KAIWUDB does NOT support metadata reading as source
-        "supports_full": True,  # Supports full migration (auto-discovery)
+        "capability": SourceCapability.FULL_MIGRATION,
+        "supports_metadata": False,
+        "supports_full": True,
         "jdbc_prefix": "jdbc:kaiwudb://",
     },
     # Time-series databases
@@ -167,7 +166,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 8086,
         "jdbc_driver": None,  # HTTP protocol, no JDBC
         "jdbc_url_template": None,
-        "capability": SourceCapability.META_AND_DATA,  # Supports metadata + data, but not full migration
+        "capability": SourceCapability.META_AND_DATA,
         "supports_metadata": True,
         "supports_full": False,
         "jdbc_prefix": None,
@@ -177,7 +176,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
         "default_port": 8086,
         "jdbc_driver": None,
         "jdbc_url_template": None,
-        "capability": SourceCapability.META_AND_DATA,  # Supports metadata + data, but not full migration
+        "capability": SourceCapability.META_AND_DATA,
         "supports_metadata": True,
         "supports_full": False,
         "jdbc_prefix": None,
@@ -194,7 +193,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     # Document databases
     SourceType.MONGODB: {
-        "engine": Engine.TIMESERIES,  # Use TIMESERIES for non-relational sources
+        "engine": Engine.TIMESERIES,
         "default_port": 27017,
         "jdbc_driver": None,
         "jdbc_url_template": None,
@@ -205,7 +204,7 @@ SOURCE_TYPE_REGISTRY: Dict[str, Dict[str, Any]] = {
     },
     # File-based sources
     SourceType.FTP: {
-        "engine": Engine.TIMESERIES,  # Use TIMESERIES for file sources
+        "engine": Engine.TIMESERIES,
         "default_port": 21,
         "jdbc_driver": None,
         "jdbc_url_template": None,

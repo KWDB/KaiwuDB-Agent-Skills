@@ -57,7 +57,8 @@ class DialogueSimulator:
         print(f"{message}")
         print(f"{'='*60}")
     
-    def log_system(self, message):
+    @staticmethod
+    def log_system(message):
         """Log a system action (internal AI Agent processing)."""
         print(f"\n--- [SYSTEM] {message} ---")
     
