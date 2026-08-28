@@ -233,6 +233,34 @@
         "time-series",
         "ready"
       ]
+    },
+    {
+      "name": "kwdb-data-migration",
+      "source": "./skills/kwdb-data-migration",
+      "description": "Automated heterogeneous database migration for KaiwuDB / KWDB via KDTS REST API.",
+      "version": "1.0.0",
+      "author": {
+        "name": "kwdb team"
+      },
+      "repository": "https://github.com/KWDB/KaiwuDB-Agent-Skills/tree/main/skills/kwdb-data-migration",
+      "license": "MIT",
+      "category": "database",
+      "keywords": [
+        "kaiwudb",
+        "kwdb",
+        "data-migration",
+        "kdts",
+        "heterogeneous",
+        "database"
+      ],
+      "tags": [
+        "kaiwudb",
+        "kwdb",
+        "data-migration",
+        "kdts",
+        "heterogeneous",
+        "ready"
+      ]
     }
   ]
 }

@@ -41,6 +41,7 @@ Only install skills that appear in public discovery or release manifests. Planne
 - `kwdb-ts-anomaly-detection`: Detect anomalies and generate reports for KWDB time-series data.
 - `kwdb-build`: Build and test KaiwuDB source with the supported CMake, C++, and Go workflows.
 - `kwdb-schema-design`: Design KWDB schemas and DDL for relational, time-series, and mixed workloads.
+- `kwdb-data-migration`: Automated heterogeneous database migration for KaiwuDB / KWDB via KDTS REST API.
 
 ## Claude Code Plugin
 
@@ -74,7 +75,7 @@ clawhub --dir ~/.codex/skills install <skill-slug>
 
 ## Planned Skills
 
-- `kwdb-data-migration`: Plan and execute KWDB data migration, import/export, upgrade, and sync workflows.
+(None)
 
 ## Validate
 
