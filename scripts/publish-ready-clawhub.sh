@@ -67,3 +67,10 @@ clawhub skill publish skills/kwdb-schema-design \
   --version "$version" \
   --tags latest,kwdb,ready \
   "${owner_args[@]}"
+
+clawhub skill publish skills/kwdb-data-migration \
+  --slug kwdb-data-migration \
+  --name "KWDB Data Migration" \
+  --version "$version" \
+  --tags latest,kwdb,ready \
+  "${owner_args[@]}"
