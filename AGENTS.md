@@ -27,10 +27,11 @@ The repository currently maintains these Ready Skills:
 - `kwdb-ts-anomaly-detection`
 - `kwdb-build`
 - `kwdb-schema-design`
+- `kwdb-data-migration`
 
 The following skill directories are still planned:
 
-- `kwdb-data-migration`
+(None)
 
 ## Stack Baseline
 

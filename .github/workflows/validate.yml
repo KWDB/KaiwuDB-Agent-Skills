@@ -1,0 +1,21 @@
+name: Validate
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate repository consistency
+        run: bash scripts/validate-repo.sh
+      - name: Run skill-creator unit tests
+        run: python -m unittest discover -s .agents/skills/skill-creator/tests
